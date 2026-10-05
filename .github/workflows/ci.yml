@@ -1,0 +1,55 @@
+name: CI
+
+# Runs on every pull request and on pushes to main. Mirrors the checks in SOP section 10:
+# formatter, linter + static analysis (ruff incl. bandit "S" rules), automated tests, dependency scan.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint + tests (Python ${{ matrix.python }}, Windows)
+    runs-on: windows-latest        # the SOP targets Windows 11 / Windows Server 2022
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Format check
+        run: python -m ruff format --check .
+      - name: Lint and static analysis
+        run: python -m ruff check .
+      - name: Tests
+        run: python -m pytest -q
+        env:
+          AISYS_ENV: development
+
+  dependency-audit:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install pip-audit
+      - name: Audit pinned dependencies
+        run: pip-audit -r requirements.lock --no-deps --disable-pip
