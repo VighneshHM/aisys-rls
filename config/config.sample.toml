@@ -1,0 +1,21 @@
+# Sample configuration (no secrets). Copy to config/config.toml and adjust.
+# Secrets are NEVER stored here: set AISYS_SECRET_KEY in the environment.
+# Override the file location with AISYS_CONFIG.
+
+[app]
+name = "AISYS RFID Library"
+environment = "development"      # development | production
+host = "127.0.0.1"
+port = 8000
+
+[database]
+url = "sqlite:///data/aisys.db"
+
+[security]
+session_ttl_minutes = 480
+max_failed_logins = 5
+lockout_minutes = 15
+
+[logging]
+level = "INFO"
+format = "json"                  # json | text

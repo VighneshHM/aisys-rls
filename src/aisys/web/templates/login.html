@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Sign in · {{ app_name }}{% endblock %}
+{% block body %}
+<div class="auth">
+  <section class="auth-brand">
+    <div class="logo"><span class="logo-mark">{{ icon("radio") }}</span> {{ app_name }}</div>
+    <svg class="waves" viewBox="0 0 200 200" fill="none" stroke="#fff" stroke-width="3" aria-hidden="true">
+      <circle cx="100" cy="100" r="14" fill="#fff"/><circle cx="100" cy="100" r="40"/><circle cx="100" cy="100" r="68"/><circle cx="100" cy="100" r="96"/>
+    </svg>
+    <h1>Every item, found and accounted for.</h1>
+    <p class="lead">An RFID layer that plugs into your existing library system: circulation, inventory and gate security,
+      without touching the records you already have.</p>
+    <ul class="feature-list">
+      <li><span class="dot">{{ icon("swap") }}</span><span><b>Self-service circulation</b><br>Check-out, renewal and return through standard NCIP / SIP2 flows.</span></li>
+      <li><span class="dot">{{ icon("scan") }}</span><span><b>Shelf inventory</b><br>Find missing and misplaced items with a handheld reader.</span></li>
+      <li><span class="dot">{{ icon("gate") }}</span><span><b>Gate security</b><br>Unauthorised removals recorded with accession number and camera snapshot.</span></li>
+    </ul>
+    <footer>Prototype build v{{ version }} · all data shown is synthetic</footer>
+  </section>
+
+  <section class="auth-panel">
+    <div class="auth-card">
+      <h2>Staff sign-in</h2>
+      <p class="muted" style="margin:0">Use your staff smart card, or your password if you are an administrator.</p>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-card" aria-selected="true" aria-controls="pane-card" type="button">{{ icon("card") }} Smart card</button>
+        <button class="tab" role="tab" id="tab-pw" aria-selected="false" aria-controls="pane-pw" type="button">{{ icon("key") }} Password</button>
+      </div>
+
+      <form id="pane-card" role="tabpanel" aria-labelledby="tab-card" autocomplete="off">
+        <div class="tap">
+          <span class="pulse">{{ icon("card") }}</span>
+          <div><strong>Tap your staff card on the reader</strong><span>Mock reader: type or paste a card UID.</span></div>
+        </div>
+        <div class="field">
+          <label for="uid">Card UID</label>
+          <input id="uid" class="uid" name="uid" maxlength="32" spellcheck="false" placeholder="Scan or type card UID" autofocus required>
+        </div>
+        <button class="btn block" style="margin-top:18px" type="submit">Sign in with card</button>
+      </form>
+
+      <form id="pane-pw" role="tabpanel" aria-labelledby="tab-pw" class="hidden">
+        <div class="field"><label for="username">Username</label><input id="username" autocomplete="username" required></div>
+        <div class="field"><label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required></div>
+        <button class="btn block" style="margin-top:18px" type="submit">Sign in</button>
+      </form>
+
+      <div id="notice" class="notice" role="alert" aria-live="polite"><span id="notice-icon"></span><span id="notice-text"></span></div>
+
+      {% if demo %}
+      <div class="demo">
+        <h3>Demo cards (synthetic)</h3>
+        <div class="chips">
+          {% for c in demo %}
+          <button type="button" class="chip {{ 'patron' if c.kind == 'patron' else '' }}" data-uid="{{ c.uid }}"><i>{{ c.label }}</i> {{ c.uid }}</button>
+          {% endfor %}
+        </div>
+        <p class="muted" style="font-size:13px;margin:10px 0 0">The patron card is rejected on purpose: patrons can borrow, but never sign in.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<template id="ico-bad">{{ icon("alert") }}</template>
+<template id="ico-ok">{{ icon("check") }}</template>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const notice = $("notice");
+  function show(kind, text) {
+    notice.className = "notice show " + kind;
+    $("notice-icon").replaceChildren($(kind === "bad" ? "ico-bad" : "ico-ok").content.cloneNode(true));
+    $("notice-text").textContent = text;
+  }
+  function pick(which) {
+    const card = which === "card";
+    $("pane-card").classList.toggle("hidden", !card); $("pane-pw").classList.toggle("hidden", card);
+    $("tab-card").setAttribute("aria-selected", card); $("tab-pw").setAttribute("aria-selected", !card);
+    notice.className = "notice"; ($(card ? "uid" : "username")).focus();
+  }
+  $("tab-card").onclick = () => pick("card"); $("tab-pw").onclick = () => pick("pw");
+
+  async function submit(form, url, body) {
+    const btn = form.querySelector("button[type=submit]"), label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Signing in…"; notice.className = "notice";
+    try {
+      const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+      if (r.ok) { show("ok", "Signed in. Loading your workspace…"); location.href = "/dashboard"; return; }
+      const j = await r.json().catch(() => ({}));
+      show("bad", typeof j.detail === "string" ? j.detail : "Please check the details and try again.");
+    } catch (e) { show("bad", "Cannot reach the server."); }
+    btn.disabled = false; btn.textContent = label;
+  }
+  $("pane-card").onsubmit = e => { e.preventDefault(); submit(e.target, "/api/auth/card-login", {uid: $("uid").value.trim()}); };
+  $("pane-pw").onsubmit = e => { e.preventDefault(); submit(e.target, "/api/auth/login", {username: $("username").value.trim(), password: $("password").value}); };
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { pick("card"); $("uid").value = c.dataset.uid; $("pane-card").requestSubmit(); });
+})();
+</script>
+{% endblock %}
