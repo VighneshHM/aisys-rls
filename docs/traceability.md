@@ -14,19 +14,19 @@ _Status is maintained by hand in the CSV; the evidence column is generated._
 | FR07 | Security gate events | planned | - |  |
 | FR08 | Dashboard & reports | planned | - |  |
 | FR09 | Notifications | planned | - |  |
-| FR10 | Data migration | planned | - |  |
-| FR11 | Administration | partial | 7 test(s) | Users, roles, cards, audit, version, health done; config UI planned |
+| FR10 | Data migration | done | 18 test(s) | See docs/migration.md; 20k rows validated in 6.6 s, committed in 5.1 s |
+| FR11 | Administration | partial | 8 test(s) | Users, roles, cards, audit, version, health done; config UI planned |
 | FR12 | Offline lifecycle | planned | 1 test(s) |  |
-| NFR01 | Data integrity | planned | - |  |
-| NFR02 | Security & privacy | partial | 9 test(s) | TLS termination documented at deployment stage |
+| NFR01 | Data integrity | partial | 5 test(s) | Backup before commit, insert-only, fingerprint check done; guided restore planned (AC10) |
+| NFR02 | Security & privacy | partial | 12 test(s) | TLS termination documented at deployment stage |
 | NFR03 | Compatibility | planned | 1 test(s) |  |
 | NFR04 | Licensing | partial | - | Versions pinned in pyproject; SBOM/licence inventory planned |
-| NFR05 | Testability | partial | - | Automated tests tagged to requirement IDs |
+| NFR05 | Testability | partial | 1 test(s) | Automated tests tagged to requirement IDs |
 | NFR06 | Maintainability | partial | 2 test(s) | Done for foundation |
 | NFR07 | Supportability | partial | 3 test(s) | Health + logs done; runbook planned |
 | NFR08 | Documentation | partial | - | OpenAPI auto-generated; guides planned |
 | NFR09 | Delivery | partial | - |  |
-| AC01 | Acceptance | planned | - |  |
+| AC01 | Acceptance | done | 13 test(s) | See docs/migration.md; 20k rows validated in 6.6 s, committed in 5.1 s |
 | AC02 | Acceptance | planned | - |  |
 | AC03 | Acceptance | planned | - |  |
 | AC04 | Acceptance | planned | - |  |
@@ -35,18 +35,23 @@ _Status is maintained by hand in the CSV; the evidence column is generated._
 | AC07 | Acceptance | done | 10 test(s) | Patron cards rejected for login (A-04) |
 | AC08 | Acceptance | planned | - |  |
 | AC09 | Acceptance | planned | - |  |
-| AC10 | Acceptance | planned | - |  |
+| AC10 | Acceptance | planned | 3 test(s) |  |
 
 ## Test detail
 
+- **AC01**: `test_migration.py::test_isbn_check_digits`, `test_migration.py::test_price_parsing`, `test_migration.py::test_row_rules_errors_vs_warnings`, `test_migration.py::test_import_stages_and_validates_without_touching_library`, `test_migration.py::test_invalid_rows_and_duplicates_are_identified_per_row`, `test_migration.py::test_commit_migrates_valid_rows_and_reconciles`, `test_migration.py::test_existing_records_are_never_modified_and_overlap_is_skipped`, `test_migration.py::test_rollback_restores_pre_migration_state`, `test_migration.py::test_failed_commit_is_atomic_and_leaves_library_unchanged`, `test_migration.py::test_full_20000_row_xlsx_import_reconcile_and_rollback`, `test_migration.py::test_reported_row_numbers_match_the_spreadsheet`, `test_migration.py::test_migration_page_is_permission_gated`, `test_migration.py::test_warnings_on_skipped_rows_are_not_reported_as_imported`
 - **AC07**: `test_foundation.py::test_staff_card_logs_in_and_gets_role_permissions`, `test_foundation.py::test_patron_card_cannot_log_in`, `test_foundation.py::test_patron_login_attempt_is_audited`, `test_foundation.py::test_unknown_and_malformed_cards_rejected`, `test_foundation.py::test_disabled_staff_card_rejected`, `test_foundation.py::test_rbac_enforced_and_denial_audited`, `test_foundation.py::test_unauthenticated_requests_get_401`, `test_foundation.py::test_logout_revokes_session`, `test_foundation.py::test_issue_cards_and_users`, `test_foundation.py::test_navigation_only_shows_what_role_may_use`
+- **AC10**: `test_migration.py::test_backup_taken_before_commit_holds_pre_migration_state`, `test_migration.py::test_rollback_restores_pre_migration_state`, `test_migration.py::test_failed_commit_is_atomic_and_leaves_library_unchanged`
 - **FR02**: `test_foundation.py::test_ui_assets_served_locally_no_external_requests`
 - **FR04**: `test_foundation.py::test_rbac_enforced_and_denial_audited`
-- **FR11**: `test_foundation.py::test_staff_card_logs_in_and_gets_role_permissions`, `test_foundation.py::test_issue_cards_and_users`, `test_foundation.py::test_audit_log_is_append_only`, `test_foundation.py::test_system_info_reports_versions`, `test_foundation.py::test_web_pages`, `test_foundation.py::test_navigation_only_shows_what_role_may_use`, `test_foundation.py::test_demo_cards_hidden_in_production`
+- **FR10**: `test_migration.py::test_isbn_check_digits`, `test_migration.py::test_price_parsing`, `test_migration.py::test_row_rules_errors_vs_warnings`, `test_migration.py::test_mapping_suggestion_covers_sample_headers`, `test_migration.py::test_import_stages_and_validates_without_touching_library`, `test_migration.py::test_invalid_rows_and_duplicates_are_identified_per_row`, `test_migration.py::test_commit_migrates_valid_rows_and_reconciles`, `test_migration.py::test_second_batch_adds_copies_to_existing_bib_records`, `test_migration.py::test_rollback_restores_pre_migration_state`, `test_migration.py::test_missing_required_column_needs_mapping_then_recovers`, `test_migration.py::test_rejects_bad_files`, `test_migration.py::test_semicolon_cp1252_and_bom_files`, `test_migration.py::test_error_report_csv_neutralises_formula_injection`, `test_migration.py::test_migration_is_permission_protected_and_audited`, `test_migration.py::test_full_20000_row_xlsx_import_reconcile_and_rollback`, `test_migration.py::test_reported_row_numbers_match_the_spreadsheet`, `test_migration.py::test_migration_page_is_permission_gated`, `test_migration.py::test_warnings_on_skipped_rows_are_not_reported_as_imported`
+- **FR11**: `test_foundation.py::test_staff_card_logs_in_and_gets_role_permissions`, `test_foundation.py::test_issue_cards_and_users`, `test_foundation.py::test_audit_log_is_append_only`, `test_foundation.py::test_system_info_reports_versions`, `test_foundation.py::test_web_pages`, `test_foundation.py::test_navigation_only_shows_what_role_may_use`, `test_foundation.py::test_demo_cards_hidden_in_production`, `test_migration.py::test_migration_page_is_permission_gated`
 - **FR12**: `test_foundation.py::test_migrate_creates_missing_data_directory`
-- **NFR02**: `test_foundation.py::test_patron_login_attempt_is_audited`, `test_foundation.py::test_disabled_staff_card_rejected`, `test_foundation.py::test_password_login_and_lockout`, `test_foundation.py::test_unknown_user_and_bad_password_look_identical`, `test_foundation.py::test_input_validation_rejects_bad_payloads`, `test_foundation.py::test_passwords_and_tokens_not_stored_in_clear`, `test_foundation.py::test_log_masking`, `test_foundation.py::test_audit_log_is_append_only`, `test_foundation.py::test_demo_cards_hidden_in_production`
+- **NFR01**: `test_migration.py::test_commit_migrates_valid_rows_and_reconciles`, `test_migration.py::test_backup_taken_before_commit_holds_pre_migration_state`, `test_migration.py::test_existing_records_are_never_modified_and_overlap_is_skipped`, `test_migration.py::test_second_batch_adds_copies_to_existing_bib_records`, `test_migration.py::test_failed_commit_is_atomic_and_leaves_library_unchanged`
+- **NFR02**: `test_foundation.py::test_patron_login_attempt_is_audited`, `test_foundation.py::test_disabled_staff_card_rejected`, `test_foundation.py::test_password_login_and_lockout`, `test_foundation.py::test_unknown_user_and_bad_password_look_identical`, `test_foundation.py::test_input_validation_rejects_bad_payloads`, `test_foundation.py::test_passwords_and_tokens_not_stored_in_clear`, `test_foundation.py::test_log_masking`, `test_foundation.py::test_audit_log_is_append_only`, `test_foundation.py::test_demo_cards_hidden_in_production`, `test_migration.py::test_rejects_bad_files`, `test_migration.py::test_error_report_csv_neutralises_formula_injection`, `test_migration.py::test_migration_is_permission_protected_and_audited`
 - **NFR03**: `test_foundation.py::test_ui_assets_served_locally_no_external_requests`
+- **NFR05**: `test_migration.py::test_full_20000_row_xlsx_import_reconcile_and_rollback`
 - **NFR06**: `test_foundation.py::test_migrations_upgrade_and_downgrade`, `test_foundation.py::test_migrate_creates_missing_data_directory`
 - **NFR07**: `test_foundation.py::test_log_masking`, `test_foundation.py::test_health_endpoints`, `test_foundation.py::test_system_info_reports_versions`
 
-Summary: 1/31 done, 10 partial.
+Summary: 3/31 done, 11 partial.

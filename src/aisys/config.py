@@ -23,6 +23,7 @@ class Settings:
     lockout_minutes: int = 15
     log_level: str = "INFO"
     log_format: str = "json"
+    backup_dir: str = "data/backups"
     secret_key: str = field(default="", repr=False)
 
 
@@ -38,6 +39,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     db = raw.get("database", {})
     sec = raw.get("security", {})
     log = raw.get("logging", {})
+    backup = raw.get("backup", {})
     d = Settings()
 
     settings = Settings(
@@ -51,6 +53,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         lockout_minutes=int(sec.get("lockout_minutes", d.lockout_minutes)),
         log_level=log.get("level", d.log_level),
         log_format=log.get("format", d.log_format),
+        backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
         secret_key=os.environ.get("AISYS_SECRET_KEY", ""),
     )
     if settings.environment == "production" and len(settings.secret_key) < 32:

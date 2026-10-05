@@ -1,0 +1,22 @@
+{
+  "rows": 200,
+  "seed": 42,
+  "defects": {
+    "missing_title": 1,
+    "missing_accession": 1,
+    "bad_accession": 1,
+    "bad_isbn": 1,
+    "bad_price": 1,
+    "bad_date": 1,
+    "future_date": 1,
+    "dup_accession": 1,
+    "dup_barcode": 1,
+    "unknown_type": 2,
+    "bad_year": 1,
+    "status_issued": 2
+  },
+  "expected_invalid": 7,
+  "expected_duplicate": 2,
+  "expected_valid": 191,
+  "expected_valid_with_warnings": 5
+}
