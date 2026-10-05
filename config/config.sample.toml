@@ -19,3 +19,6 @@ lockout_minutes = 15
 [logging]
 level = "INFO"
 format = "json"                  # json | text
+
+[backup]
+dir = "data/backups"          # pre-migration / pre-update database backups

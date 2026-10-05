@@ -49,3 +49,4 @@ extend-immutable-calls = ["fastapi.Depends", "aisys.deps.require"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106", "S608"]
+"src/aisys/devtools/*" = ["S311"]  # synthetic data, not cryptography

@@ -1,0 +1,201 @@
+Acc. No.,Barcode,Book Title,Author(s),ISBN,Publisher,Year,Edition,Language,Call No,Location,Type,Status,Price (INR),Date Acquired
+ACC000001,BC100000,"Ancient Algorithms, Volume 1",Isla Hollis,9781819600131,Lakeside Books,2007,,English,617.4 HOL,Science Section,Book,Available,580.00,29/11/2016
+ACC000002,BC100001,"Coastal Mathematics, Volume 2",Rohan Novak,9789402654233,Harbour & Finch,1981,2nd,English,095.49 NOV,Main Library,Book,Available,1276.00,02/02/2021
+ACC000003,BC100002,"Ancient Mechanics, Volume 3",Liam Thorne,9780781618496,Harbour & Finch,2011,2nd,English,197.91 THO,Reference Room,Reference,Available,4046.50,17/07/2008
+ACC000004,BC100003,"Modern Rivers, Volume 4",Hugo Jansen,,Lakeside Books,1981,2nd,English,390.36 JAN,Humanities Section,Book,Available,2488.00,15/12/2021
+ACC000005,BC100004,"Complete Mechanics, Volume 5",Farid Lindqvist,9784192832762,Harbour & Finch,2015,3rd,English,705.72 LIN,Science Section,Book,Available,455.00,03/01/2007
+ACC000006,BC100005,"Applied Philosophy, Volume 6",Bruno Hollis,9785641395371,Meridian Publishing,2016,,English,470.19 HOL,Main Library,Book,Available,3402.50,15/10/2023
+ACC000007,BC100006,"Advanced Poetry, Volume 7",Hugo Rao,9789696532873,Northgate Press,2023,2nd,English,049.15 RAO,Main Library,Book,Available,225.50,19/10/2021
+ACC000008,BC100007,"Digital Networks, Volume 8",Noor Thorne,9786978480181,Harbour & Finch,2024,2nd,English,657.44 THO,Humanities Section,Book,Available,3872.50,30/05/2007
+ACC000009,BC100008,"Ancient History, Volume 9",Noor Fontaine,9784828148939,Lakeside Books,1998,3rd,English,781.21 FON,Technology Section,Book,Available,2385.00,05/01/2008
+ACC000010,BC100009,"Coastal Databases, Volume 10",Asha Thorne,9780154303912,Northgate Press,2021,,English,498.9 THO,Technology Section,Book,Available,2257.00,01/06/2012
+ACC000011,BC100010,"Coastal Poetry, Volume 11",Elena Petrov,,Lakeside Books,1991,2nd,English,541.78 PET,Science Section,Book,Available,1587.50,24/07/2012
+ACC000012,BC100011,"Collected Mathematics, Volume 12",Rohan Gupta,9786578713313,Harbour & Finch,1976,2nd,English,603.71 GUP,Main Library,Book,Available,3433.00,23/07/2016
+ACC000013,BC100012,"Applied Sociology, Volume 13",Hugo Alder,9780310518341,Meridian Publishing,1988,2nd,English,553.17 ALD,Humanities Section,Book,Available,2182.00,26/02/2008
+ACC000014,BC100013,"Strategic Architecture, Volume 14",Priya Novak,9781656670106,Meridian Publishing,2021,2nd,English,348.14 NOV,Humanities Section,Book,Available,2850.50,14/04/2010
+ACC000015,BC100014,"Applied Mathematics, Volume 15",Gita Rao,9786247317811,Northgate Press,2016,,English,554.2 RAO,Humanities Section,Book,Available,3095.00,07/11/2017
+ACC000016,BC100015,"Modern Architecture, Volume 16",Farid Novak,9783602606474,Harbour & Finch,2002,2nd,English,714.94 NOV,Humanities Section,Book,Available,1458.50,27/08/2007
+ACC000017,BC100016,"Coastal Astronomy, Volume 17",Elena Gupta,9780980500974,Cedar House,2008,2nd,English,162.8 GUP,Main Library,Book,Available,2566.50,12/10/2020
+ACC000018,BC100017,"Urban Economics, Volume 18",Farid Castell,9783619399093,Northgate Press,2001,,English,674.75 CAS,Technology Section,Book,Available,1404.50,01/12/2009
+ACC000019,BC100018,"Urban Philosophy, Volume 19",Isla Gupta,9785346247517,Northgate Press,2004,2nd,English,637.73 GUP,Technology Section,Book,Available,4007.00,03/08/2018
+ACC000020,BC100019,"Ancient Economics, Volume 20",Rohan Gupta,9782513542789,Harbour & Finch,2014,3rd,English,827.84 GUP,Main Library,Book,Available,4454.50,05/04/2020
+ACC000021,BC100020,"Urban Algorithms, Volume 21",Rohan Jansen,,Northgate Press,1983,,English,271.15 JAN,Main Library,Book,Available,655.00,11/02/2013
+ACC000022,BC100021,"Ancient Geometry, Volume 22",Elena Iyer,9783534874019,Meridian Publishing,1992,,English,046.1 IYE,Humanities Section,Book,Available,4412.50,12/05/2008
+ACC000023,BC100022,"Elementary Poetry, Volume 23",Isla Fontaine,9788680112800,Harbour & Finch,2012,3rd,English,566.19 FON,Technology Section,Book,Available,894.50,10/08/2009
+ACC000024,BC100023,"Collected Poetry, Volume 24",Bruno Jansen,9780533158690,Lakeside Books,1990,,English,886.21 JAN,Technology Section,Book,Available,3892.00,04/03/2015
+ACC000025,BC100024,"Quantum Ecology, Volume 25",Asha Fontaine,9785634216072,Lakeside Books,1987,2nd,English,837.59 FON,Main Library,Book,Available,3393.50,03/02/2020
+ACC000026,BC100025,"Comparative History, Volume 26",Hugo Hollis,9783654145860,Cedar House,1996,,English,962.4 HOL,Main Library,Book,Available,521.50,23/09/2021
+ACC000027,BC100026,"Ancient Biology, Volume 27",Farid Sato,,Harbour & Finch,1977,3rd,English,112.77 SAT,Main Library,Book,Available,715.50,07/06/2006
+ACC000028,BC100027,"Collected Mechanics, Volume 28",Kavya Novak,9788169340601,Cedar House,2009,,English,704.93 NOV,Science Section,Book,Available,3593.50,04/03/2014
+ACC000029,BC100028,"Practical Mechanics, Volume 29",Noor Castell,,Harbour & Finch,2014,2nd,English,322.85 CAS,Technology Section,Serial,Available,3227.00,31/07/2013
+ACC000030,BC100029,"Ancient History, Volume 30",Quinn Jansen,9785648236622,Cedar House,2011,3rd,English,309.52 JAN,Science Section,Book,Available,2998.00,05/11/2019
+ACC000031,BC100030,"Coastal Algorithms, Volume 31",Jon Jansen,9789957773878,Lakeside Books,2017,2nd,English,087.37 JAN,Science Section,Book,Available,1974.00,19/01/2017
+ACC000032,BC100031,"Urban Medicine, Volume 32",Kavya Castell,9783433200377,Cedar House,2024,2nd,English,075.59 CAS,Technology Section,Book,Available,3257.00,11/09/2011
+ACC000033,BC100032,"Collected Sociology, Volume 33",Gita Mehta,9783201632874,Northgate Press,2010,,English,256.16 MEH,Humanities Section,Book,Available,1694.00,06/10/2012
+ACC000034,BC100033,"Complete Poetry, Volume 34",Omar Quist,,Cedar House,1995,2nd,English,973.97 QUI,Main Library,Book,Available,2121.00,23/10/2019
+ACC000035,BC100034,"Complete Medicine, Volume 35",Quinn Novak,9788727743486,Meridian Publishing,2015,,English,245.36 NOV,Technology Section,Book,Available,548.00,28/04/2018
+ACC000036,BC100035,"Complete Economics, Volume 36",Jon Hollis,9785812236236,Northgate Press,2001,2nd,English,418.43 HOL,Science Section,Book,Available,1929.00,09/01/2014
+ACC000037,BC100036,"Coastal Statistics, Volume 37",Noor Bhatt,9786690967052,Harbour & Finch,2023,,English,400.54 BHA,Humanities Section,Book,Available,2776.00,28/06/2011
+ACC000038,BC100037,"Coastal Geometry, Volume 38",Tomas Hollis,9784670656279,Lakeside Books,2014,3rd,English,547.4 HOL,Science Section,Book,Available,3537.50,19/03/2008
+ACC000039,BC100038,"Illustrated Sociology, Volume 39",Sara Alder,9786272046533,Meridian Publishing,1995,3rd,English,346.98 ALD,Science Section,Book,Available,3649.50,27/06/2017
+ACC000040,BC100039,"Illustrated Biology, Volume 40",Noor Iyer,9787080531006,Lakeside Books,1987,3rd,English,860.3 IYE,Technology Section,Book,Available,4446.50,22/09/2012
+ACC000041,BC100040,"Digital Architecture, Volume 41",Elena Petrov,9789374529911,Lakeside Books,1994,,English,111.75 PET,Humanities Section,Book,Available,3233.00,27/02/2014
+ACC000042,BC100041,"Silent History, Volume 42",Sara Mehta,9783193149190,Northgate Press,1997,,English,546.55 MEH,Science Section,Book,Available,2613.00,16/08/2015
+ACC000043,BC100042,"Comparative Economics, Volume 43",Quinn Kaur,9786716572628,Cedar House,2016,3rd,English,277.79 KAU,Technology Section,Book,Available,3562.00,18/04/2006
+ACC000044,BC100043,"Coastal Astronomy, Volume 44",Omar Novak,9789453147371,Cedar House,2014,,English,685.49 NOV,Humanities Section,Book,Available,797.50,20/09/2010
+ACC000045,BC100044,"Elementary Algorithms, Volume 45",Priya Kaur,9783545494800,Cedar House,1987,3rd,English,088.31 KAU,Science Section,Book,Available,572.50,28/01/2007
+ACC000046,BC100045,"Collected Astronomy, Volume 46",Rohan Hollis,9787701436345,Cedar House,1998,3rd,English,485.71 HOL,Main Library,Book,Available,746.00,27/07/2018
+ACC000047,BC100046,"Urban Mechanics, Volume 47",Noor Rao,9787444313514,Cedar House,2023,3rd,English,707.24 RAO,Science Section,Book,Available,4077.00,07/03/2018
+ACC000048,BC100047,"Practical Mathematics, Volume 48",Priya Iyer,9788941343523,Harbour & Finch,1975,2nd,English,726.69 IYE,Main Library,Book,Available,1885.00,20/06/2012
+ACC000049,BC100048,"Digital Biology, Volume 49",Bruno Bhatt,9782710947776,Harbour & Finch,1986,3rd,English,989.7 BHA,Reference Room,Reference,Available,4073.00,20/08/2007
+ACC000050,BC100049,"Advanced Astronomy, Volume 50",Dev Castell,9781902294131,Northgate Press,2010,,English,783.54 CAS,Technology Section,Book,Available,2110.50,14/10/2020
+ACC000051,BC100050,"Applied Databases, Volume 51",Mira Okafor,,Harbour & Finch,2012,2nd,English,440.40 OKA,Humanities Section,Book,Available,2676.50,16/07/2013
+ACC000052,BC100051,"Hidden Medicine, Volume 52",Dev Gupta,9784123281201,Meridian Publishing,2003,2nd,English,706.77 GUP,Main Library,Book,Available,3996.50,26/02/2016
+ACC000053,BC100052,"Strategic History, Volume 53",Bruno Hollis,9784713493618,Cedar House,1989,2nd,English,664.20 HOL,Technology Section,Book,Available,524.00,25/04/2013
+ACC000054,BC100053,"Advanced Poetry, Volume 54",Carla Bhatt,9784994717465,Harbour & Finch,2007,2nd,English,553.64 BHA,Technology Section,Book,Available,2568.00,13/05/2005
+ACC000055,BC100054,"Complete Economics, Volume 55",Tomas Bhatt,,Harbour & Finch,2013,2nd,English,257.4 BHA,Science Section,Book,Available,4240.50,28/02/2010
+ACC000056,BC100055,"Modern Architecture, Volume 56",Sara Sato,,Harbour & Finch,2011,2nd,English,042.98 SAT,Technology Section,Book,Available,3925.00,06/06/2023
+ACC000057,BC100056,"Quantum Astronomy, Volume 57",Quinn Okafor,,Lakeside Books,2012,,English,447.82 OKA,Science Section,Book,Available,4150.00,25/11/2012
+ACC000058,BC100057,"Strategic Economics, Volume 58",Priya Lindqvist,9785125674688,Northgate Press,2004,3rd,English,091.41 LIN,Main Library,Book,Available,4442.00,28/02/2017
+ACC000059,BC100058,"Advanced Philosophy, Volume 59",Dev Mehta,,Northgate Press,2017,3rd,English,891.70 MEH,Main Library,Book,Available,202.50,01/09/2006
+ACC000060,BC100059,,Bruno Gupta,9789770348246,Meridian Publishing,2019,,English,497.16 GUP,Main Library,Book,Available,1387.00,23/02/2019
+ACC000061,BC100060,"Silent Medicine, Volume 61",Hugo Fontaine,9780861317127,Meridian Publishing,2020,2nd,English,299.66 FON,Main Library,Book,Available,4108.50,25/03/2015
+ACC000062,BC100061,"Advanced Ecology, Volume 62",Priya Petrov,9788263982141,Meridian Publishing,1996,3rd,English,957.65 PET,Technology Section,Book,Available,247.00,08/12/2016
+ACC000063,BC100062,"Advanced Algorithms, Volume 63",Jon Jansen,9789727875580,Cedar House,1999,3rd,English,467.42 JAN,Humanities Section,Book,Available,290.50,01/03/2011
+ACC000064,BC100063,"Practical Architecture, Volume 64",Sara Mehta,9786057662705,Lakeside Books,2007,,English,989.76 MEH,Main Library,Book,Available,4445.00,08/01/2009
+ACC000065,BC100064,"Elementary Chemistry, Volume 65",Omar Dorsey,9787026217452,Cedar House,2019,3rd,English,408.84 DOR,Humanities Section,Book,Available,3053.50,26/11/2018
+ACC000066,BC100065,"Modern Philosophy, Volume 66",Rohan Mehta,,Meridian Publishing,2009,2nd,English,037.80 MEH,Technology Section,Book,Available,3910.00,10/10/2006
+ACC000067,BC100066,"Modern Architecture, Volume 67",Jon Hollis,9786117240058,Northgate Press,1993,2nd,English,368.48 HOL,Main Library,Serial,Available,409.00,25/01/2010
+ACC000068,BC100067,"Collected Poetry, Volume 68",Hugo Quist,9782221969373,Cedar House,unknown,3rd,English,238.60 QUI,Technology Section,Book,Available,609.00,17/06/2013
+ACC000069,BC100068,"Advanced Statistics, Volume 69",Isla Alder,,Meridian Publishing,1993,2nd,English,694.70 ALD,Technology Section,Book,Available,2863.00,09/11/2006
+ACC 69#bad,BC100069,"Quantum Economics, Volume 70",Omar Lindqvist,,Harbour & Finch,2015,,English,986.55 LIN,Science Section,Book,Available,4045.50,15/12/2005
+ACC000071,BC100070,"Advanced Statistics, Volume 71",Jon Gupta,,Meridian Publishing,1981,3rd,English,243.49 GUP,Humanities Section,Book,Available,419.00,02/09/2006
+ACC000072,BC100071,"Comparative Sociology, Volume 72",Jon Jansen,9786409097438,Cedar House,1997,,English,225.82 JAN,Science Section,Book,Available,1331.50,21/01/2012
+ACC000073,BC100072,"Practical Medicine, Volume 73",Isla Ebert,9780470952146,Harbour & Finch,2022,,English,426.23 EBE,Science Section,Book,Available,3337.50,18/09/2011
+ACC000074,BC100073,"Practical Poetry, Volume 74",Rohan Lindqvist,9784247451719,Lakeside Books,2023,,English,990.29 LIN,Main Library,Book,Available,4252.50,04/08/2021
+ACC000075,BC100074,"Illustrated Geometry, Volume 75",Liam Castell,9780481754968,Harbour & Finch,1981,,English,692.30 CAS,Main Library,Book,Available,2940.50,21/10/2014
+ACC000076,BC100012,"Strategic Algorithms, Volume 76",Tomas Rao,9789317461209,Northgate Press,1994,,English,505.15 RAO,Reference Room,Reference,Available,2389.50,27/04/2012
+ACC000077,BC100076,"Ancient Architecture, Volume 77",Rohan Ebert,9785869261793,Meridian Publishing,1992,3rd,English,034.89 EBE,Technology Section,Book,Available,3687.00,24/12/2012
+ACC000078,BC100077,"Comparative Mathematics, Volume 78",Omar Okafor,,Harbour & Finch,1981,2nd,English,703.48 OKA,Main Library,Book,Available,2569.00,27/10/2019
+ACC000079,BC100078,"Coastal Mechanics, Volume 79",Bruno Mehta,9781713900535,Lakeside Books,2011,2nd,English,211.9 MEH,Science Section,Book,Available,3262.00,04/11/2006
+ACC000080,BC100079,"Coastal Mathematics, Volume 80",Sara Gupta,9783529042287,Harbour & Finch,1986,2nd,English,113.85 GUP,Main Library,Book,Available,899.00,08/02/2012
+ACC000081,BC100080,"Silent Poetry, Volume 81",Asha Lindqvist,9783950240269,Cedar House,1982,2nd,English,764.9 LIN,Reference Room,Reference,Available,2359.00,23/12/2014
+ACC000082,BC100081,"Strategic Statistics, Volume 82",Liam Quist,9787839084708,Northgate Press,2005,2nd,English,868.52 QUI,Technology Section,Book,Available,4347.50,16/03/2009
+ACC000083,BC100082,"Collected Chemistry, Volume 83",Priya Okafor,9781592124992,Cedar House,2020,2nd,English,333.49 OKA,Main Library,Book,Available,2807.50,05/01/2007
+ACC000084,BC100083,"Urban History, Volume 84",Omar Quist,9781183673656,Meridian Publishing,2000,2nd,English,426.94 QUI,Main Library,Book,Available,2138.00,13/04/2014
+ACC000085,BC100084,"Ancient Philosophy, Volume 85",Noor Kaur,9785271111617,Harbour & Finch,1983,,English,570.8 KAU,Humanities Section,Book,Available,2616.50,20/10/2008
+ACC000086,BC100085,"Coastal Geometry, Volume 86",Kavya Dorsey,9786049451980,Lakeside Books,1984,,English,673.62 DOR,Technology Section,Book,Available,2410.50,03/06/2006
+ACC000087,BC100086,"Applied Chemistry, Volume 87",Liam Rao,9784936899808,Cedar House,2017,,English,850.89 RAO,Humanities Section,Book,Available,2211.00,22/07/2022
+ACC000088,BC100087,"Advanced Algorithms, Volume 88",Farid Iyer,9784550229616,Lakeside Books,2022,3rd,English,649.4 IYE,Science Section,Book,Available,3900.00,14/02/2016
+ACC000089,BC100088,"Modern Databases, Volume 89",Gita Mehta,9785254599104,Lakeside Books,1985,2nd,English,773.80 MEH,Humanities Section,Book,Available,3262.50,25/02/2005
+ACC000090,BC100089,"Hidden Economics, Volume 90",Isla Okafor,9787976438150,Meridian Publishing,1982,3rd,English,291.87 OKA,Science Section,Book,Available,N/A,29/08/2014
+ACC000091,BC100090,"Strategic Databases, Volume 91",Jon Bhatt,9789003432445,Harbour & Finch,1982,,English,008.64 BHA,Technology Section,Book,Available,2723.00,05/08/2020
+ACC000092,BC100091,"Collected Networks, Volume 92",Elena Mehta,9783885160601,Meridian Publishing,1979,2nd,English,883.41 MEH,Reference Room,Reference,Available,4172.00,28/02/2012
+ACC000093,BC100092,"Collected Sociology, Volume 93",Mira Novak,9786052975169,Northgate Press,1990,2nd,English,447.76 NOV,Humanities Section,Book,Available,1082.00,16/04/2011
+ACC000094,BC100093,"Illustrated Databases, Volume 94",Carla Mehta,,Harbour & Finch,1989,,English,342.22 MEH,Main Library,Book,Available,3931.00,28/03/2017
+ACC000095,BC100094,"Modern Databases, Volume 95",Dev Quist,9785523124327,Cedar House,1984,3rd,English,779.98 QUI,Main Library,Book,Available,3501.50,15/07/2011
+ACC000096,BC100095,"Modern Networks, Volume 96",Priya Okafor,9789799552716,Meridian Publishing,2003,,English,647.39 OKA,Humanities Section,Book,Available,1412.50,17/10/2011
+ACC000097,BC100096,"Advanced Sociology, Volume 97",Bruno Lindqvist,9784770054111,Cedar House,2013,2nd,English,520.50 LIN,Technology Section,Book,Available,3433.50,29/08/2006
+ACC000098,BC100097,"Complete Sociology, Volume 98",Rohan Bhatt,9789359782073,Northgate Press,1996,2nd,English,732.11 BHA,Main Library,Book,Available,1045.00,26/09/2022
+ACC000099,BC100098,"Urban Networks, Volume 99",Bruno Hollis,9787889255462,Meridian Publishing,2024,,English,347.87 HOL,Main Library,Book,Available,3423.50,18/12/2012
+ACC000100,BC100099,"Hidden Philosophy, Volume 100",Carla Kaur,9786449251920,Harbour & Finch,1994,,English,991.84 KAU,Reference Room,Reference,Available,236.00,28/08/2014
+ACC000101,BC100100,"Illustrated Poetry, Volume 101",Tomas Castell,9786528168507,Harbour & Finch,1994,3rd,English,185.28 CAS,Science Section,Book,Available,3801.50,15/06/2016
+ACC000102,BC100101,"Elementary Astronomy, Volume 102",Gita Hollis,,Lakeside Books,1979,3rd,English,303.13 HOL,Science Section,Book,Available,2975.00,29/04/2022
+ACC000103,BC100102,"Urban Geometry, Volume 103",Quinn Bhatt,9789296222921,Meridian Publishing,1977,2nd,English,421.47 BHA,Main Library,Book,Available,1100.00,18/08/2011
+ACC000104,BC100103,"Applied Statistics, Volume 104",Tomas Jansen,9787383473591,Meridian Publishing,2004,2nd,English,788.37 JAN,Science Section,Book,Available,4418.50,11/09/2012
+ACC000105,BC100104,"Illustrated Databases, Volume 105",Quinn Novak,,Lakeside Books,2013,2nd,English,142.33 NOV,Technology Section,Book,Available,2762.00,11/03/2007
+ACC000106,BC100105,"Hidden Astronomy, Volume 106",Liam Rao,,Cedar House,1982,3rd,English,292.11 RAO,Main Library,Book,Available,335.50,05/03/2023
+ACC000107,BC100106,"Quantum Biology, Volume 107",Omar Quist,9786137506066,Cedar House,1998,,English,242.50 QUI,Science Section,Book,Available,4377.00,10/03/2020
+ACC000108,BC100107,"Modern Mechanics, Volume 108",Hugo Alder,9781522047278,Meridian Publishing,2014,3rd,English,006.11 ALD,Technology Section,Book,Available,3935.00,04/06/2012
+ACC000109,BC100108,"Silent Biology, Volume 109",Gita Ebert,9789861434100,Lakeside Books,2001,,English,655.80 EBE,Science Section,Book,Available,3690.50,15/02/2019
+ACC000110,BC100109,"Complete Economics, Volume 110",Dev Petrov,9780893246099,Harbour & Finch,1990,,English,585.54 PET,Technology Section,Book,Available,3668.50,10/10/2018
+ACC000111,BC100110,"Quantum Economics, Volume 111",Quinn Lindqvist,9788888806709,Meridian Publishing,1998,,English,260.96 LIN,Humanities Section,Book,Available,662.00,26/10/2009
+ACC000112,BC100111,"Silent Mechanics, Volume 112",Carla Lindqvist,9781952058523,Meridian Publishing,2019,,English,491.81 LIN,Humanities Section,Book,Available,2820.00,16/01/2017
+ACC000113,BC100112,"Quantum Poetry, Volume 113",Carla Okafor,9783030548681,Meridian Publishing,1991,3rd,English,038.97 OKA,Technology Section,Book,Available,4473.50,20/11/2010
+ACC000114,BC100113,"Practical History, Volume 114",Liam Bhatt,,Harbour & Finch,1992,2nd,English,128.48 BHA,Main Library,Book,Available,3000.50,17/09/2018
+ACC000115,BC100114,"Collected Linguistics, Volume 115",Omar Mehta,9782775841613,Meridian Publishing,2013,,English,843.24 MEH,Humanities Section,Book,Available,844.00,06/11/2018
+ACC000116,BC100115,"Coastal History, Volume 116",Kavya Dorsey,9784479627579,Northgate Press,2021,2nd,English,891.46 DOR,Main Library,Book,Available,1649.50,09/05/2010
+ACC000117,BC100116,"Collected Biology, Volume 117",Bruno Castell,9786582029707,Lakeside Books,1979,2nd,English,242.83 CAS,Technology Section,Book,Available,1279.50,16/06/2016
+ACC000118,BC100117,"Comparative Mechanics, Volume 118",Mira Sato,9782755719284,Harbour & Finch,2000,3rd,English,322.84 SAT,Science Section,Book,Available,1516.50,01/12/2015
+ACC000119,BC100118,"Advanced Architecture, Volume 119",Dev Alder,9787868144732,Cedar House,1993,2nd,English,711.63 ALD,Technology Section,Book,Available,589.50,13/03/2009
+ACC000120,BC100119,"Practical Chemistry, Volume 120",Elena Castell,9787155188449,Lakeside Books,2020,,English,727.90 CAS,Reference Room,Reference,Available,1748.50,14/11/2015
+ACC000121,BC100120,"Quantum Mechanics, Volume 121",Quinn Hollis,9783237058952,Meridian Publishing,2010,3rd,English,133.79 HOL,Reference Room,Reference,Available,4204.50,03/05/2016
+ACC000122,BC100121,"Modern Economics, Volume 122",Jon Mehta,,Meridian Publishing,2008,3rd,English,421.99 MEH,Technology Section,Book,Available,4153.00,28/04/2014
+ACC000123,BC100122,"Collected Sociology, Volume 123",Carla Ebert,,Northgate Press,2003,,English,478.88 EBE,Humanities Section,Book,Available,417.50,10/09/2005
+ACC000124,BC100123,"Urban Mechanics, Volume 124",Elena Rao,9782268018249,Lakeside Books,1985,,English,331.91 RAO,Technology Section,Book,Available,4207.00,23/06/2011
+ACC000125,BC100124,"Applied Mechanics, Volume 125",Quinn Jansen,9784384249811,Cedar House,2016,3rd,English,173.76 JAN,Humanities Section,Book,Available,490.50,04/01/2011
+ACC000126,BC100125,"Digital Networks, Volume 126",Tomas Thorne,9789001094393,Meridian Publishing,2014,,English,655.4 THO,Science Section,Book,Available,2588.00,15/07/2014
+ACC000127,BC100126,"Strategic Geometry, Volume 127",Jon Jansen,9786471027678,Meridian Publishing,1988,,English,349.78 JAN,Technology Section,Book,Available,1111.00,26/10/2012
+ACC000128,BC100127,"Digital Philosophy, Volume 128",Kavya Lindqvist,,Lakeside Books,2023,3rd,English,380.66 LIN,Humanities Section,Book,Available,3657.00,18/07/2021
+ACC000129,BC100128,"Coastal Chemistry, Volume 129",Kavya Hollis,9784732104694,Meridian Publishing,1990,,English,986.21 HOL,Science Section,Book,Available,636.50,09/08/2022
+ACC000130,BC100129,"Elementary Sociology, Volume 130",Kavya Gupta,9787877470167,Cedar House,2004,3rd,English,990.31 GUP,Science Section,Book,Issued,2801.50,22/05/2018
+ACC000131,BC100130,"Practical Sociology, Volume 131",Liam Bhatt,9787974801628,Harbour & Finch,2021,3rd,English,375.98 BHA,Main Library,Book,Available,1260.50,31/12/2010
+ACC000132,BC100131,"Illustrated Mechanics, Volume 132",Bruno Mehta,9788358416872,Cedar House,1992,3rd,English,846.80 MEH,Science Section,Book,Available,1237.00,22/03/2011
+ACC000133,BC100132,"Ancient Poetry, Volume 133",Dev Mehta,9785852398680,Northgate Press,1977,,English,040.18 MEH,Technology Section,Book,Available,4159.00,23/03/2012
+ACC000134,BC100133,"Elementary Astronomy, Volume 134",Quinn Okafor,9788259526946,Cedar House,1996,3rd,English,520.66 OKA,Technology Section,Book,Available,3223.50,11/01/2011
+ACC000135,BC100134,"Coastal Astronomy, Volume 135",Sara Jansen,9780551694095,Meridian Publishing,1991,,English,991.84 JAN,Technology Section,Novel,Available,4373.50,28/10/2022
+ACC000136,BC100135,"Applied Rivers, Volume 136",Sara Petrov,9789623091305,Meridian Publishing,1995,2nd,English,429.20 PET,Technology Section,Book,Available,2831.00,12/04/2013
+ACC000137,BC100136,"Collected Mathematics, Volume 137",Noor Quist,9787028385784,Meridian Publishing,1995,3rd,English,980.23 QUI,Main Library,Book,Available,3905.50,01/01/2024
+ACC000138,BC100137,"Complete Geometry, Volume 138",Kavya Rao,9784973348437,Harbour & Finch,2024,3rd,English,296.91 RAO,Technology Section,Book,Available,1934.50,06/11/2022
+ACC000139,BC100138,"Practical Astronomy, Volume 139",Kavya Petrov,9784419866525,Harbour & Finch,1977,2nd,English,295.92 PET,Humanities Section,Book,Available,2473.50,05/02/2016
+ACC000140,BC100139,"Modern Mechanics, Volume 140",Omar Iyer,9783384842190,Cedar House,1990,3rd,English,249.7 IYE,Technology Section,Book,Available,2965.00,06/12/2007
+ACC000141,BC100140,"Collected Mathematics, Volume 12",Rohan Gupta,9786578713313,Harbour & Finch,1976,2nd,English,603.71 GUP,Main Library,Book,Available,1167.00,01/08/2022
+ACC000142,BC100141,"Quantum Poetry, Volume 113",Carla Okafor,9783030548681,Meridian Publishing,1991,,English,038.97 OKA,Science Section,Book,Available,2622.00,06/08/2014
+ACC000143,BC100142,"Advanced Statistics, Volume 71",Jon Gupta,,Meridian Publishing,1981,2nd,English,243.49 GUP,Main Library,Book,Available,3196.00,31/01/2013
+ACC000144,BC100143,"Strategic Architecture, Volume 14",Priya Novak,9781656670106,Meridian Publishing,2021,3rd,English,348.14 NOV,Science Section,Book,Available,3666.00,08/11/2011
+ACC000145,BC100144,"Quantum Ecology, Volume 25",Asha Fontaine,9785634216072,Lakeside Books,1987,,English,837.59 FON,Science Section,Book,Available,2002.50,12/09/2015
+ACC000146,BC100145,"Ancient Mechanics, Volume 3",Liam Thorne,9780781618496,Harbour & Finch,2011,,English,197.91 THO,Technology Section,Book,Available,1232.50,09/11/2027
+ACC000147,BC100146,"Urban Philosophy, Volume 19",Isla Gupta,9785346247517,Northgate Press,2004,3rd,English,637.73 GUP,Main Library,Book,Available,995.50,02/01/2007
+ACC000148,BC100147,"Modern Databases, Volume 95",Dev Quist,9785523124327,Cedar House,1984,2nd,English,779.98 QUI,Science Section,Book,Available,1320.00,29/01/2008
+ACC000149,BC100148,"Applied Rivers, Volume 136",Sara Petrov,9789623091305,Meridian Publishing,1995,3rd,English,429.20 PET,Science Section,Book,Available,3755.50,09/09/2018
+ACC000150,BC100149,"Complete Economics, Volume 55",Tomas Bhatt,,Harbour & Finch,2013,2nd,English,257.4 BHA,Technology Section,Book,Available,1929.00,25/05/2008
+ACC000151,BC100150,"Comparative History, Volume 26",Hugo Hollis,9783654145860,Cedar House,1996,3rd,English,962.4 HOL,Technology Section,Book,Available,3029.50,06/10/2007
+ACC000152,BC100151,"Silent Poetry, Volume 81",Asha Lindqvist,9783950240269,Cedar House,1982,2nd,English,764.9 LIN,Main Library,Book,Available,2182.50,23/07/2010
+ACC000153,BC100152,"Advanced Poetry, Volume 7",Hugo Rao,9789696532873,Northgate Press,2023,2nd,English,049.15 RAO,Science Section,Book,Available,4391.00,08/10/2019
+ACC000154,BC100153,"Illustrated Poetry, Volume 101",Tomas Castell,9786528168507,Harbour & Finch,1994,,English,185.28 CAS,Technology Section,Book,Available,3311.00,24/03/2006
+ACC000155,BC100154,"Advanced Ecology, Volume 62",Priya Petrov,9788263982141,Meridian Publishing,1996,,English,957.65 PET,Main Library,Book,Issued,3108.50,28/04/2018
+ACC000156,BC100155,"Complete Poetry, Volume 34",Omar Quist,,Cedar House,1995,3rd,English,973.97 QUI,Technology Section,Book,Available,3143.00,26/10/2023
+ACC000157,BC100156,"Quantum Mechanics, Volume 121",Quinn Hollis,9783237058952,Meridian Publishing,2010,,English,133.79 HOL,Reference Room,Reference,Available,286.00,12/04/2022
+ACC000158,BC100157,"Modern Rivers, Volume 4",Hugo Jansen,,Lakeside Books,1981,,English,390.36 JAN,Technology Section,Book,Available,4300.50,23/11/2005
+ACC000159,BC100158,"Coastal Chemistry, Volume 129",Kavya Hollis,9784732104694,Meridian Publishing,1990,3rd,English,986.21 HOL,Technology Section,Book,Available,825.00,02/07/2014
+ACC000160,BC100159,"Comparative Sociology, Volume 72",Jon Jansen,9786409097438,Cedar House,1997,3rd,English,225.82 JAN,Science Section,Book,Available,1422.50,10/10/2006
+ACC000161,BC100160,"Illustrated Poetry, Volume 101",Tomas Castell,9786528168507,Harbour & Finch,1994,3rd,English,185.28 CAS,Main Library,Book,Available,2690.50,13/02/2022
+ACC000162,BC100161,"Advanced Ecology, Volume 62",Priya Petrov,9788263982141,Meridian Publishing,1996,2nd,English,957.65 PET,Main Library,Book,Available,3864.00,yesterday
+ACC000163,BC100162,"Coastal Mathematics, Volume 80",Sara Gupta,9783529042287,Harbour & Finch,1986,3rd,English,113.85 GUP,Science Section,Book,Available,1128.00,05/10/2019
+ACC000164,BC100163,"Complete Economics, Volume 36",Jon Hollis,9785812236236,Northgate Press,2001,2nd,English,418.43 HOL,Humanities Section,Book,Available,4434.50,04/09/2008
+ACC000165,BC100164,"Comparative Economics, Volume 43",Quinn Kaur,9786716572628,Cedar House,2016,2nd,English,277.79 KAU,Main Library,Book,Available,390.50,26/10/2021
+ACC000166,BC100165,"Complete Economics, Volume 110",Dev Petrov,9780893246099,Harbour & Finch,1990,2nd,English,585.54 PET,Main Library,Book,Available,4214.50,08/06/2006
+ACC000167,BC100166,"Practical Sociology, Volume 131",Liam Bhatt,9787974801628,Harbour & Finch,2021,3rd,English,375.98 BHA,Science Section,Book,Available,3162.00,16/03/2016
+ACC000168,BC100167,"Modern Philosophy, Volume 66",Rohan Mehta,,Meridian Publishing,2009,3rd,English,037.80 MEH,Main Library,Book,Available,2021.00,15/11/2017
+ACC000169,BC100168,"Collected Mathematics, Volume 12",Rohan Gupta,9786578713313,Harbour & Finch,1976,,English,603.71 GUP,Main Library,Book,Available,4014.50,11/04/2005
+ACC000170,BC100169,"Urban Networks, Volume 99",Bruno Hollis,9787889255462,Meridian Publishing,2024,,English,347.87 HOL,Technology Section,Book,Available,1989.50,06/01/2009
+ACC000171,BC100170,"Practical Architecture, Volume 64",Sara Mehta,9786057662705,Lakeside Books,2007,2nd,English,989.76 MEH,Humanities Section,Book,Available,788.50,26/02/2021
+ACC000172,BC100171,"Coastal Algorithms, Volume 31",Jon Jansen,9789957773878,Lakeside Books,2017,,English,087.37 JAN,Science Section,Book,Available,4375.00,08/03/2006
+ACC000014,BC100172,"Urban Geometry, Volume 103",Quinn Bhatt,9789296222921,Meridian Publishing,1977,2nd,English,421.47 BHA,Humanities Section,Book,Available,2831.00,08/06/2015
+,BC100173,"Collected Biology, Volume 117",Bruno Castell,9786582029707,Lakeside Books,1979,2nd,English,242.83 CAS,Humanities Section,Book,Available,2137.50,02/07/2009
+ACC000175,BC100174,"Modern Databases, Volume 95",Dev Quist,9785523124327,Cedar House,1984,,English,779.98 QUI,Science Section,Book,Available,1383.00,25/01/2016
+ACC000176,BC100175,"Illustrated Databases, Volume 105",Quinn Novak,,Lakeside Books,2013,2nd,English,142.33 NOV,Main Library,Book,Available,2894.00,23/02/2017
+ACC000177,BC100176,"Advanced Sociology, Volume 97",Bruno Lindqvist,9784770054111,Cedar House,2013,2nd,English,520.50 LIN,Main Library,Book,Available,1830.00,24/04/2021
+ACC000178,BC100177,"Modern Mechanics, Volume 108",Hugo Alder,9781522047278,Meridian Publishing,2014,,English,006.11 ALD,Humanities Section,Book,Available,912.00,06/05/2006
+ACC000179,BC100178,"Complete Ecology, Volume 60",Bruno Gupta,9789770348246,Meridian Publishing,2019,2nd,English,497.16 GUP,Humanities Section,Book,Available,3905.00,28/08/2016
+ACC000180,BC100179,"Quantum Ecology, Volume 25",Asha Fontaine,9785634216072,Lakeside Books,1987,2nd,English,837.59 FON,Main Library,Book,Available,660.50,18/04/2019
+ACC000181,BC100180,"Complete Poetry, Volume 34",Omar Quist,,Cedar House,1995,2nd,English,973.97 QUI,Technology Section,Book,Available,2822.50,09/11/2010
+ACC000182,BC100181,"Coastal History, Volume 116",Kavya Dorsey,9784479627579,Northgate Press,2021,,English,891.46 DOR,Science Section,Book,Available,1042.00,04/09/2006
+ACC000183,BC100182,"Collected Mechanics, Volume 28",Kavya Novak,9788169340601,Cedar House,2009,2nd,English,704.93 NOV,Technology Section,Book,Available,1139.50,15/06/2015
+ACC000184,BC100183,"Advanced Poetry, Volume 54",Carla Bhatt,9784994717465,Harbour & Finch,2007,2nd,English,553.64 BHA,Main Library,Book,Available,890.00,24/05/2015
+ACC000185,BC100184,"Comparative Mathematics, Volume 78",Omar Okafor,,Harbour & Finch,1981,3rd,English,703.48 OKA,Main Library,Book,Available,1911.50,18/08/2020
+ACC000186,BC100185,"Coastal Geometry, Volume 38",Tomas Hollis,9784670656279,Lakeside Books,2014,2nd,English,547.4 HOL,Technology Section,Book,Available,4356.00,27/07/2010
+ACC000187,BC100186,"Ancient Architecture, Volume 77",Rohan Ebert,9785869261793,Meridian Publishing,1992,,English,034.89 EBE,Technology Section,Book,Available,3854.00,25/11/2008
+ACC000188,BC100187,"Quantum Ecology, Volume 25",Asha Fontaine,9785634216072,Lakeside Books,1987,,English,837.59 FON,Main Library,Book,Available,247.00,12/01/2023
+ACC000189,BC100188,"Quantum Astronomy, Volume 57",Quinn Okafor,,Lakeside Books,2012,2nd,English,447.82 OKA,Humanities Section,Book,Available,838.50,23/06/2023
+ACC000190,BC100189,"Ancient Economics, Volume 20",Rohan Gupta,9782513542789,Harbour & Finch,2014,,English,827.84 GUP,Technology Section,Book,Available,1205.00,13/06/2006
+ACC000191,BC100190,"Ancient Philosophy, Volume 85",Noor Kaur,9785271111617,Harbour & Finch,1983,,English,570.8 KAU,Science Section,Book,Available,3698.50,05/05/2015
+ACC000192,BC100191,"Digital Philosophy, Volume 128",Kavya Lindqvist,,Lakeside Books,2023,2nd,English,380.66 LIN,Science Section,Book,Available,3049.00,28/04/2020
+ACC000193,BC100192,"Practical Mathematics, Volume 48",Priya Iyer,9788941343523,Harbour & Finch,1975,,English,726.69 IYE,Main Library,Book,Available,2163.50,02/01/2015
+ACC000194,BC100193,"Digital Philosophy, Volume 128",Kavya Lindqvist,,Lakeside Books,2023,2nd,English,380.66 LIN,Main Library,Book,Available,868.50,09/05/2017
+ACC000195,BC100194,"Urban Networks, Volume 99",Bruno Hollis,9787889255462,Meridian Publishing,2024,3rd,English,347.87 HOL,Science Section,Book,Available,309.50,22/06/2009
+ACC000196,BC100195,"Collected Networks, Volume 92",Elena Mehta,9783885160601,Meridian Publishing,1979,2nd,English,883.41 MEH,Humanities Section,Novel,Available,4265.50,12/07/2022
+ACC000197,BC100196,"Hidden Philosophy, Volume 100",Carla Kaur,9786449251920,Harbour & Finch,1994,2nd,English,991.84 KAU,Science Section,Book,Available,390.50,02/08/2005
+ACC000198,BC100197,"Applied Mathematics, Volume 15",Gita Rao,9786247317811,Northgate Press,2016,3rd,English,554.2 RAO,Humanities Section,Book,Available,2056.00,01/08/2015
+ACC000199,BC100198,"Comparative History, Volume 26",Hugo Hollis,9783654145860,Cedar House,1996,2nd,English,962.4 HOL,Main Library,Book,Available,1947.50,30/05/2010
+ACC000200,BC100199,"Strategic Databases, Volume 91",Jon Bhatt,9789003432445,Harbour & Finch,1982,,English,008.64 BHA,Reference Room,Reference,Available,1592.00,17/12/2023

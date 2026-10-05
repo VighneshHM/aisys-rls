@@ -14,3 +14,4 @@ dist/
 *.pdf
 *.egg-info/
 build/
+samples/library_20000.csv

@@ -16,6 +16,7 @@ from aisys import __version__, migrate
 from aisys.cli import DEMO_PATRON_CARDS, DEMO_USERS
 from aisys.config import Settings
 from aisys.deps import Principal, get_db, get_principal_optional, get_settings
+from aisys.migration.mapping import FIELDS, REQUIRED
 from aisys.models import AuditEvent, AuthSession, Card, User
 from aisys.routes import STARTED_AT
 
@@ -31,7 +32,7 @@ NAV = [
     ("inventory", "Inventory", "scan", "#", "inventory.run", False),
     ("gate", "Gate events", "gate", "#", "gate.view", False),
     ("reports", "Reports", "chart", "#", "reports.view", False),
-    ("migration", "Data migration", "upload", "#", "migration.run", False),
+    ("migration", "Data migration", "upload", "/migration", "migration.run", True),
     ("audit", "Audit log", "list", "#", "audit.read", False),
     ("admin", "Administration", "users", "#", "admin.users", False),
 ]
@@ -46,6 +47,26 @@ ROLE_LABELS = {
 
 def _context(request: Request, settings: Settings, **extra) -> dict:
     return {"app_name": settings.app_name, "version": __version__, "environment": settings.environment, **extra}
+
+
+def _shell(request: Request, settings: Settings, principal: Principal, active: str, **extra) -> dict:
+    """Context shared by every signed-in page: navigation filtered by permission, identity, version."""
+    user = principal.user
+    nav = [
+        {"key": k, "label": label, "icon": icon, "href": href, "live": live}
+        for k, label, icon, href, perm, live in NAV
+        if perm is None or perm in principal.permissions
+    ]
+    return _context(
+        request,
+        settings,
+        user=user,
+        role_label=ROLE_LABELS.get(user.role.name, user.role.name.replace("_", " ").title()),
+        initials="".join(w[0] for w in user.display_name.split()[:2]).upper(),
+        nav=nav,
+        active=active,
+        **extra,
+    )
 
 
 def _greeting() -> str:
@@ -90,7 +111,7 @@ def dashboard(
 ):
     if principal is None:
         return RedirectResponse("/")
-    user, perms = principal.user, principal.permissions
+    perms = principal.permissions
 
     since = datetime.now(UTC) - timedelta(hours=24)
     stats = [
@@ -138,28 +159,36 @@ def dashboard(
         health = {"ok": False, "db": False, "current": None, "head": None}
     health["uptime"] = _uptime()
 
-    nav = [
-        {"key": k, "label": label, "icon": icon, "href": href, "live": live}
-        for k, label, icon, href, perm, live in NAV
-        if perm is None or perm in perms
-    ]
-    initials = "".join(w[0] for w in user.display_name.split()[:2]).upper()
     return TEMPLATES.TemplateResponse(
         request,
         "dashboard.html",
-        _context(
+        _shell(
             request,
             settings,
-            user=user,
-            role_label=ROLE_LABELS.get(user.role.name, user.role.name.replace("_", " ").title()),
-            initials=initials,
+            principal,
+            "dashboard",
             greeting=_greeting(),
             perms=sorted(perms),
             perm_groups=_group_permissions(perms),
             stats=stats,
             recent=recent,
             health=health,
-            nav=nav,
-            active="dashboard",
         ),
+    )
+
+
+@router.get("/migration", response_class=HTMLResponse)
+def migration_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    if principal is None:
+        return RedirectResponse("/")
+    if "migration.run" not in principal.permissions:
+        return TEMPLATES.TemplateResponse(
+            request, "forbidden.html", _shell(request, settings, principal, "migration"), status_code=403
+        )
+    return TEMPLATES.TemplateResponse(
+        request, "migration.html", _shell(request, settings, principal, "migration", fields=FIELDS, required=REQUIRED)
     )
