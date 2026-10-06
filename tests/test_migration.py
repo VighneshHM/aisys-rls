@@ -338,3 +338,73 @@ def test_warnings_on_skipped_rows_are_not_reported_as_imported(client, lib):
     s = upload(client, lib, data).json()["summary"]
     assert s["valid"] == 1 and s["invalid"] == 1
     assert s["warning_codes"] == {"item_type_unknown": 1} and s["valid_with_warnings"] == 1
+
+
+# ------------------------------------------------------------------ stale validation (library changed after the check)
+TINY = csv_bytes(["Acc No", "Title"], [["S1", "One"], ["S2", "Two"], ["S1", "One again"]])  # 2 valid, 1 in-file dup
+
+
+def _first_two_batches(client, lib):
+    a = upload(client, lib, TINY).json()
+    client.post(f"/api/migrations/{a['id']}/commit", headers=lib)
+    b = upload(client, lib, TINY).json()  # checked while batch A's items are in the library
+    return a, b
+
+
+@pytest.mark.req("AC01", "FR10")
+def test_validated_batch_is_rechecked_after_another_batch_is_rolled_back(client, lib):
+    a, b = _first_two_batches(client, lib)
+    assert (b["summary"]["valid"], b["summary"]["duplicate"]) == (0, 3)  # everything clashes with batch A
+    client.post(f"/api/migrations/{a['id']}/rollback", headers=lib)  # library no longer holds those items
+
+    got = client.get(f"/api/migrations/{b['id']}", headers=lib).json()
+    assert (got["summary"]["valid"], got["summary"]["duplicate"]) == (2, 1)  # only the in-file duplicate remains
+    assert got["refreshed"]["previous"] == {"valid": 0, "invalid": 0, "duplicate": 3}
+    again = client.get(f"/api/migrations/{b['id']}", headers=lib).json()
+    assert "refreshed" not in again  # the notice is shown once, and nothing is rechecked needlessly
+    assert client.post(f"/api/migrations/{b['id']}/commit", headers=lib).status_code == 200
+
+
+@pytest.mark.req("AC01", "FR10")
+def test_rows_endpoint_and_error_report_also_use_fresh_results(client, lib):
+    a, b = _first_two_batches(client, lib)
+    client.post(f"/api/migrations/{a['id']}/rollback", headers=lib)
+    rows = client.get(f"/api/migrations/{b['id']}/rows?status=valid", headers=lib).json()
+    assert rows["total"] == 2
+
+
+@pytest.mark.req("AC01", "FR10", "NFR01")
+def test_commit_on_stale_results_is_refused_then_succeeds_after_review(client, lib, settings):
+    a, b = _first_two_batches(client, lib)
+    client.post(f"/api/migrations/{a['id']}/rollback", headers=lib)
+    r = client.post(f"/api/migrations/{b['id']}/commit", headers=lib)  # never reviewed the new numbers
+    assert r.status_code == 409 and "changed since validation" in r.json()["detail"]
+    assert count(settings, "items") == 0  # nothing was written
+    fresh = client.get(f"/api/migrations/{b['id']}", headers=lib).json()
+    assert fresh["summary"]["valid"] == 2
+    assert client.post(f"/api/migrations/{b['id']}/commit", headers=lib).status_code == 200
+    assert count(settings, "items") == 2
+
+
+@pytest.mark.req("AC01", "FR10")
+def test_list_flags_stale_batches_and_recheck_is_audited(client, lib):
+    a, b = _first_two_batches(client, lib)
+    listing = {x["id"]: x for x in client.get("/api/migrations", headers=lib).json()}
+    assert listing[b["id"]]["stale"] is False
+    client.post(f"/api/migrations/{a['id']}/rollback", headers=lib)
+    listing = {x["id"]: x for x in client.get("/api/migrations", headers=lib).json()}
+    assert listing[b["id"]]["stale"] is True and listing[a["id"]]["stale"] is False
+    client.get(f"/api/migrations/{b['id']}", headers=lib)  # opening refreshes it
+    assert {x["id"]: x for x in client.get("/api/migrations", headers=lib).json()}[b["id"]]["stale"] is False
+    aud = login_card(client, "STAFFAUDIT01")
+    events = client.get("/api/audit?action=migration.revalidate", headers=aud).json()
+    assert events and events[0]["detail"]["reason"] == "library_changed"
+
+
+@pytest.mark.req("FR10")
+def test_unchanged_library_is_not_rechecked(client, lib):
+    b = upload(client, lib, TINY).json()
+    for _ in range(3):
+        assert "refreshed" not in client.get(f"/api/migrations/{b['id']}", headers=lib).json()
+    aud = login_card(client, "STAFFAUDIT01")
+    assert client.get("/api/audit?action=migration.revalidate", headers=aud).json() == []

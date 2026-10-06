@@ -72,7 +72,7 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 @media (prefers-reduced-motion: reduce) { .tap .pulse::after { animation: none; } }
 .tap strong { display: block; } .tap span { font-size: 13px; color: var(--ink-2); }
 .notice { display: none; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 11px 13px; border-radius: 10px; font-size: 14px; }
-.notice.show { display: flex; } .notice.bad { background: var(--bad-soft); color: var(--bad); } .notice.ok { background: var(--good-soft); color: var(--good); }
+.notice.show { display: flex; } .notice.bad { background: var(--bad-soft); color: var(--bad); } .notice.warn { background: var(--warn-soft); color: var(--warn); } .notice.ok { background: var(--good-soft); color: var(--good); }
 .demo { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
 .demo h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -143,6 +143,9 @@ td { padding: 11px 20px; border-bottom: 1px solid var(--line); vertical-align: t
 .steps li.active { color: var(--ink); border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
 .steps li.active span { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .steps li.done { color: var(--good); } .steps li.done span { background: var(--good-soft); color: var(--good); border-color: transparent; }
+.steps li .lbl { font-weight: inherit; }
+.steps li.warn { color: var(--warn); } .steps li.warn span { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.steps li.bad { color: var(--bad); } .steps li.bad span { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .drop { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 30px 20px; border: 2px dashed color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 14px; background: var(--accent-soft); cursor: pointer; transition: background .15s, border-color .15s; }
 .drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
 .drop-ico { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }

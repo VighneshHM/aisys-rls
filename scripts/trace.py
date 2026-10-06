@@ -55,7 +55,7 @@ def main() -> None:
         out.append(f"- **{rid}**: " + ", ".join(f"`{t}`" for t in evidence[rid]))
     done = sum(r["status"] == "done" for r in rows)
     out += ["", f"Summary: {done}/{len(rows)} done, {sum(r['status'] == 'partial' for r in rows)} partial.", ""]
-    (ROOT / "docs" / "traceability.md").write_text("\n".join(out), encoding="utf-8")
+    (ROOT / "docs" / "traceability.md").write_text("\n".join(out), encoding="utf-8", newline="\n")
     print(f"wrote docs/traceability.md ({len(rows)} requirements, {sum(map(len, evidence.values()))} links)")
 
 
