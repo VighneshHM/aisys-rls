@@ -15,6 +15,7 @@ ACCESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,31}$")
 BARCODE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
+REQUIRED_LABELS = {"title": "Title", "accession_no": "Accession number"}
 MAX_LEN = {"title": 500, "author": 300, "publisher": 300, "edition": 100, "language": 50,
            "call_number": 100, "location": 100}  # fmt: skip
 
@@ -128,7 +129,7 @@ def validate_row(values: dict[str, str]) -> RowResult:
 
     for f in ("title", "accession_no"):
         if not v.get(f):
-            err(f, "required_missing", f"{f.replace('_', ' ').capitalize()} is required")
+            err(f, "required_missing", f"{REQUIRED_LABELS[f]} is required")
 
     acc = v.get("accession_no", "")
     if acc and not ACCESSION_RE.match(acc):

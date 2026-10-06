@@ -22,3 +22,10 @@ format = "json"                  # json | text
 
 [backup]
 dir = "data/backups"          # pre-migration / pre-update database backups
+
+# RFID devices. Each entry builds one adapter; "mock" is a built-in simulator. A real reader is a driver
+# class registered in code (see src/aisys/rfid/registry.py) and selected here with driver = "<name>".
+[[devices]]
+id = "staff-1"
+kind = "staff_reader"
+driver = "mock"

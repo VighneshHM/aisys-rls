@@ -10,14 +10,26 @@ from fastapi.staticfiles import StaticFiles
 
 from aisys import __version__, migrate, pages
 from aisys.auth.permissions import sync_rbac
+from aisys.catalogue_routes import router as catalogue_router
 from aisys.config import Settings, load_settings
 from aisys.db import make_engine, make_sessionmaker
 from aisys.integrations.credentials import CredentialProvider, MockCredentialProvider
 from aisys.logging_setup import configure_logging
 from aisys.migration_routes import router as migration_router
+from aisys.rfid.registry import DeviceRegistry
+from aisys.rfid_routes import router as rfid_router
 from aisys.routes import router
 
 log = logging.getLogger("aisys")
+
+
+class RevalidatingStaticFiles(StaticFiles):
+    """Static files the browser must re-check on every use (cheap: an unchanged file answers 304 via its ETag)."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 def create_app(
@@ -41,10 +53,15 @@ def create_app(
     app.state.engine = engine
     app.state.session_factory = factory
     app.state.credential_provider = credential_provider or MockCredentialProvider()
+    app.state.devices = DeviceRegistry(settings.devices)  # fails fast on a bad [[devices]] config
     app.include_router(router)
     app.include_router(migration_router)
+    app.include_router(catalogue_router)
+    app.include_router(rfid_router)
 
-    app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static")
+    app.mount(
+        "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"
+    )
     app.include_router(pages.router)
 
     log.info("application ready", extra={"ctx": {"version": __version__, "env": settings.environment}})
