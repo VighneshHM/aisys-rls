@@ -290,7 +290,17 @@
     const reuse = new URLSearchParams(location.search).get("tag");
     if (reuse && st.reader) await prepareReuse(reuse);
     const pre = new URLSearchParams(location.search).get("item");
-    if (pre) { try { const it = await api("/api/catalogue/items/" + encodeURIComponent(pre)); chooseItem(it); } catch (e) { /* ignore a stale link */ } }
+    if (pre) {
+      try {
+        const it = await api("/api/catalogue/items/" + encodeURIComponent(pre));
+        chooseItem(it);
+        // simulator: an untagged book arrives with an empty reader (the last book's tag is taken off); staff generate the tag
+        if (SIM && st.reader && !it.tag && !reuse) {
+          await api("/api/rfid/mock/readers/" + st.reader + "/tags", {method: "DELETE"});
+          st.tag = null; await readPad();
+        }
+      } catch (e) { /* ignore a stale link */ }
+    }
   })();
 })();
 </script>

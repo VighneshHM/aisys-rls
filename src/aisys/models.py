@@ -210,3 +210,59 @@ class TagEvent(Base):
     item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
     actor: Mapped[str] = mapped_column(String(64), default="")
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# ---------------------------------------------------------------- circulation
+class Member(Base):
+    """A library member. Patrons are identified by their card but are never users: they cannot log in."""
+
+    __tablename__ = "members"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_no: Mapped[str] = mapped_column(String(32), unique=True)
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="active")  # active | blocked
+    block_reason: Mapped[str] = mapped_column(String(200), default="")
+    fines_cents: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Loan(Base):
+    """One borrowing of one item. Open while returned_at is empty; an item has at most one open loan (DB-enforced)."""
+
+    __tablename__ = "loans"
+    __table_args__ = (Index("uq_loans_open_item", "item_id", unique=True, sqlite_where=text("returned_at IS NULL")),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"), index=True)
+    out_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    renewals: Mapped[int] = mapped_column(Integer, default=0)
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    out_by: Mapped[str] = mapped_column(String(64))
+    returned_by: Mapped[str] = mapped_column(String(64), default="")
+
+    member: Mapped[Member] = relationship(lazy="joined")
+    item: Mapped[Item] = relationship(lazy="joined")
+
+
+class CircEvent(Base):
+    """Auditable transaction history: every circulation attempt, including refusals and ILMS failures.
+
+    Append-only (DB triggers, migration 0005). `txn_id` is the id sent to the ILMS, so a local row can be matched to
+    the ILMS's own log.
+    """
+
+    __tablename__ = "circ_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    action: Mapped[str] = mapped_column(String(16), index=True)  # checkout | renew | checkin | due_date
+    outcome: Mapped[str] = mapped_column(String(10))  # ok | refused | failed
+    code: Mapped[str] = mapped_column(String(32), default="")
+    message: Mapped[str] = mapped_column(String(300), default="")
+    protocol: Mapped[str] = mapped_column(String(10), default="")
+    txn_id: Mapped[str] = mapped_column(String(40), index=True)
+    member_id: Mapped[int | None] = mapped_column(ForeignKey("members.id"), nullable=True, index=True)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True, index=True)
+    loan_id: Mapped[int | None] = mapped_column(ForeignKey("loans.id"), nullable=True)
+    actor: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)

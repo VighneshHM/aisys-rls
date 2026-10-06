@@ -7,6 +7,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from aisys.circulation.connector import CirculationConfig
 from aisys.rfid.registry import DEFAULT_DEVICES, DeviceConfig
 
 DEFAULT_CONFIG_PATH = Path("config/config.toml")
@@ -27,6 +28,7 @@ class Settings:
     log_format: str = "json"
     backup_dir: str = "data/backups"
     devices: tuple[DeviceConfig, ...] = DEFAULT_DEVICES
+    circulation: CirculationConfig = CirculationConfig()
     secret_key: str = field(default="", repr=False)
 
 
@@ -50,6 +52,18 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         )
         or DEFAULT_DEVICES
     )
+    circ, ilms = raw.get("circulation", {}), raw.get("ilms", {})
+    dc = CirculationConfig()
+    circulation = CirculationConfig(
+        fine_limit_cents=int(circ.get("fine_limit_cents", dc.fine_limit_cents)),
+        loan_days=int(circ.get("loan_days", dc.loan_days)),
+        max_renewals=int(circ.get("max_renewals", dc.max_renewals)),
+        max_loans=int(circ.get("max_loans", dc.max_loans)),
+        ilms_driver=str(ilms.get("driver", dc.ilms_driver)),
+        ilms_protocol=str(ilms.get("protocol", dc.ilms_protocol)),
+        ilms_retries=int(ilms.get("retries", dc.ilms_retries)),
+        ilms_backoff_s=float(ilms.get("backoff_s", dc.ilms_backoff_s)),
+    )
     d = Settings()
 
     settings = Settings(
@@ -65,6 +79,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         log_format=log.get("format", d.log_format),
         backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
         devices=devices,
+        circulation=circulation,
         secret_key=os.environ.get("AISYS_SECRET_KEY", ""),
     )
     if settings.environment == "production" and len(settings.secret_key) < 32:

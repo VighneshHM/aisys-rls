@@ -15,6 +15,7 @@ from aisys.deps import Principal, client_ip, get_db, get_settings, require
 from aisys.migration import mapping as mapping_mod
 from aisys.migration import parsing, service
 from aisys.models import MigrationBatch, MigrationRow
+from aisys.timeutil import iso
 
 router = APIRouter(prefix="/api/migrations", tags=["migration"])
 Perm = Depends(require("migration.run"))
@@ -34,10 +35,10 @@ def _batch_out(b: MigrationBatch, refreshed: dict | None = None) -> dict:
         "headers": b.headers,
         "summary": {k: v for k, v in b.summary.items() if k != "library_stamp"},
         "created_by": b.created_by,
-        "created_at": b.created_at.isoformat(),
+        "created_at": iso(b.created_at),
         "backup": b.backup_path,
-        "committed_at": b.committed_at.isoformat() if b.committed_at else None,
-        "rolled_back_at": b.rolled_back_at.isoformat() if b.rolled_back_at else None,
+        "committed_at": iso(b.committed_at),
+        "rolled_back_at": iso(b.rolled_back_at),
         "target_fields": mapping_mod.FIELDS,
         "required_fields": list(mapping_mod.REQUIRED),
     }
@@ -106,7 +107,7 @@ def list_batches(_: Principal = Perm, db: Session = Depends(get_db)):
             "filename": b.filename,
             "status": b.status,
             "created_by": b.created_by,
-            "created_at": b.created_at.isoformat(),
+            "created_at": iso(b.created_at),
             "source_rows": b.summary.get("source_rows"),
             "valid": b.summary.get("valid"),
             "invalid": b.summary.get("invalid"),

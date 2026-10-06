@@ -384,3 +384,10 @@ def test_reuse_entry_points_exist_on_the_pages(client, lib):
     assert "/tagging?tag=" in client.get("/tags").text and "Reuse on another item" in client.get("/tags").text
     tg = client.get("/tagging").text
     assert "prepareReuse" in tg and 'get("tag")' in tg
+
+
+@pytest.mark.req("FR05", "AC02")
+def test_an_untagged_book_opened_for_tagging_starts_with_an_empty_simulator_reader(client, lib):
+    page = client.get("/tagging", headers=lib).text
+    assert "!it.tag && !reuse" in page  # the page takes the last book's tag off the reader on arrival
+    assert "await putNextBook()" not in page.split("!it.tag && !reuse")[1][:300]  # and does not invent a new one

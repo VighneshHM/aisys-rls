@@ -23,3 +23,5 @@ Items marked **[confirmed]** were agreed with the candidate; the rest are my own
 1. Which ILMS (if any) will the reviewers integrate with? Connector will be written against SIP2 first.
 2. Expected columns of the migration spreadsheet (importer is mapping-driven in the meantime).
 3. Performance targets (we will define and publish our own, see test plan).
+| A-15 | Circulation talks to the ILMS only through a connector interface; a mock stands in, worded as SIP2 or NCIP. No wire protocol is built or claimed. | confirmed | See docs/circulation.md. |
+| A-16 | Fines are a stored amount per member; circulation stops when it exceeds a configurable limit. Overdue fines are not calculated. | own | Reasonable for the exercise; real fines come from the ILMS. |

@@ -26,6 +26,7 @@ from aisys.models import BibRecord, Item, RfidTag, TagEvent
 from aisys.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
 from aisys.rfid.events import TagObserved, is_valid_tag_uid, normalize_tag_uid
 from aisys.rfid.registry import DeviceRegistry
+from aisys.timeutil import iso
 
 log = logging.getLogger("aisys.rfid")
 BLOCKED_ITEM_STATUSES = {"lost", "withdrawn"}
@@ -575,9 +576,9 @@ def list_tags(db: Session, *, state: str | None = None, q: str = "", limit: int 
                 "state": st,
                 "links": n,
                 "item": {"id": link.item_id, "accession_no": link.item.accession_no, "title": link.item.bib.title},
-                "tagged_at": link.tagged_at.isoformat(),
+                "tagged_at": iso(link.tagged_at),
                 "tagged_by": link.tagged_by,
-                "ended_at": link.ended_at.isoformat() if link.ended_at else None,
+                "ended_at": iso(link.ended_at),
                 "end_reason": link.end_reason,
             }
             for link, n, st in rows
@@ -588,7 +589,7 @@ def list_tags(db: Session, *, state: str | None = None, q: str = "", limit: int 
 def event_out(e: TagEvent) -> dict:
     return {
         "id": e.id,
-        "ts": e.ts.isoformat(),
+        "ts": iso(e.ts),
         "tag_uid": e.tag_uid,
         "reader_id": e.reader_id,
         "type": e.event_type,

@@ -13,7 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from aisys import __version__, migrate
-from aisys.cli import DEMO_PATRON_CARDS, DEMO_USERS
+from aisys.cli import DEMO_MEMBERS, DEMO_USERS
 from aisys.config import Settings
 from aisys.deps import Principal, get_db, get_principal_optional, get_settings
 from aisys.migration.mapping import FIELDS, REQUIRED
@@ -27,7 +27,7 @@ router = APIRouter(include_in_schema=False)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
-    ("circulation", "Circulation", "swap", "#", "circulation.checkout", False),
+    ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "#", "inventory.run", False),
@@ -114,7 +114,7 @@ def home(request: Request, db: Session = Depends(get_db), settings: Settings = D
     demo = []
     if settings.environment != "production":
         demo = [{"uid": uid, "kind": "staff", "label": role.replace("_", " ")} for _, _, role, uid in DEMO_USERS]
-        demo += [{"uid": uid, "kind": "patron", "label": "patron"} for uid, _ in DEMO_PATRON_CARDS[:1]]
+        demo += [{"uid": uid, "kind": "patron", "label": "patron"} for uid, *_ in DEMO_MEMBERS[:1]]
     return TEMPLATES.TemplateResponse(request, "login.html", _context(request, settings, demo=demo))
 
 
@@ -254,6 +254,28 @@ def tagging_page(
         "tagging.html",
         "tagging",
         simulator=settings.environment != "production",
+    )
+
+
+@router.get("/circulation", response_class=HTMLResponse)
+def circulation_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "circulation.checkout",
+        "circulation.html",
+        "circulation",
+        simulator=settings.environment != "production",
+        can_checkin="circulation.checkin" in perms,
+        can_renew="circulation.renew" in perms,
+        can_block="member.write" in perms,
+        protocol=settings.circulation.ilms_protocol.upper(),
     )
 
 

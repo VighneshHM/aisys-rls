@@ -17,6 +17,7 @@ from aisys import audit
 from aisys.migration import validation
 from aisys.models import BibRecord, Item, RfidTag
 from aisys.rfid.events import is_valid_tag_uid, normalize_tag_uid
+from aisys.timeutil import iso
 
 ITEM_FIELDS = (
     "title",
@@ -54,8 +55,8 @@ def tag_out(tag: RfidTag | None) -> dict | None:
         "security_armed": tag.security_armed,
         "reader_id": tag.reader_id,
         "tagged_by": tag.tagged_by,
-        "tagged_at": tag.tagged_at.isoformat(),
-        "ended_at": tag.ended_at.isoformat() if tag.ended_at else None,
+        "tagged_at": iso(tag.tagged_at),
+        "ended_at": iso(tag.ended_at),
         "end_reason": tag.end_reason,
     }
 
