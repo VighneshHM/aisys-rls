@@ -154,7 +154,7 @@ def test_a_tag_that_is_not_on_the_reader_never_blocks_the_loan(client, lib, read
 
 
 # ================================================================== FR04 blocks
-@pytest.mark.req("AC03", "FR04")
+@pytest.mark.req("AC04", "FR04")
 def test_circulation_is_blocked_for_reference_items_blocked_members_and_big_fines(client, lib, settings):
     book(client, lib, "R1", item_type="reference")
     book(client, lib, "B1")
@@ -169,7 +169,7 @@ def test_circulation_is_blocked_for_reference_items_blocked_members_and_big_fine
     assert out(client, lib, "M0005", "B1").status_code == 200  # owes 3.00, under the 5.00 limit: allowed
 
 
-@pytest.mark.req("FR04")
+@pytest.mark.req("AC04", "FR04")
 def test_a_librarian_can_block_and_unblock_a_member(client, lib, clerk, settings):
     book(client, lib, "B2")
     assert client.post("/api/circulation/members/M0006/block", headers=clerk, json={"blocked": True}).status_code == 403

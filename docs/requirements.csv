@@ -23,7 +23,7 @@ NFR09,Delivery,Complete D0-D10 and list remaining production work,partial,
 AC01,Acceptance,"Import spreadsheet into staging, reject invalid rows, identify duplicates, migrate valid, reconcile counts",done,"See docs/migration.md; 20k rows validated in 6.6 s, committed in 5.1 s"
 AC02,Acceptance,"Create/locate bib item, validate, associate mock RFID tag, display tag-to-item relationship",done,"See docs/rfid.md; create/locate, validate, associate mock tag, relationship view"
 AC03,Acceptance,"Check out, renew, check in via mocked NCIP or SIP2 with auditable history",done,See docs/circulation.md
-AC04,Acceptance,"Block circulation for reference item, blocked member, or fine over limit",planned,
+AC04,Acceptance,"Block circulation for reference item, blocked member, or fine over limit",done,Built with AC03; see docs/circulation.md
 AC05,Acceptance,Handheld mock inventories a shelf; missing/misplaced report; visible and audible confirmation events,planned,
 AC06,Acceptance,"Gate mock unauthorised-removal event, accession number, mock CCTV image, queued email",planned,
 AC07,Acceptance,Staff smart-card login via mock credential provider; role-based permissions enforced,done,Patron cards rejected for login (A-04)
