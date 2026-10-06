@@ -1,0 +1,267 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Circulation · {{ app_name }}{% endblock %}
+{% block heading %}Circulation{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Check out, renew and check in</h2>
+  <p>Scan the patron's card to see who is borrowing, then name the item (accession number, barcode or tag). Every action goes to the library system over {{ protocol }} and is recorded in the history below. A patron card only identifies the member: it never signs anyone in.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>1 · Patron</h3><span id="member-badge" class="badge">none chosen</span></header>
+      <div class="body">
+        <div class="field" style="margin-bottom:10px">
+          <label for="card">Patron card</label>
+          <div class="toolbar" style="margin:0">
+            <div class="grow"><input id="card" class="uid" placeholder="Scan or type the card number" autocomplete="off" spellcheck="false"></div>
+            <button class="btn" id="card-btn" type="button">Identify</button>
+          </div>
+        </div>
+        {% if simulator %}
+        <div class="field" style="margin-bottom:10px">
+          <label for="demo-cards">Simulated patron card</label>
+          <select id="demo-cards"><option value="">Pick a demo card…</option></select>
+        </div>
+        {% endif %}
+        <div id="member-notice" class="notice" role="alert"></div>
+        <div id="member"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h3>2 · Item</h3><span id="item-badge" class="badge">none chosen</span></header>
+      <div class="body">
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="grow"><input id="item-ref" placeholder="Accession no., barcode or tag UID" autocomplete="off" spellcheck="false" aria-label="Item"></div>
+          <button class="btn ghost" id="item-btn" type="button">Look up</button>
+        </div>
+        <div id="item" style="margin-top:12px"></div>
+        <div class="actions">
+          <button class="btn" id="out-btn" type="button" disabled>Check out</button>
+          {% if can_renew %}<button class="btn ghost" id="renew-btn" type="button" disabled>Renew</button>{% endif %}
+          {% if can_checkin %}<button class="btn ghost" id="in-btn" type="button" disabled>Check in</button>{% endif %}
+          <button class="btn ghost" id="due-btn" type="button" disabled>Due date</button>
+        </div>
+        {% if simulator %}
+        <details class="sim" style="margin-top:14px">
+          <summary>Simulator controls <span class="sub">· development only</span></summary>
+          <p class="sub" style="margin:10px 0 8px">Each action first holds the item's tag up to the simulated reader, as staff would with the book in hand. You can also make the mock library system misbehave to see retries.</p>
+          <div class="toolbar" style="margin:0">
+            <div class="grow"><select id="fail-mode" aria-label="Failure to simulate">
+              <option value="timeout">Library system times out</option>
+              <option value="error">Library system is down</option>
+              <option value="lost_reply">Reply is lost (request was processed)</option>
+            </select></div>
+            <select id="fail-times" aria-label="How many requests fail"><option value="1">next 1 request</option><option value="2">next 2</option><option value="3">next 3 (all tries)</option></select>
+            <button class="btn ghost small" id="fail-btn" type="button">Make it fail</button>
+            <button class="btn ghost small" id="fail-clear" type="button">Clear</button>
+          </div>
+          <div id="fail-note" class="sub" style="margin-top:8px"></div>
+        </details>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel hidden" id="result-panel">
+      <header><h3 id="result-title">Result</h3><span id="result-badge"></span></header>
+      <div class="body" id="result-body"></div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Transaction history</h3><button class="btn ghost small" id="refresh" type="button">Refresh</button></header>
+      <div class="table-wrap" id="events"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
+  const money = c => (c / 100).toFixed(2);
+  const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
+  let member = null, item = null;
+
+  // ------------------------------------------------------------------ patron
+  function renderMember() {
+    const m = member;
+    $("member-badge").className = "badge " + (!m ? "" : m.can_borrow ? "good" : "warn");
+    $("member-badge").textContent = !m ? "none chosen" : m.can_borrow ? "Can borrow" : m.status === "blocked" ? "Blocked" : "Fines over limit";
+    if (!m) { fill($("member")); return; }
+    fill($("member"),
+      h("dl", {class: "kv tight", style: "margin:4px 0 12px"},
+        h("dt", {}, "Member"), h("dd", {}, h("b", {}, m.name), " · ", h("span", {class: "mono"}, m.member_no)),
+        h("dt", {}, "Status"), h("dd", {}, m.status === "blocked" ? "Blocked" + (m.block_reason ? " · " + m.block_reason : "") : "Active"),
+        h("dt", {}, "Fines"), h("dd", {}, money(m.fines_cents) + " (limit " + money(m.fine_limit_cents) + ")" + (m.fines_over_limit ? " · over the limit" : "")),
+        h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans)),
+      m.loans.length ? h("div", {class: "table-wrap", style: "margin:0 -4px"}, h("table", {},
+        h("thead", {}, h("tr", {}, ["Item", "Due", ""].map(t => h("th", {}, t)))),
+        h("tbody", {}, m.loans.map(l => h("tr", {},
+          h("td", {}, h("b", {}, l.accession_no), h("div", {class: "sub"}, l.title)),
+          h("td", {}, day(l.due_at), l.overdue ? h("div", {}, h("span", {class: "badge warn"}, l.days_overdue + " d overdue")) : null,
+            l.renewals ? h("div", {class: "sub"}, "renewed ×" + l.renewals) : null),
+          h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => pick(l.accession_no)}, "Select")))))))
+        : h("div", {class: "sub"}, "No items on loan."),
+      CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
+        m.status === "blocked" ? "Unblock member" : "Block member")) : null);
+    sync();
+  }
+
+  async function loadMember(no) {
+    member = await api("/api/circulation/members/" + encodeURIComponent(no));
+    renderMember();
+  }
+
+  async function identify() {
+    const uid = $("card").value.trim();
+    if (!uid) return;
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/identify", {json: {uid}});
+      renderMember();
+    } catch (e) { member = null; renderMember(); say("member-notice", "bad", e.message); }
+  }
+
+  async function toggleBlock() {
+    const blocking = member.status !== "blocked";
+    const reason = blocking ? (prompt("Why is " + member.name + " being blocked? (shown to staff)", "") ?? null) : "";
+    if (reason === null) return;
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/block", {json: {blocked: blocking, reason}});
+      renderMember(); loadEvents();
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ item
+  function sync() {
+    const have = !!item;
+    $("out-btn").disabled = !(have && member);
+    for (const id of ["renew-btn", "in-btn", "due-btn"]) { const b = $(id); if (b) b.disabled = !have; }
+  }
+
+  async function lookup(ref) {
+    ref = (ref ?? $("item-ref").value).trim();
+    if (!ref) return;
+    try {
+      item = await api("/api/circulation/items/resolve?ref=" + encodeURIComponent(ref));
+      $("item-ref").value = item.accession_no;
+      $("item-badge").className = "badge " + (item.loan ? "warn" : item.is_reference ? "" : "good");
+      $("item-badge").textContent = item.loan ? "On loan" : item.is_reference ? "Reference" : "Available";
+      fill($("item"), h("dl", {class: "kv tight", style: "margin:0"},
+        h("dt", {}, "Title"), h("dd", {}, h("b", {}, item.title), item.author ? " · " + item.author : ""),
+        h("dt", {}, "Accession"), h("dd", {class: "mono"}, item.accession_no),
+        h("dt", {}, "Status"), h("dd", {}, item.loan
+          ? "On loan to " + item.loan.member_name + " (" + item.loan.member_no + "), due " + day(item.loan.due_at) + (item.loan.overdue ? " · overdue" : "")
+          : item.is_reference ? "Reference item: cannot be borrowed" : item.status)));
+    } catch (e) {
+      item = null; $("item-badge").className = "badge"; $("item-badge").textContent = "none chosen";
+      fill($("item"), h("div", {class: "notice show bad"}, e.message));
+    }
+    sync();
+  }
+  const pick = ref => { $("item-ref").value = ref; lookup(ref); };
+
+  // ------------------------------------------------------------------ actions
+  const TITLES = {checkout: "Checked out", renew: "Renewed", checkin: "Checked in"};
+
+  function showResult(kind, title, lines, badge) {
+    $("result-panel").classList.remove("hidden");
+    $("result-title").textContent = title;
+    fill($("result-badge"), h("span", {class: "badge " + kind}, badge));
+    fill($("result-body"), h("div", {class: "notice show " + (kind === "good" ? "ok" : kind === "warn" ? "warn" : "bad"), style: "margin:0 0 12px"}, lines[0]), lines.slice(1));
+  }
+
+  async function act(action) {
+    if (!item) return;
+    const ref = item.accession_no;
+    if (SIM) { try { await api("/api/circulation/mock/present", {json: {item_ref: ref}}); } catch (e) { /* no tag to hold up: fine */ } }
+    const body = action === "checkout" ? {member_no: member.member_no, item_ref: ref} : {item_ref: ref};
+    try {
+      const r = await api("/api/circulation/" + action, {json: body});
+      const sec = r.security;
+      showResult(sec.ok ? "good" : "warn", TITLES[action] + " · " + r.loan.accession_no,
+        [action === "checkin" ? "Returned" + (r.loan.overdue ? "" : " on time") + ": " + r.loan.title : (action === "renew" ? "New due date " : "Due ") + day(r.loan.due_at) + " · " + r.loan.member_name,
+         h("p", {class: "sub", style: "margin:0 0 6px"}, r.protocol.toUpperCase() + " · " + r.message + (r.replayed ? " (repeated answer: the first reply was lost, nothing was done twice)" : "")),
+         sec.message ? h("p", {class: sec.ok ? "sub" : "", style: "margin:0 0 6px" + (sec.ok ? "" : ";color:var(--warn-ink,#8a5a00)")}, sec.message) : null,
+         h("p", {class: "sub mono", style: "margin:0"}, r.txn_id)],
+        sec.ok ? "Done" : "Done · check tag");
+    } catch (e) {
+      showResult(e.status === 503 ? "warn" : "bad", e.status === 503 ? "Library system unavailable" : "Not allowed", [e.message,
+        h("p", {class: "sub", style: "margin:0"}, e.status === 503 ? "Nothing was changed. Try again in a moment." : "Nothing was changed. This attempt is recorded in the history.")],
+        e.status === 503 ? "Not done" : "Refused");
+    }
+    if (member) await loadMember(member.member_no).catch(() => {});
+    await lookup(ref); loadEvents();
+    if (SIM) api("/api/circulation/mock/ilms/fail").then(r => $("fail-note").textContent = r.pending ? r.pending + " simulated failure(s) still waiting." : "").catch(() => {});
+  }
+
+  async function dueDate() {
+    if (!item) return;
+    try {
+      const r = await api("/api/circulation/due?item_ref=" + encodeURIComponent(item.accession_no));
+      showResult(r.on_loan && r.ok ? "good" : "", "Due date · " + r.accession_no,
+        [r.on_loan ? (r.ok ? "Due " + day(r.due_at) + " (member " + r.member_no + ")" : r.message) : "This item is not on loan.",
+         r.protocol ? h("p", {class: "sub", style: "margin:0"}, r.protocol.toUpperCase() + " · " + r.message) : null], r.on_loan ? "On loan" : "Available");
+    } catch (e) { showResult("bad", "Due date", [e.message], "Error"); }
+  }
+
+  // ------------------------------------------------------------------ history
+  const OUTCOME = {ok: ["good", "Done"], refused: ["warn", "Refused"], failed: ["bad", "Failed"]};
+  const ACTION = {checkout: "Check out", renew: "Renew", checkin: "Check in"};
+  async function loadEvents() {
+    let d;
+    try { d = await api("/api/circulation/events?limit=12"); } catch (e) { fill($("events"), h("div", {class: "empty"}, e.message)); return; }
+    fill($("events"), d.events.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["When", "Action", "Item", "Member", "Result"].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.events.map(e => h("tr", {},
+        h("td", {class: "time"}, when(e.ts)),
+        h("td", {}, ACTION[e.action] || e.action),
+        h("td", {class: "mono"}, e.accession_no || "—"),
+        h("td", {class: "mono"}, e.member_no || "—"),
+        h("td", {title: e.txn_id + " · " + e.actor}, h("span", {class: "badge " + (OUTCOME[e.outcome] || ["", ""])[0]}, (OUTCOME[e.outcome] || ["", e.outcome])[1]),
+          h("div", {class: "sub"}, e.message))))))
+      : h("div", {class: "empty"}, "No transactions yet."));
+  }
+
+  // ------------------------------------------------------------------ wiring
+  $("card-btn").onclick = identify;
+  $("card").addEventListener("keydown", e => { if (e.key === "Enter") identify(); });
+  $("item-btn").onclick = () => lookup();
+  $("item-ref").addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });
+  $("out-btn").onclick = () => act("checkout");
+  if ($("renew-btn")) $("renew-btn").onclick = () => act("renew");
+  if ($("in-btn")) $("in-btn").onclick = () => act("checkin");
+  $("due-btn").onclick = dueDate;
+  $("refresh").onclick = loadEvents;
+
+  if (SIM) {
+    api("/api/circulation/mock/patron-cards").then(cards => {
+      const sel = $("demo-cards");
+      if (!cards.length) sel.firstChild.textContent = "No demo members yet: run  python -m aisys.cli seed-demo";
+      for (const c of cards) sel.append(h("option", {value: c.uid}, c.name + " · " + c.member_no + (c.status === "blocked" ? " · blocked" : "")));
+      sel.onchange = () => { if (sel.value) { $("card").value = sel.value; identify(); } };
+    }).catch(() => {});
+    const pending = n => $("fail-note").textContent = n
+      ? n + " simulated failure(s) waiting: they hit the next requests of any kind (check-out, renew, check-in, due date). Each retry uses one."
+      : "No simulated failures waiting.";
+    $("fail-btn").onclick = async () => {
+      try { pending((await api("/api/circulation/mock/ilms/fail", {json: {mode: $("fail-mode").value, times: +$("fail-times").value}})).pending); }
+      catch (e) { $("fail-note").textContent = e.message; }
+    };
+    $("fail-clear").onclick = async () => {
+      try { pending((await api("/api/circulation/mock/ilms/fail", {method: "DELETE"})).pending); }
+      catch (e) { $("fail-note").textContent = e.message; }
+    };
+    api("/api/circulation/mock/ilms/fail").then(r => pending(r.pending)).catch(() => {});
+    window.addEventListener("focus", () => api("/api/circulation/mock/ilms/fail").then(r => pending(r.pending)).catch(() => {}));
+  }
+  renderMember(); sync(); loadEvents();
+})();
+</script>
+{% endblock %}

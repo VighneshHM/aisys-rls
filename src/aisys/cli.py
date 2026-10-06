@@ -12,7 +12,7 @@ from aisys.auth import security
 from aisys.auth.permissions import sync_rbac
 from aisys.config import Settings, load_settings
 from aisys.db import make_engine, make_sessionmaker
-from aisys.models import Card, Role, User
+from aisys.models import Card, Member, Role, User
 
 # SYNTHETIC demo identities only (SOP stage 1: all data and credentials are synthetic).
 DEMO_PASSWORD = "Demo-Admin-Pass-1"  # noqa: S105 - synthetic, documented demo credential
@@ -22,7 +22,15 @@ DEMO_USERS = [
     ("clerk", "Cleo Clerk", "circulation_clerk", "STAFFCLERK01"),
     ("auditor", "Ari Auditor", "auditor", "STAFFAUDIT01"),
 ]
-DEMO_PATRON_CARDS = [("PATRON000001", "M0001"), ("PATRON000002", "M0002")]
+# (card uid, member no, name, status, block reason, fines in cents): one of each situation circulation must handle
+DEMO_MEMBERS = [
+    ("PATRON000001", "M0001", "Priya Nair", "active", "", 0),
+    ("PATRON000002", "M0002", "Tom Becker", "active", "", 0),
+    ("PATRON000003", "M0003", "Lena Okafor", "blocked", "Overdue items not returned", 0),
+    ("PATRON000004", "M0004", "Sam Ortiz", "active", "", 1250),  # fines over the 5.00 limit
+    ("PATRON000005", "M0005", "Ana Silva", "active", "", 300),  # owes something, still under the limit
+    ("PATRON000006", "M0006", "Kim Park", "active", "", 0),
+]
 
 
 def seed_demo(settings: Settings) -> None:
@@ -42,9 +50,11 @@ def seed_demo(settings: Settings) -> None:
             db.add(user)
             db.flush()
             db.add(Card(uid=card_uid, kind="staff", user_id=user.id))
-        for uid, member in DEMO_PATRON_CARDS:
+        for uid, member_no, name, status, reason, fines in DEMO_MEMBERS:
+            if not db.scalar(select(Member).where(Member.member_no == member_no)):
+                db.add(Member(member_no=member_no, name=name, status=status, block_reason=reason, fines_cents=fines))
             if not db.scalar(select(Card).where(Card.uid == uid)):
-                db.add(Card(uid=uid, kind="patron", member_ref=member))
+                db.add(Card(uid=uid, kind="patron", member_ref=member_no))
         audit.record(db, actor="system", action="seed.demo", detail={"users": len(DEMO_USERS)})
         db.commit()
 

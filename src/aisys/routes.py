@@ -27,6 +27,7 @@ from aisys.deps import (
 )
 from aisys.integrations.credentials import CardPresentation, CredentialProvider
 from aisys.models import AuditEvent, Card, Role, User
+from aisys.timeutil import iso
 
 router = APIRouter()
 STARTED_AT = datetime.now(UTC)
@@ -68,7 +69,7 @@ def _login_response(result: service.LoginResult, response: Response, settings: S
     )
     return {
         "token": result.token,
-        "expires_at": result.expires_at.isoformat(),
+        "expires_at": iso(result.expires_at),
         "user": _user_out(result.user),
     }
 
@@ -233,7 +234,7 @@ def read_audit(
     return [
         {
             "id": e.id,
-            "ts": e.ts.isoformat(),
+            "ts": iso(e.ts),
             "actor": e.actor,
             "action": e.action,
             "entity": e.entity,

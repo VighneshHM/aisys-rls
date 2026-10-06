@@ -11,6 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from aisys import __version__, migrate, pages
 from aisys.auth.permissions import sync_rbac
 from aisys.catalogue_routes import router as catalogue_router
+from aisys.circulation.registry import build_connector
+from aisys.circulation_routes import router as circulation_router
 from aisys.config import Settings, load_settings
 from aisys.db import make_engine, make_sessionmaker
 from aisys.integrations.credentials import CredentialProvider, MockCredentialProvider
@@ -54,10 +56,12 @@ def create_app(
     app.state.session_factory = factory
     app.state.credential_provider = credential_provider or MockCredentialProvider()
     app.state.devices = DeviceRegistry(settings.devices)  # fails fast on a bad [[devices]] config
+    app.state.ilms = build_connector(settings.circulation)  # fails fast on a bad [ilms] config
     app.include_router(router)
     app.include_router(migration_router)
     app.include_router(catalogue_router)
     app.include_router(rfid_router)
+    app.include_router(circulation_router)
 
     app.mount(
         "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"

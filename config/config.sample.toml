@@ -29,3 +29,18 @@ dir = "data/backups"          # pre-migration / pre-update database backups
 id = "staff-1"
 kind = "staff_reader"
 driver = "mock"
+
+# Library policy. The ILMS owns loan limits; fines over the limit stop circulation.
+[circulation]
+fine_limit_cents = 500
+loan_days = 14
+max_renewals = 2
+max_loans = 5
+
+# The ILMS connector. "mock" is a built-in simulator that words its replies as SIP2 or NCIP.
+# A real system is a class implementing CirculationConnector, registered in code and selected here.
+[ilms]
+driver = "mock"
+protocol = "sip2"                # sip2 | ncip
+retries = 2
+backoff_s = 0.1

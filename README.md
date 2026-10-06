@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration** and **AC02 tagging** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -32,6 +32,13 @@ The catalogue then shows the tag-to-item relationship. Use **Remove or retire ta
 tag can be reused, a retired one never can), and the **Tag registry** page to see every tag and its state; a
 removed tag has a **Reuse on another item** button there.
 Details and design: `docs/rfid.md`.
+
+## Try circulation (AC03)
+
+Sign in (`STAFFLIB0001` or `STAFFCLERK01`), open **Circulation**, pick a simulated patron card, name an item (accession
+no., barcode or tag UID) and check it out, renew it and check it in. Demo members include a blocked one and one over the
+fine limit, so you can see each refusal; the simulator can also make the mock library system time out or lose a reply.
+Every attempt appears in the history. Details and design: `docs/circulation.md`.
 
 ## Develop
 

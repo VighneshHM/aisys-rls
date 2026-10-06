@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aisys.app import create_app
+from aisys.circulation.connector import CirculationConfig
 from aisys.cli import DEMO_PASSWORD, seed_demo
 from aisys.config import Settings
 
@@ -15,6 +16,7 @@ def settings(tmp_path) -> Settings:
         log_level="WARNING",
         max_failed_logins=3,
         lockout_minutes=15,
+        circulation=CirculationConfig(ilms_backoff_s=0.0),  # retries without waiting
     )
 
 
