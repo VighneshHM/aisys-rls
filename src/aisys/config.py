@@ -7,6 +7,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from aisys.rfid.registry import DEFAULT_DEVICES, DeviceConfig
+
 DEFAULT_CONFIG_PATH = Path("config/config.toml")
 SAMPLE_CONFIG_PATH = Path("config/config.sample.toml")
 
@@ -24,6 +26,7 @@ class Settings:
     log_level: str = "INFO"
     log_format: str = "json"
     backup_dir: str = "data/backups"
+    devices: tuple[DeviceConfig, ...] = DEFAULT_DEVICES
     secret_key: str = field(default="", repr=False)
 
 
@@ -40,6 +43,13 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     sec = raw.get("security", {})
     log = raw.get("logging", {})
     backup = raw.get("backup", {})
+    devices = (
+        tuple(
+            DeviceConfig(id=str(d["id"]), kind=str(d.get("kind", "staff_reader")), driver=str(d.get("driver", "mock")))
+            for d in raw.get("devices", [])
+        )
+        or DEFAULT_DEVICES
+    )
     d = Settings()
 
     settings = Settings(
@@ -54,6 +64,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         log_level=log.get("level", d.log_level),
         log_format=log.get("format", d.log_format),
         backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
+        devices=devices,
         secret_key=os.environ.get("AISYS_SECRET_KEY", ""),
     )
     if settings.environment == "production" and len(settings.secret_key) < 32:

@@ -15,6 +15,9 @@ Items marked **[confirmed]** were agreed with the candidate; the rest are my own
 | A-09 | Mock card reader only presents a UID; real cards would add a challenge-response `proof` (field already in the interface). | own | Provider boundary is `integrations/credentials.py`. |
 | A-10 | TLS is terminated at deployment (reverse proxy or uvicorn certs); cookies are `Secure` in production. | own | "Encrypted transport where applicable" (NFR02). |
 | A-11 | No NCIP/SIP2/ISO/security certification is claimed anywhere. | SOP scope | Adapters are protocol-shaped and tested against mocks only. |
+| A-12 | A tag binds to an **item (physical copy)**: one active tag per item and one active item per tag, enforced in the database. A tag ends as **removed** (reusable) or **retired** (permanent). | own | See docs/rfid.md. Member-card tagging waits for member records. |
+| A-13 | Devices are built from `[[devices]]` config; the mock staff reader is a simulator whose "place a tag" controls exist only outside production. | own | Hardware is out of scope (SOP section 3); a real reader is one driver class. |
+| A-14 | Device write happens before the database save, with a compensating undo if the save fails. | own | A reader cannot join a DB transaction. |
 
 ## Open questions (to resolve with reviewers if possible)
 1. Which ILMS (if any) will the reviewers integrate with? Connector will be written against SIP2 first.

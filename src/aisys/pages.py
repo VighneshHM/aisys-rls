@@ -26,9 +26,10 @@ router = APIRouter(include_in_schema=False)
 # (key, label, icon, href, permission needed to see it, implemented yet?)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
-    ("catalogue", "Catalogue", "book", "#", "catalogue.read", False),
+    ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
     ("circulation", "Circulation", "swap", "#", "circulation.checkout", False),
-    ("tagging", "RFID tagging", "tag", "#", "rfid.tag", False),
+    ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
+    ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "#", "inventory.run", False),
     ("gate", "Gate events", "gate", "#", "gate.view", False),
     ("reports", "Reports", "chart", "#", "reports.view", False),
@@ -45,8 +46,23 @@ ROLE_LABELS = {
 }
 
 
+STATIC_DIR = Path(__file__).parent / "web" / "static"
+
+
+def asset_version() -> str:
+    """Changes whenever any static file changes, so a browser never keeps running a stale script or stylesheet."""
+    newest = max((f.stat().st_mtime_ns for f in STATIC_DIR.iterdir() if f.is_file()), default=0)
+    return f"{__version__}-{newest // 1_000_000:x}"
+
+
 def _context(request: Request, settings: Settings, **extra) -> dict:
-    return {"app_name": settings.app_name, "version": __version__, "environment": settings.environment, **extra}
+    return {
+        "app_name": settings.app_name,
+        "version": __version__,
+        "asset_v": asset_version(),
+        "environment": settings.environment,
+        **extra,
+    }
 
 
 def _shell(request: Request, settings: Settings, principal: Principal, active: str, **extra) -> dict:
@@ -191,4 +207,63 @@ def migration_page(
         )
     return TEMPLATES.TemplateResponse(
         request, "migration.html", _shell(request, settings, principal, "migration", fields=FIELDS, required=REQUIRED)
+    )
+
+
+def _gated_page(request, settings, principal, permission, template, active, **extra):
+    """Render a signed-in page if the role has `permission`; otherwise the friendly 'not permitted' page (403)."""
+    if principal is None:
+        return RedirectResponse("/")
+    if permission not in principal.permissions:
+        return TEMPLATES.TemplateResponse(
+            request, "forbidden.html", _shell(request, settings, principal, active), status_code=403
+        )
+    return TEMPLATES.TemplateResponse(request, template, _shell(request, settings, principal, active, **extra))
+
+
+@router.get("/catalogue", response_class=HTMLResponse)
+def catalogue_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "catalogue.read",
+        "catalogue.html",
+        "catalogue",
+        can_write="catalogue.write" in perms,
+        can_tag="rfid.tag" in perms,
+    )
+
+
+@router.get("/tagging", response_class=HTMLResponse)
+def tagging_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "rfid.tag",
+        "tagging.html",
+        "tagging",
+        simulator=settings.environment != "production",
+    )
+
+
+@router.get("/tags", response_class=HTMLResponse)
+def tags_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request, settings, principal, "catalogue.read", "tags.html", "registry", can_tag="rfid.tag" in perms
     )

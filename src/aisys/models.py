@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Table
+from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Table, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from aisys.db import Base
@@ -165,3 +165,48 @@ class Item(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     bib: Mapped[BibRecord] = relationship(lazy="joined")
+
+
+# ---------------------------------------------------------------- RFID tags
+class RfidTag(Base):
+    """One link between a physical tag and an item (one interval in the tag's life).
+
+    status: 'active'  = currently on the item
+            'removed' = taken off the item; the tag can be linked again (to any item)
+            'retired' = taken off and out of service for good (damaged / lost); the UID can never be linked again
+    A tag UID has at most one active link and an item has at most one active tag (both enforced by the database).
+    """
+
+    __tablename__ = "rfid_tags"
+    __table_args__ = (
+        Index("uq_rfid_tags_active_item", "item_id", unique=True, sqlite_where=text("status = 'active'")),
+        Index("uq_rfid_tags_active_uid", "tag_uid", unique=True, sqlite_where=text("status = 'active'")),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tag_uid: Mapped[str] = mapped_column(String(32), index=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="active")  # active | removed | retired
+    security_armed: Mapped[bool] = mapped_column(Boolean, default=True)
+    reader_id: Mapped[str] = mapped_column(String(64), default="")
+    tagged_by: Mapped[str] = mapped_column(String(64))
+    tagged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_reason: Mapped[str] = mapped_column(String(200), default="")
+
+    item: Mapped[Item] = relationship(lazy="joined")
+
+
+class TagEvent(Base):
+    """Device/tag activity stream for monitoring (separate from the audit log, which records staff actions)."""
+
+    __tablename__ = "tag_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    tag_uid: Mapped[str] = mapped_column(String(32), index=True)
+    reader_id: Mapped[str] = mapped_column(String(64), default="")
+    event_type: Mapped[str] = mapped_column(
+        String(20), index=True
+    )  # read|tagged|retagged|removed|retired|encode_failed
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
+    actor: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
