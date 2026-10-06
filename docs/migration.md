@@ -69,6 +69,17 @@ Permission-gated and audited (upload, mapping, validate, commit, rollback). File
 Cells are inserted into the UI as text only (never HTML). Exported CSV cells starting with `= + - @` are prefixed with `'`.
 Uploaded files are parsed in memory and never written to disk or executed.
 
+## Stale results (library changed after a file was checked)
+A batch is checked against the library as it is *at that moment*. If the library changes afterwards (another batch is committed
+or rolled back), the saved result would be wrong, so the system stamps each check with a fingerprint of the accession numbers,
+barcodes and bibliographic keys it compared against and **re-checks automatically** when the fingerprint differs:
+
+* Opening a batch, listing its rows or downloading its report re-checks it first; the page shows a one-off notice with the old and
+  new numbers (for example duplicates 193 -> 2). The history marks such batches **Needs re-check**.
+* **Commit never uses unreviewed numbers:** if the library changed, commit re-checks and refuses with `409` so the refreshed counts
+  can be read first. The database's unique constraints are a second line of defence (a clash aborts the whole transaction).
+* Every automatic re-check is audited (`migration.revalidate`, with before/after counts).
+
 ## Evidence
 * Synthetic data generator: `python -m aisys.devtools.sample_data --rows 20000 --out samples` (deterministic; the manifest lists the
   exact number of deliberate defects, and tests assert the importer finds exactly those).

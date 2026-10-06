@@ -24,15 +24,15 @@ class MappingIn(BaseModel):
     mapping: dict[str, str]
 
 
-def _batch_out(b: MigrationBatch) -> dict:
-    return {
+def _batch_out(b: MigrationBatch, refreshed: dict | None = None) -> dict:
+    out = {
         "id": b.id,
         "filename": b.filename,
         "sha256": b.file_sha256,
         "status": b.status,
         "mapping": b.mapping,
         "headers": b.headers,
-        "summary": b.summary,
+        "summary": {k: v for k, v in b.summary.items() if k != "library_stamp"},
         "created_by": b.created_by,
         "created_at": b.created_at.isoformat(),
         "backup": b.backup_path,
@@ -41,6 +41,9 @@ def _batch_out(b: MigrationBatch) -> dict:
         "target_fields": mapping_mod.FIELDS,
         "required_fields": list(mapping_mod.REQUIRED),
     }
+    if refreshed:  # shown once: the library changed after this file was checked, so it was checked again
+        out["refreshed"] = refreshed
+    return out
 
 
 def _guard(fn, *args, **kwargs):
@@ -52,6 +55,13 @@ def _guard(fn, *args, **kwargs):
 
 def _get(db: Session, batch_id: int) -> MigrationBatch:
     return _guard(service.get_batch, db, batch_id)
+
+
+def _get_fresh(db: Session, batch_id: int, principal: Principal, request: Request):
+    """Load a batch, re-validating it first if the library changed since it was last checked."""
+    batch = _get(db, batch_id)
+    refreshed = _guard(service.refresh_if_stale, db, batch, actor=principal.user.username, ip=client_ip(request))
+    return batch, refreshed
 
 
 @router.post("", status_code=201)
@@ -88,7 +98,8 @@ async def upload(
 
 @router.get("")
 def list_batches(_: Principal = Perm, db: Session = Depends(get_db)):
-    rows = db.scalars(select(MigrationBatch).order_by(MigrationBatch.id.desc()).limit(50))
+    rows = list(db.scalars(select(MigrationBatch).order_by(MigrationBatch.id.desc()).limit(50)))
+    stamp = service.current_stamp(db) if any(b.status == "validated" for b in rows) else ""
     return [
         {
             "id": b.id,
@@ -100,26 +111,29 @@ def list_batches(_: Principal = Perm, db: Session = Depends(get_db)):
             "valid": b.summary.get("valid"),
             "invalid": b.summary.get("invalid"),
             "duplicate": b.summary.get("duplicate"),
+            "stale": service.is_stale(b, stamp),  # library changed since the check; opening it re-checks
         }
         for b in rows
     ]
 
 
 @router.get("/{batch_id}")
-def get_batch(batch_id: int, _: Principal = Perm, db: Session = Depends(get_db)):
-    return _batch_out(_get(db, batch_id))
+def get_batch(batch_id: int, request: Request, principal: Principal = Perm, db: Session = Depends(get_db)):
+    batch, refreshed = _get_fresh(db, batch_id, principal, request)
+    return _batch_out(batch, refreshed)
 
 
 @router.get("/{batch_id}/rows")
 def list_rows(
     batch_id: int,
+    request: Request,
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    _: Principal = Perm,
+    principal: Principal = Perm,
     db: Session = Depends(get_db),
 ):
-    _get(db, batch_id)
+    _get_fresh(db, batch_id, principal, request)
     q = select(MigrationRow).where(MigrationRow.batch_id == batch_id)
     if status:
         q = q.where(MigrationRow.status == status)
@@ -135,8 +149,8 @@ def list_rows(
 
 
 @router.get("/{batch_id}/errors.csv")
-def errors_csv(batch_id: int, _: Principal = Perm, db: Session = Depends(get_db)):
-    batch = _get(db, batch_id)
+def errors_csv(batch_id: int, request: Request, principal: Principal = Perm, db: Session = Depends(get_db)):
+    batch, _ = _get_fresh(db, batch_id, principal, request)
     return StreamingResponse(
         service.errors_csv(db, batch),
         media_type="text/csv",

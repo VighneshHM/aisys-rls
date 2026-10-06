@@ -132,6 +132,47 @@ def set_mapping(db: Session, batch: MigrationBatch, new_mapping: dict[str, str],
     validate_batch(db, batch, actor=actor, ip=ip)
 
 
+def _library_state(db: Session) -> tuple[set[str], set[str], set[str]]:
+    """Everything a row can clash with: accession numbers, barcodes (casefolded) and bibliographic keys."""
+    taken_acc = {a.casefold() for a in db.scalars(select(Item.accession_no))}
+    taken_bc = {b.casefold() for b in db.scalars(select(Item.barcode).where(Item.barcode.is_not(None)))}
+    return taken_acc, taken_bc, set(db.scalars(select(BibRecord.dedupe_key)))
+
+
+def _stamp(taken_acc: set[str], taken_bc: set[str], keys: set[str]) -> str:
+    """Fingerprint of the library as the validator sees it; changes whenever a result could change."""
+    h = hashlib.sha256()
+    for part in (taken_acc, taken_bc, keys):
+        h.update(str(len(part)).encode())
+        for value in sorted(part):
+            h.update(value.encode())
+            h.update(b"")
+    return h.hexdigest()
+
+
+def current_stamp(db: Session) -> str:
+    return _stamp(*_library_state(db))
+
+
+def is_stale(batch: MigrationBatch, stamp: str) -> bool:
+    """A validated batch is stale when the library changed after it was checked."""
+    return batch.status == "validated" and batch.summary.get("library_stamp") != stamp
+
+
+def refresh_if_stale(db: Session, batch: MigrationBatch, *, actor: str, ip: str = "") -> dict | None:
+    """Re-run validation if the library changed since the last check. Returns what changed, or None."""
+    if not is_stale(batch, current_stamp(db)):
+        return None
+    keys = ("valid", "invalid", "duplicate")
+    previous = {k: batch.summary.get(k) for k in keys}
+    validate_batch(db, batch, actor=actor, ip=ip)
+    now = {k: batch.summary.get(k) for k in keys}
+    audit.record(db, actor=actor, action="migration.revalidate", entity="migration_batch", entity_id=batch.id,
+                 detail={"reason": "library_changed", "before": previous, "after": now}, ip=ip)  # fmt: skip
+    db.commit()
+    return {"reason": "library_changed", "previous": previous, "now": now}
+
+
 def validate_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = "") -> dict:
     """Dry run: classify every staged row. Writes only to the staging table, never to the library."""
     if batch.status not in ("staged", "validated"):
@@ -145,9 +186,8 @@ def validate_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = 
         db.commit()
         return batch.summary
 
-    taken_acc = {a.casefold() for a in db.scalars(select(Item.accession_no))}
-    taken_bc = {b.casefold() for b in db.scalars(select(Item.barcode).where(Item.barcode.is_not(None)))}
-    existing_keys = set(db.scalars(select(BibRecord.dedupe_key)))
+    taken_acc, taken_bc, existing_keys = _library_state(db)
+    library_stamp = _stamp(taken_acc, taken_bc, existing_keys)
     seen_acc: dict[str, int] = {}
     seen_bc: dict[str, int] = {}
     new_keys: set[str] = set()
@@ -215,6 +255,7 @@ def validate_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = 
         "bibs_reused": len(reused_keys),
         "library_items_before": _count(db, Item),
         "library_bibs_before": _count(db, BibRecord),
+        "library_stamp": library_stamp,
     }
     audit.record(
         db,
@@ -272,14 +313,17 @@ def _fingerprint(db: Session, exclude_batch_id: int) -> str:
 def commit_batch(db: Session, settings: Settings, batch: MigrationBatch, *, actor: str, ip: str = "") -> dict:
     if batch.status != "validated":
         raise MigrationError(409, f"Only a validated batch can be committed (this one is {batch.status})")
-    expected_valid = batch.summary.get("valid", 0)
-    if expected_valid == 0:
+    # The library may have changed since the dry run (another batch committed or rolled back, manual edits).
+    # Re-check first, and never commit numbers the user has not seen: refuse so they can review the new ones.
+    changed = refresh_if_stale(db, batch, actor=actor, ip=ip)
+    if changed:
+        raise MigrationError(
+            409,
+            "Library data changed since validation (valid rows "
+            f"{changed['previous']['valid']} -> {changed['now']['valid']}); review the refreshed results and retry",
+        )
+    if batch.summary.get("valid", 0) == 0:
         raise MigrationError(422, "There are no valid rows to migrate")
-
-    # The library may have changed since the dry run (another batch, manual edits): re-check first.
-    fresh = validate_batch(db, batch, actor=actor, ip=ip)
-    if fresh.get("valid") != expected_valid:
-        raise MigrationError(409, "Library data changed since validation; review the refreshed summary and retry")
 
     try:
         info = backup.create_backup(settings.database_url, settings.backup_dir, f"pre-migration-batch{batch.id}")
