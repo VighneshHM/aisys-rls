@@ -103,4 +103,21 @@ def search(db: Session, q: str, limit: int = 10) -> list[dict]:
         .order_by(Member.name)
         .limit(limit)
     )
-    return [{"member_no": m.member_no, "name": m.name, "status": m.status, "fines_cents": m.fines_cents} for m in rows]
+    rows = list(rows)
+    cards = dict(
+        db.execute(
+            select(Card.member_ref, Card.uid).where(
+                Card.kind == "patron", Card.active, Card.member_ref.in_([m.member_no for m in rows])
+            )
+        ).all()
+    )
+    return [
+        {
+            "member_no": m.member_no,
+            "name": m.name,
+            "status": m.status,
+            "fines_cents": m.fines_cents,
+            "card": cards.get(m.member_no),
+        }
+        for m in rows
+    ]

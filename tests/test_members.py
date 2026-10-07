@@ -30,9 +30,13 @@ def test_a_new_member_gets_the_next_number_and_can_use_a_new_card(client, lib):
     assert created["member_no"] == "M0007"  # the demo data has M0001-M0006
     assert created["name"] == "Nadia Rahman" and created["status"] == "active" and created["can_borrow"] is True
     assert identify(client, lib, "PATRON700001").json()["member_no"] == "M0007"  # the card identifies her
+    assert created["card"]["uid"] == "PATRON700001" and created["cards_withdrawn"] == 0  # the panel shows her card
+    assert add(client, lib, "No Card Yet").json()["card"] is None
     book(client, lib, "MB1")
     assert out(client, lib, "M0007", "MB1").status_code == 200  # and she can borrow at once
-    assert add(client, lib, "Next Person").json()["member_no"] == "M0008"  # numbers keep counting
+    assert (
+        add(client, lib, "Next Person").json()["member_no"] == "M0009"
+    )  # numbers keep counting (M0008 went to "No Card Yet")
 
 
 @pytest.mark.req("FR04")
@@ -61,6 +65,10 @@ def test_a_replacement_card_switches_the_old_one_off(client, lib, settings):
     assert lost.status_code == 409 and lost.json()["detail"]["code"] == "card_inactive"
     assert "replaced" in lost.json()["detail"]["message"]
     assert identify(client, lib, "PATRON800001").json()["member_no"] == "M0001"
+    offered = [c["uid"] for c in client.get("/api/circulation/mock/patron-cards", headers=lib).json()]
+    assert "PATRON800001" in offered and old not in offered  # the simulator offers only working cards
+    shown = client.get("/api/circulation/members/M0001", headers=lib).json()
+    assert shown["card"]["uid"] == "PATRON800001" and shown["cards_withdrawn"] == 1  # current card, one withdrawn
     assert client.post("/api/auth/card-login", json={"uid": "PATRON800001"}).status_code in (401, 403)  # never a login
     taken = client.post("/api/circulation/members/M0002/card", headers=lib, json={"uid": "PATRON800001"})
     assert taken.status_code == 409  # one card, one member
@@ -87,6 +95,11 @@ def test_members_can_be_found_by_name_or_number(client, lib):
     assert client.get("/api/circulation/members", headers=lib, params={"q": "zzzz"}).json()["members"] == []
     sam = client.get("/api/circulation/members", headers=lib, params={"q": "ortiz"}).json()["members"][0]
     assert sam["fines_cents"] == 1250 and sam["status"] == "active"
+    assert sam["card"] == "PATRON000004"  # the search shows which card each person holds
+    assert (
+        client.get("/api/circulation/members", headers=lib, params={"q": "priya nairobi"}).json()["members"][0]["card"]
+        is None
+    )
 
 
 @pytest.mark.req("FR04", "NFR02")
@@ -121,3 +134,9 @@ def test_ordinary_forms_do_not_use_the_red_danger_style(client, lib):
     assert page.count('class: "confirm"') == 1  # the block-member reason box
     css = client.get("/static/app.css").text
     assert ".confirm.neutral" in css
+
+
+@pytest.mark.req("FR04")
+def test_the_card_box_and_the_demo_list_follow_whoever_is_shown(client, lib):
+    page = client.get("/circulation", headers=lib).text
+    assert "function syncCardFields" in page and "syncCardFields(m);" in page  # every way of loading a member calls it

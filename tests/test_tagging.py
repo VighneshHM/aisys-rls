@@ -140,6 +140,8 @@ def test_devices_are_configured_in_toml_not_in_code(tmp_path):
     assert [d.id for d in load_settings(tmp_path / "missing.toml").devices] == [
         "staff-1",
         "handheld-1",
+        "gate-1",
+        "camera-1",
     ]  # sensible default
 
 

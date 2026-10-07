@@ -7,6 +7,7 @@ from aisys.app import create_app
 from aisys.circulation.connector import CirculationConfig
 from aisys.cli import DEMO_PASSWORD, seed_demo
 from aisys.config import Settings
+from aisys.notifications.providers import NotificationConfig
 
 
 @pytest.fixture
@@ -17,6 +18,7 @@ def settings(tmp_path) -> Settings:
         max_failed_logins=3,
         lockout_minutes=15,
         circulation=CirculationConfig(ilms_backoff_s=0.0),  # retries without waiting
+        notifications=NotificationConfig(backoff_s=0.0),
     )
 
 

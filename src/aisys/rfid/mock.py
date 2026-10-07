@@ -6,12 +6,14 @@ tests and demos can exercise offline / write-failure paths.
 
 from __future__ import annotations
 
+import html
 import secrets
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from threading import RLock
 
-from aisys.rfid.devices import DeviceError, DeviceHealth, DeviceUnavailable
-from aisys.rfid.events import TagObserved, is_valid_tag_uid, normalize_tag_uid
+from aisys.rfid.devices import DeviceError, DeviceHealth, DeviceUnavailable, Snapshot
+from aisys.rfid.events import Passage, TagObserved, is_valid_tag_uid, normalize_tag_uid
 
 
 @dataclass
@@ -159,3 +161,92 @@ class MockHandheld:
 
     def indicate(self, pattern: str) -> None:
         self.indications.append(pattern)
+
+
+class MockGate:
+    """Mock security gate. The simulator injects passages; `poll` hands them to the application once."""
+
+    kind = "gate"
+    is_mock = True
+
+    def __init__(self, device_id: str = "gate-1", **_options: object) -> None:
+        self.device_id = device_id
+        self.online = True
+        self.indications: list[str] = []
+        self._waiting: list[Passage] = []
+        self._fail_next: set[str] = set()
+        self._lock = RLock()
+
+    # ---- simulator controls ---------------------------------------------------------------------
+    def walk_through(self, tags: list[tuple[str, bool | None]], people: int = 1) -> None:
+        """Someone walks through carrying `tags` = (uid, security bit as read from the tag)."""
+        now = TagObserved.now()
+        seen = tuple(TagObserved(normalize_tag_uid(u), self.device_id, now, None, armed) for u, armed in tags)
+        with self._lock:
+            self._waiting.append(Passage(self.device_id, TagObserved.now(), max(1, people), seen))
+
+    def fail_next(self, command: str = "poll") -> None:
+        self._fail_next.add(command)
+
+    # ---- Gate interface -------------------------------------------------------------------------
+    def health(self) -> DeviceHealth:
+        return DeviceHealth(self.online, "mock gate" if self.online else "mock gate switched off")
+
+    def poll(self) -> list[Passage]:
+        if not self.online:
+            raise DeviceUnavailable(f"{self.device_id} is offline")
+        if "poll" in self._fail_next:
+            self._fail_next.discard("poll")
+            raise DeviceError(f"{self.device_id}: simulated poll failure")
+        with self._lock:
+            out, self._waiting = self._waiting, []
+            return out
+
+    def indicate(self, pattern: str) -> None:
+        self.indications.append(pattern)
+
+
+class MockCamera:
+    """Mock CCTV camera: draws a labelled placeholder frame (an SVG) instead of a real photograph."""
+
+    kind = "camera"
+    is_mock = True
+
+    def __init__(self, device_id: str = "camera-1", **_options: object) -> None:
+        self.device_id = device_id
+        self.online = True
+        self._fail_next: set[str] = set()
+
+    def fail_next(self, command: str = "capture") -> None:
+        self._fail_next.add(command)
+
+    def health(self) -> DeviceHealth:
+        return DeviceHealth(self.online, "mock camera" if self.online else "mock camera switched off")
+
+    def capture(self, caption: str) -> Snapshot:
+        if not self.online:
+            raise DeviceUnavailable(f"{self.device_id} is offline")
+        if "capture" in self._fail_next:
+            self._fail_next.discard("capture")
+            raise DeviceError(f"{self.device_id}: simulated capture failure")
+        stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+        lines = [html.escape(part) for part in caption.splitlines()[:4]]
+        text = "".join(
+            f'<text x="24" y="{236 + 26 * n}" fill="#e6edf7" font-size="18" font-family="monospace">{line}</text>'
+            for n, line in enumerate(lines)
+        )
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360">'
+            '<rect width="640" height="360" fill="#0b1220"/>'
+            '<rect x="0" y="0" width="640" height="360" fill="none" stroke="#2b3a55" stroke-width="4"/>'
+            '<rect x="40" y="70" width="560" height="120" rx="6" fill="#111c33" stroke="#2b3a55"/>'
+            '<circle cx="320" cy="108" r="22" fill="#2b3a55"/>'
+            '<rect x="288" y="136" width="64" height="48" rx="12" fill="#2b3a55"/>'
+            '<circle cx="28" cy="28" r="7" fill="#ef4444"/>'
+            '<text x="44" y="34" fill="#ef4444" font-size="18" font-family="monospace">REC</text>'
+            '<text x="500" y="34" fill="#9fb0c9" font-size="14" font-family="monospace">MOCK CCTV</text>'
+            f'<text x="24" y="216" fill="#9fb0c9" font-size="14" font-family="monospace">'
+            f"{html.escape(self.device_id)} - {stamp}</text>"
+            f"{text}</svg>"
+        )
+        return Snapshot("image/svg+xml", svg.encode("utf-8"))

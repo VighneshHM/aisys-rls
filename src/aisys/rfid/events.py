@@ -31,3 +31,17 @@ class TagObserved:
     @staticmethod
     def now() -> datetime:
         return datetime.now(UTC)
+
+
+@dataclass(frozen=True)
+class Passage:
+    """One walk through a security gate: how many people, and every tag the gate read on them.
+
+    `TagObserved.security_armed` is the security bit as the gate read it from the tag itself, which is what makes the
+    alarm decision independent of the library system.
+    """
+
+    gate_id: str
+    at: datetime
+    people: int = 1
+    tags: tuple[TagObserved, ...] = ()

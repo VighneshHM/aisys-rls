@@ -92,7 +92,7 @@ To connect a real system: implement `CirculationConnector` (see `src/aisys/circu
 
 ## Members
 
-Staff with `member.write` can **add a member** (name; the number is the next free `M####` unless given; a card is optional), **issue or replace a card** (the old card is switched off and refused with "replaced or withdrawn"), and **find a member by name or number** for a patron who has no card with them. Card numbers are unique across staff and patron cards, so a staff card can never become a patron card. All of it is audit-logged.
+Staff with `member.write` can **add a member** (name; the number is the next free `M####` unless given; a card is optional), **issue or replace a card** (the old card is switched off and refused with "replaced or withdrawn"), and **find a member by name or number** for a patron who has no card with them. The member panel shows the member's current card (and how many earlier cards were withdrawn), or "No card issued yet". Card numbers are unique across staff and patron cards, so a staff card can never become a patron card. All of it is audit-logged.
 
 ## Demo members (synthetic)
 

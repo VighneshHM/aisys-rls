@@ -96,14 +96,42 @@
   let member = null, item = null, askingReason = false, fineMode = null, issuing = false;
 
   // ------------------------------------------------------------------ patron
+  // the card box and the demo-card list always describe the member shown, however they were chosen
+  function syncCardFields(m) {
+    if (m.card === undefined) return;  // an older server that does not send the card: leave the fields alone
+    const uid = m.card ? m.card.uid : "";
+    $("card").value = uid;
+    const sel = $("demo-cards");
+    if (sel) sel.value = [...sel.options].some(o => o.value === uid) ? uid : "";
+  }
+
+  // simulator only: the list of cards the demo can "scan" (reloaded when a member or card is added)
+  async function loadDemoCards() {
+    const sel = $("demo-cards");
+    if (!sel) return;
+    try {
+      const cards = await api("/api/circulation/mock/patron-cards");
+      const keep = sel.value;
+      fill(sel, h("option", {value: ""}, cards.length ? "Pick a demo card…" : "No members yet: add one, or run  python -m aisys.cli seed-demo"),
+        cards.map(c => h("option", {value: c.uid}, c.name + " · " + c.member_no + " · " + c.uid + (c.status === "blocked" ? " · blocked" : ""))));
+      sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+      if (member) syncCardFields(member);
+    } catch (e) { /* the list is a convenience */ }
+  }
+
   function renderMember() {
     const m = member;
     $("member-badge").className = "badge " + (!m ? "" : m.can_borrow ? "good" : "warn");
     $("member-badge").textContent = !m ? "none chosen" : m.can_borrow ? "Can borrow" : m.status === "blocked" ? "Blocked" : "Fines over limit";
     if (!m) { fill($("member")); return; }
+    syncCardFields(m);
     fill($("member"),
       h("dl", {class: "kv tight", style: "margin:4px 0 12px"},
         h("dt", {}, "Member"), h("dd", {}, h("b", {}, m.name), " · ", h("span", {class: "mono"}, m.member_no)),
+        h("dt", {}, "Card"), h("dd", {}, m.card ? [h("span", {class: "mono"}, m.card.uid), m.card.issued_at ? h("span", {class: "sub"}, " · issued " + day(m.card.issued_at)) : null,
+          m.cards_withdrawn ? h("div", {class: "sub"}, m.cards_withdrawn + " earlier card" + (m.cards_withdrawn === 1 ? "" : "s") + " withdrawn") : null]
+          : m.card === undefined ? [h("span", {class: "sub"}, "Not shown: restart the app to load the latest version")]
+          : [h("span", {class: "sub"}, "No card issued yet"), m.cards_withdrawn ? h("div", {class: "sub"}, m.cards_withdrawn + " earlier card" + (m.cards_withdrawn === 1 ? "" : "s") + " withdrawn") : null]),
         h("dt", {}, "Status"), h("dd", {}, m.status === "blocked" ? "Blocked" + (m.block_reason ? " · " + m.block_reason : "") : "Active"),
         h("dt", {}, "Fines"), h("dd", {}, money(m.fines_cents) + " (limit " + money(m.fine_limit_cents) + ")" + (m.fines_over_limit ? " · over the limit" : "")),
         h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans)),
@@ -152,7 +180,7 @@
     clear("member-notice");
     try {
       member = await api("/api/circulation/members/" + member.member_no + "/card", {json: {uid: $("new-card").value}});
-      issuing = false; renderMember();
+      issuing = false; renderMember(); loadDemoCards();
       say("member-notice", "ok", "Card issued to " + member.name + ".");
     } catch (e) { say("member-notice", "bad", e.message); }
   }
@@ -170,7 +198,7 @@
     clear("member-notice");
     try {
       member = await api("/api/circulation/members", {json: {name: $("nm-name").value, member_no: $("nm-no").value, card_uid: $("nm-card").value}});
-      fill($("member-form")); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden"); renderMember();
+      fill($("member-form")); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden"); renderMember(); loadDemoCards();
       say("member-notice", "ok", member.name + " was added as " + member.member_no + ".");
     } catch (e) { say("member-notice", "bad", e.message); }
   }
@@ -184,7 +212,7 @@
       fill($("member-results"), r.members.length ? r.members.map(m => h("button", {type: "button", class: "pick", onclick: async () => {
           clear("member-notice"); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden");
           await loadMember(m.member_no); fill($("member-results")); $("member-q").value = "";
-        }}, h("b", {}, m.name), h("span", {}, m.member_no + (m.status === "blocked" ? " · blocked" : "") + (m.fines_cents ? " · owes " + money(m.fines_cents) : ""))))
+        }}, h("b", {}, m.name), h("span", {}, m.member_no + " · " + (m.card ? "card " + m.card : "no card") + (m.status === "blocked" ? " · blocked" : "") + (m.fines_cents ? " · owes " + money(m.fines_cents) : ""))))
         : h("div", {class: "sub"}, "No member matches."));
     } catch (e) { fill($("member-results"), h("div", {class: "sub"}, e.message)); }
   }
@@ -353,12 +381,8 @@
   $("refresh").onclick = loadEvents;
 
   if (SIM) {
-    api("/api/circulation/mock/patron-cards").then(cards => {
-      const sel = $("demo-cards");
-      if (!cards.length) sel.firstChild.textContent = "No demo members yet: run  python -m aisys.cli seed-demo";
-      for (const c of cards) sel.append(h("option", {value: c.uid}, c.name + " · " + c.member_no + (c.status === "blocked" ? " · blocked" : "")));
-      sel.onchange = () => { if (sel.value) { $("card").value = sel.value; identify(); } };
-    }).catch(() => {});
+    $("demo-cards").onchange = () => { if ($("demo-cards").value) { $("card").value = $("demo-cards").value; identify(); } };
+    loadDemoCards();
     const pending = n => $("fail-note").textContent = n
       ? n + " simulated failure(s) waiting: they hit the next requests of any kind (check-out, renew, check-in, due date). Each retry uses one."
       : "No simulated failures waiting.";

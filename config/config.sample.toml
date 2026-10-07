@@ -35,6 +35,16 @@ id = "handheld-1"
 kind = "handheld"        # walks a shelf for inventory
 driver = "mock"
 
+[[devices]]
+id = "gate-1"
+kind = "gate"            # security gate at the exit
+driver = "mock"
+
+[[devices]]
+id = "camera-1"
+kind = "camera"          # CCTV camera that photographs alarms
+driver = "mock"
+
 # Library policy. The ILMS owns loan limits; fines over the limit stop circulation.
 [circulation]
 fine_limit_cents = 500
@@ -47,6 +57,18 @@ max_fine_per_loan_cents = 1000   # one loan never costs more than 10.00
 
 # The ILMS connector. "mock" is a built-in simulator that words its replies as SIP2 or NCIP.
 # A real system is a class implementing CirculationConnector, registered in code and selected here.
+[gate]
+duplicate_window_s = 60          # the same tag alarming again within this many seconds is a duplicate
+
+# Notification channels. "mock" providers record what they would send. A real email, SMS or print service is a class
+# implementing NotificationProvider, registered in code and selected here.
+[notifications]
+email = "mock"
+sms = "mock"
+print = "mock"
+max_attempts = 3                 # delivery attempts before a message is marked failed
+backoff_s = 60                   # wait before a retry grows with each failure (backoff_s x attempts so far)
+
 [ilms]
 driver = "mock"
 protocol = "sip2"                # sip2 | ncip
