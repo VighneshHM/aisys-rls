@@ -54,8 +54,10 @@ def find_member(db: Session, member_no: str) -> Member:
 def identify(db: Session, uid: str, *, actor: str, ip: str = "") -> Member:
     """A patron card identifies a member. It never logs anyone in (staff cards do that, elsewhere)."""
     card = db.scalar(select(Card).where(Card.uid == uid.strip().upper()))
-    if card is None or card.kind != "patron" or not card.active or not card.member_ref:
+    if card is None or card.kind != "patron" or not card.member_ref:
         raise CircError(404, "unknown_card", "This is not a registered patron card")
+    if not card.active:
+        raise CircError(409, "card_inactive", "This card is no longer active (it was replaced or withdrawn)")
     member = find_member(db, card.member_ref)
     audit.record(db, actor=actor, action="member.identify", entity="member", entity_id=member.member_no, ip=ip)
     db.commit()

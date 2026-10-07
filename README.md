@@ -39,7 +39,8 @@ Sign in (`STAFFLIB0001` or `STAFFCLERK01`), open **Circulation**, pick a simulat
 no., barcode or tag UID) and check it out, renew it and check it in. Demo members include a blocked one and one over the
 fine limit, so you can see each refusal; the simulator can also make the mock library system time out or lose a reply.
 Every attempt appears in the history. Late returns are charged a fine (see `docs/circulation.md`); staff can record
-payments and waivers on the member panel. Details and design: `docs/circulation.md`.
+payments and waivers on the member panel, add members and issue or replace their cards. Details and design:
+`docs/circulation.md`.
 
 ## Try inventory (AC05)
 
