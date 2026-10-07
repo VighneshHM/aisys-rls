@@ -119,9 +119,17 @@ def member_out(db: Session, member: Member, config: CirculationConfig, *, with_l
     loans = list(
         db.scalars(select(Loan).where(Loan.member_id == member.id, Loan.returned_at.is_(None)).order_by(Loan.due_at))
     )
+    cards = list(
+        db.scalars(
+            select(Card).where(Card.kind == "patron", Card.member_ref == member.member_no).order_by(Card.id.desc())
+        )
+    )
+    current = next((c for c in cards if c.active), None)
     return {
         "member_no": member.member_no,
         "name": member.name,
+        "card": {"uid": current.uid, "issued_at": iso(current.issued_at)} if current else None,
+        "cards_withdrawn": sum(1 for c in cards if not c.active),
         "status": member.status,
         "block_reason": member.block_reason,
         "fines_cents": member.fines_cents,

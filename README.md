@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -48,6 +48,13 @@ Sign in as `STAFFLIB0001`, open **Inventory**, pick a shelf location and start a
 click **Put this shelf in range**, then **Scan shelf**: the report shows found, missing, misplaced and unknown tags
 with the beep and light each earned. Items need a `location` (the import has one) and tags (tag them first). Details
 and design: `docs/inventory.md`.
+
+## Try the gate (AC06)
+
+Sign in as `STAFFADMIN01`, open **Gate events**, type a tagged book's accession number under *Simulate a walk through the
+gate* and click **Walk through the gate**. Because the book was never checked out its security bit is still on, so it
+raises an alarm with a CCTV snapshot and queued messages. Click **Send queued messages** to deliver them and read them
+in the mock outbox. Check the book out first and walk it through again: no alarm. Details and design: `docs/gate.md`.
 
 ## Develop
 

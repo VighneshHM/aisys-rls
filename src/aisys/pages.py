@@ -31,7 +31,7 @@ NAV = [
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "/inventory", "inventory.run", True),
-    ("gate", "Gate events", "gate", "#", "gate.view", False),
+    ("gate", "Gate events", "gate", "/gate", "gate.view", True),
     ("reports", "Reports", "chart", "#", "reports.view", False),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
     ("audit", "Audit log", "list", "#", "audit.read", False),
@@ -291,6 +291,25 @@ def circulation_page(
         can_renew="circulation.renew" in perms,
         can_block="member.write" in perms,
         protocol=settings.circulation.ilms_protocol.upper(),
+    )
+
+
+@router.get("/gate", response_class=HTMLResponse)
+def gate_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "gate.view",
+        "gate.html",
+        "gate",
+        simulator=settings.environment != "production" and "rfid.tag" in perms,
+        can_admin="admin.config" in perms,
     )
 
 

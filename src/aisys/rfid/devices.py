@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from aisys.rfid.events import TagObserved
+from aisys.rfid.events import Passage, TagObserved
 
 
 class DeviceError(Exception):
@@ -43,6 +43,33 @@ class Handheld(Device, Protocol):
 
     def indicate(self, pattern: str) -> None:
         """Audible/visible confirmation: 'ok' (one beep, green), 'warning' (two beeps, amber), 'error' (long, red)."""
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """A still image from a camera."""
+
+    content_type: str
+    data: bytes
+
+
+@runtime_checkable
+class Gate(Device, Protocol):
+    """Security gate: reports each passage (with the security bit of every tag) and sounds or lights an alarm."""
+
+    def poll(self) -> list[Passage]:
+        """Passages since the last poll. Raises DeviceUnavailable if the gate is unreachable."""
+
+    def indicate(self, pattern: str) -> None:
+        """Local alarm: 'ok', 'warning' or 'alarm' (siren and flashing light)."""
+
+
+@runtime_checkable
+class Camera(Device, Protocol):
+    """CCTV camera: takes a still image on request."""
+
+    def capture(self, caption: str) -> Snapshot:
+        """A snapshot. `caption` is overlaid by cameras that support it (the mock does)."""
 
 
 @runtime_checkable

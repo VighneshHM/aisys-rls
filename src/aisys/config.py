@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from aisys.circulation.connector import CirculationConfig
+from aisys.gate.config import GateConfig
+from aisys.notifications.providers import NotificationConfig
 from aisys.rfid.registry import DEFAULT_DEVICES, DeviceConfig
 
 DEFAULT_CONFIG_PATH = Path("config/config.toml")
@@ -29,6 +31,8 @@ class Settings:
     backup_dir: str = "data/backups"
     devices: tuple[DeviceConfig, ...] = DEFAULT_DEVICES
     circulation: CirculationConfig = CirculationConfig()
+    notifications: NotificationConfig = NotificationConfig()
+    gate: GateConfig = GateConfig()
     secret_key: str = field(default="", repr=False)
 
 
@@ -67,6 +71,16 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         ilms_retries=int(ilms.get("retries", dc.ilms_retries)),
         ilms_backoff_s=float(ilms.get("backoff_s", dc.ilms_backoff_s)),
     )
+    notif, gate_raw = raw.get("notifications", {}), raw.get("gate", {})
+    dn, dg = NotificationConfig(), GateConfig()
+    notifications = NotificationConfig(
+        email_driver=str(notif.get("email", dn.email_driver)),
+        sms_driver=str(notif.get("sms", dn.sms_driver)),
+        print_driver=str(notif.get("print", dn.print_driver)),
+        max_attempts=int(notif.get("max_attempts", dn.max_attempts)),
+        backoff_s=float(notif.get("backoff_s", dn.backoff_s)),
+    )
+    gate = GateConfig(duplicate_window_s=int(gate_raw.get("duplicate_window_s", dg.duplicate_window_s)))
     d = Settings()
 
     settings = Settings(
@@ -83,6 +97,8 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
         devices=devices,
         circulation=circulation,
+        notifications=notifications,
+        gate=gate,
         secret_key=os.environ.get("AISYS_SECRET_KEY", ""),
     )
     if settings.environment == "production" and len(settings.secret_key) < 32:

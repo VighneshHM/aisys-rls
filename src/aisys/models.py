@@ -5,7 +5,22 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Table, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    LargeBinary,
+    Numeric,
+    String,
+    Table,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from aisys.db import Base
@@ -316,3 +331,91 @@ class FineEntry(Base):
     note: Mapped[str] = mapped_column(String(300), default="")
     actor: Mapped[str] = mapped_column(String(64), default="")
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# ---------------------------------------------------------------- security gate, CCTV, notifications
+class GatePassage(Base):
+    """One walk through a gate (append-only). Footfall is the sum of `people`."""
+
+    __tablename__ = "gate_passages"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    gate_id: Mapped[str] = mapped_column(String(64))
+    people: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class GateEvent(Base):
+    """One tag seen at a gate and what we made of it (append-only, DB triggers, migration 0008).
+
+    kind: unauthorised   security bit on, the item is not on loan: someone is taking it out (ALARM)
+          armed_on_loan  security bit on although the item is on loan: a check-out that could not switch it off (ALARM)
+          unissued       a tag that belongs to no item (ALARM if its bit is on)
+          authorised     bit off and the item is on loan: a normal exit
+          bit_off        bit off but the item is not on loan: it was switched off without a loan (warning)
+    The alarm is decided from the security bit read at the gate, never from the library system.
+    """
+
+    __tablename__ = "gate_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    passage_id: Mapped[int] = mapped_column(ForeignKey("gate_passages.id"), index=True)
+    gate_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)
+    alarm: Mapped[bool] = mapped_column(Boolean)
+    tag_uid: Mapped[str] = mapped_column(String(32), index=True)
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True, index=True)
+    accession_no: Mapped[str] = mapped_column(String(32), default="")  # copied, so the record survives catalogue edits
+    title: Mapped[str] = mapped_column(String(500), default="")
+    loan_member_no: Mapped[str] = mapped_column(String(32), default="")
+    security_armed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    on_loan: Mapped[bool] = mapped_column(Boolean, default=False)
+    people: Mapped[int] = mapped_column(Integer, default=1)
+    decided_by: Mapped[str] = mapped_column(String(20), default="security_bit")
+    duplicate_of: Mapped[int | None] = mapped_column(Integer, nullable=True)  # an earlier alarm for the same tag
+    camera_id: Mapped[str] = mapped_column(String(64), default="")
+    image_error: Mapped[str] = mapped_column(String(200), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+
+
+class GateImage(Base):
+    """The CCTV snapshot taken for an alarm (append-only)."""
+
+    __tablename__ = "gate_images"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("gate_events.id"), unique=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    camera_id: Mapped[str] = mapped_column(String(64), default="")
+    content_type: Mapped[str] = mapped_column(String(40))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+class NotificationPref(Base):
+    """Which channels a staff user wants alerts on, and where to reach them (email address, phone, printer)."""
+
+    __tablename__ = "notification_prefs"
+    __table_args__ = (Index("uq_notification_prefs_user_channel", "user_id", "channel", unique=True),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    channel: Mapped[str] = mapped_column(String(10))  # email | sms | print
+    address: Mapped[str] = mapped_column(String(200))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Notification(Base):
+    """A message waiting to go out (or already sent / given up on). Delivery is a separate step with retries."""
+
+    __tablename__ = "notifications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    channel: Mapped[str] = mapped_column(String(10))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    recipient: Mapped[str] = mapped_column(String(200))
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(10), default="queued", index=True)  # queued | sent | failed
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str] = mapped_column(String(300), default="")
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_ref: Mapped[str] = mapped_column(String(100), default="")
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("gate_events.id"), nullable=True, index=True)

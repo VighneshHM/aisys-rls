@@ -402,7 +402,7 @@ def mock_patron_cards(
     rows = db.execute(
         select(Card.uid, Member.member_no, Member.name, Member.status)
         .join(Member, Member.member_no == Card.member_ref)
-        .where(Card.kind == "patron")
+        .where(Card.kind == "patron", Card.active)  # a withdrawn card is not offered
         .order_by(Member.member_no)
     ).all()
     return [{"uid": u, "member_no": n, "name": nm, "status": st} for u, n, nm, st in rows]

@@ -9,10 +9,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from aisys.rfid.devices import Device, DeviceHealth, Handheld, StaffReader
-from aisys.rfid.mock import MockHandheld, MockStaffReader
+from aisys.rfid.devices import Camera, Device, DeviceHealth, Gate, Handheld, StaffReader
+from aisys.rfid.mock import MockCamera, MockGate, MockHandheld, MockStaffReader
 
-KINDS = {"staff_reader": StaffReader, "handheld": Handheld}
+KINDS = {"staff_reader": StaffReader, "handheld": Handheld, "gate": Gate, "camera": Camera}
 
 
 class DeviceConfigError(ValueError):
@@ -29,12 +29,18 @@ class DeviceConfig:
 DEFAULT_DEVICES = (
     DeviceConfig("staff-1", "staff_reader", "mock"),
     DeviceConfig("handheld-1", "handheld", "mock"),
+    DeviceConfig("gate-1", "gate", "mock"),
+    DeviceConfig("camera-1", "camera", "mock"),
 )
 
 
 class DeviceRegistry:
     _drivers: dict[str, Callable[..., Device]] = {"mock": MockStaffReader}  # staff readers, by driver name
-    _kind_drivers: dict[tuple[str, str], Callable[..., Device]] = {("handheld", "mock"): MockHandheld}
+    _kind_drivers: dict[tuple[str, str], Callable[..., Device]] = {
+        ("handheld", "mock"): MockHandheld,
+        ("gate", "mock"): MockGate,
+        ("camera", "mock"): MockCamera,
+    }
 
     def __init__(self, configs: tuple[DeviceConfig, ...] = DEFAULT_DEVICES) -> None:
         self._devices: dict[str, Device] = {}
