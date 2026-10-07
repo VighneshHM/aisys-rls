@@ -72,6 +72,9 @@ To connect a real system: implement `CirculationConnector` (see `src/aisys/circu
 
 | Method | Path | Needs |
 |---|---|---|
+| GET | `/members?q=` find members by name or number | `member.read` |
+| POST | `/members` `{name, member_no?, card_uid?}` add a member (the number is automatic if empty) | `member.write` |
+| POST | `/members/{member_no}/card` `{uid}` issue a patron card; a card they had before is switched off | `member.write` |
 | POST | `/members/identify` `{uid}`: patron card scan, returns the member and their loans | `member.read` |
 | GET | `/members/{member_no}` | `member.read` |
 | POST | `/members/{member_no}/block` `{blocked, reason}` | `member.write` |
@@ -86,6 +89,10 @@ To connect a real system: implement `CirculationConnector` (see `src/aisys/circu
 | simulator | `/mock/patron-cards`, `/mock/present`, `/mock/ilms/fail` (404 in production) | any circulation permission |
 
 `item_ref` is an accession number, a barcode or the UID of the item's active tag.
+
+## Members
+
+Staff with `member.write` can **add a member** (name; the number is the next free `M####` unless given; a card is optional), **issue or replace a card** (the old card is switched off and refused with "replaced or withdrawn"), and **find a member by name or number** for a patron who has no card with them. Card numbers are unique across staff and patron cards, so a staff card can never become a patron card. All of it is audit-logged.
 
 ## Demo members (synthetic)
 

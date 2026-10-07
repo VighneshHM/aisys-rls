@@ -1,0 +1,106 @@
+"""Members: create them, issue or replace their patron card, find them by name.
+
+A patron card only identifies a member; it never gives a login. Issuing a new card to a member who already has one
+(lost, damaged) switches the old card off in the same transaction, so a lost card cannot be used any more.
+"""
+
+from __future__ import annotations
+
+import re
+
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session
+
+from aisys import audit
+from aisys.circulation.service import CircError, find_member
+from aisys.models import Card, Member
+
+CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
+MEMBER_NO_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,31}$")
+
+
+def next_member_no(db: Session) -> str:
+    """M0001, M0002, ...: one more than the highest M-number in use (other formats are left alone)."""
+    numbers = [int(m[1:]) for (m,) in db.execute(select(Member.member_no)) if re.fullmatch(r"M\d+", m)]
+    return f"M{max(numbers, default=0) + 1:04d}"
+
+
+def _clean_card(uid: str) -> str:
+    uid = re.sub(r"[\s:-]", "", uid or "").upper()
+    if not CARD_RE.match(uid):
+        raise CircError(422, "bad_card", "A card number is 6 to 64 letters and digits")
+    return uid
+
+
+def _check_card_free(db: Session, uid: str) -> None:
+    if db.scalar(select(Card).where(Card.uid == uid)):
+        raise CircError(409, "card_in_use", "That card number is already registered to someone")
+
+
+def create_member(
+    db: Session, *, name: str, member_no: str = "", card_uid: str = "", actor: str, ip: str = ""
+) -> Member:
+    name = " ".join(name.split())
+    if not name:
+        raise CircError(422, "name_required", "A member needs a name")
+    number = member_no.strip().upper() or next_member_no(db)
+    if not MEMBER_NO_RE.match(number):
+        raise CircError(422, "bad_member_no", "A member number is letters, digits and dashes, like M0042")
+    if db.scalar(select(Member).where(Member.member_no == number)):
+        raise CircError(409, "member_exists", f"Member number {number} is already in use")
+    uid = _clean_card(card_uid) if card_uid.strip() else ""
+    if uid:
+        _check_card_free(db, uid)
+    member = Member(member_no=number, name=name)
+    db.add(member)
+    db.flush()
+    if uid:
+        db.add(Card(uid=uid, kind="patron", member_ref=number))
+    audit.record(
+        db,
+        actor=actor,
+        action="member.create",
+        entity="member",
+        entity_id=number,
+        detail={"name": name, "card": bool(uid)},
+        ip=ip,
+    )
+    db.commit()
+    return member
+
+
+def issue_card(db: Session, member_no: str, card_uid: str, *, actor: str, ip: str = "") -> Member:
+    """Give a member a card. Any card they had before is switched off (lost or replaced)."""
+    member = find_member(db, member_no)
+    uid = _clean_card(card_uid)
+    _check_card_free(db, uid)
+    old = list(db.scalars(select(Card).where(Card.kind == "patron", Card.member_ref == member.member_no, Card.active)))
+    for card in old:
+        card.active = False
+    db.add(Card(uid=uid, kind="patron", member_ref=member.member_no))
+    audit.record(
+        db,
+        actor=actor,
+        action="member.card_issue",
+        entity="member",
+        entity_id=member.member_no,
+        detail={"replaced": [c.uid for c in old]},
+        ip=ip,
+    )
+    db.commit()
+    return member
+
+
+def search(db: Session, q: str, limit: int = 10) -> list[dict]:
+    """Members whose name or number contains `q` (case-insensitive), best matches first."""
+    q = q.strip().lower().replace("%", "").replace("_", "")  # no wildcards: they would match everyone
+    if not q:
+        return []
+    like = f"%{q}%"
+    rows = db.scalars(
+        select(Member)
+        .where(or_(func.lower(Member.name).like(like), func.lower(Member.member_no).like(like)))
+        .order_by(Member.name)
+        .limit(limit)
+    )
+    return [{"member_no": m.member_no, "name": m.name, "status": m.status, "fines_cents": m.fines_cents} for m in rows]

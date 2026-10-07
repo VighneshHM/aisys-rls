@@ -26,6 +26,13 @@
           <select id="demo-cards"><option value="">Pick a demo card…</option></select>
         </div>
         {% endif %}
+        <div class="field" style="margin-bottom:10px">
+          <label for="member-q">Or find a member by name or number</label>
+          <input id="member-q" type="search" placeholder="e.g. Nair, or M0007" autocomplete="off" spellcheck="false">
+          <div class="picklist" id="member-results" style="margin-top:8px"></div>
+        </div>
+        {% if can_block %}<div class="actions" style="margin:0 0 10px"><button class="btn ghost small" id="add-member-btn" type="button">Add a new member</button></div>{% endif %}
+        <div id="member-form"></div>
         <div id="member-notice" class="notice" role="alert"></div>
         <div id="member"></div>
       </div>
@@ -86,7 +93,7 @@
   const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
   const money = c => (c / 100).toFixed(2);
   const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
-  let member = null, item = null, askingReason = false, fineMode = null;
+  let member = null, item = null, askingReason = false, fineMode = null, issuing = false;
 
   // ------------------------------------------------------------------ patron
   function renderMember() {
@@ -118,10 +125,68 @@
         h("input", {id: "block-reason", maxlength: "200", placeholder: "e.g. lost card, overdue items"}),
         h("div", {class: "actions"}, h("button", {class: "btn small danger", type: "button", onclick: () => setBlocked(true, $("block-reason").value.trim())}, "Block member"),
           h("button", {class: "btn ghost small", type: "button", onclick: () => { askingReason = false; renderMember(); }}, "Cancel")))
+      : CAN_BLOCK && issuing ? cardForm(m)
       : CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
-        m.status === "blocked" ? "Unblock member" : "Block member")) : null);
+        m.status === "blocked" ? "Unblock member" : "Block member"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = true; renderMember(); }}, "Issue or replace card")) : null);
     if (askingReason && $("block-reason")) $("block-reason").focus();
+    if (issuing && $("new-card")) $("new-card").focus();
     sync();
+  }
+
+  // ------------------------------------------------------------------ members: find, add, issue a card
+  const newCardNo = () => "PATRON" + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 90) + 10);
+  const cardField = id => h("div", {class: "toolbar", style: "margin:0"},
+    h("div", {class: "grow"}, h("input", {id, class: "uid", placeholder: "Scan or type the card number", autocomplete: "off", spellcheck: "false"})),
+    SIM ? h("button", {class: "btn ghost small", type: "button", onclick: () => { $(id).value = newCardNo(); }}, "Generate") : null);
+
+  function cardForm(m) {
+    return h("div", {class: "confirm neutral", style: "margin-top:14px"},
+      h("label", {for: "new-card"}, "New card for " + m.name + (m.status === "blocked" ? "" : ". Any card they had before stops working.")),
+      cardField("new-card"),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: submitCard}, "Issue card"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = false; renderMember(); }}, "Cancel")));
+  }
+
+  async function submitCard() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/card", {json: {uid: $("new-card").value}});
+      issuing = false; renderMember();
+      say("member-notice", "ok", "Card issued to " + member.name + ".");
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  function memberForm() {
+    return h("div", {class: "confirm neutral", style: "margin:0 0 12px"},
+      h("label", {for: "nm-name"}, "Full name"), h("input", {id: "nm-name", maxlength: "200", autocomplete: "off"}),
+      h("label", {for: "nm-no", style: "margin-top:8px"}, "Member number (leave empty for the next one)"), h("input", {id: "nm-no", maxlength: "32", placeholder: "automatic", autocomplete: "off"}),
+      h("label", {for: "nm-card", style: "margin-top:8px"}, "Patron card (optional, can be issued later)"), cardField("nm-card"),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: submitMember}, "Add member"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => fill($("member-form"))}, "Cancel")));
+  }
+
+  async function submitMember() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members", {json: {name: $("nm-name").value, member_no: $("nm-no").value, card_uid: $("nm-card").value}});
+      fill($("member-form")); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden"); renderMember();
+      say("member-notice", "ok", member.name + " was added as " + member.member_no + ".");
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  let findTimer = null;
+  async function findMembers() {
+    const q = $("member-q").value.trim();
+    if (!q) { fill($("member-results")); return; }
+    try {
+      const r = await api("/api/circulation/members?q=" + encodeURIComponent(q));
+      fill($("member-results"), r.members.length ? r.members.map(m => h("button", {type: "button", class: "pick", onclick: async () => {
+          clear("member-notice"); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden");
+          await loadMember(m.member_no); fill($("member-results")); $("member-q").value = "";
+        }}, h("b", {}, m.name), h("span", {}, m.member_no + (m.status === "blocked" ? " · blocked" : "") + (m.fines_cents ? " · owes " + money(m.fines_cents) : ""))))
+        : h("div", {class: "sub"}, "No member matches."));
+    } catch (e) { fill($("member-results"), h("div", {class: "sub"}, e.message)); }
   }
 
   const FINE_KIND = {opening: "Opening balance", charge: "Fine charged", payment: "Paid", waiver: "Waived"};
@@ -133,7 +198,7 @@
         h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = "waiver"; renderMember(); }}, "Waive fine"));
     }
     const paying = fineMode === "payment";
-    return h("div", {class: "confirm", style: "margin-top:12px"},
+    return h("div", {class: "confirm neutral", style: "margin-top:12px"},
       h("label", {for: "fine-amount"}, paying ? "Amount paid" : "Amount to waive"),
       h("input", {id: "fine-amount", inputmode: "decimal", value: money(m.fines_cents), autocomplete: "off"}),
       h("label", {for: "fine-note", style: "margin-top:8px"}, paying ? "Note (optional)" : "Why is it being waived? (required)"),
@@ -161,7 +226,7 @@
   async function identify() {
     const uid = $("card").value.trim();
     if (!uid) return;
-    clear("member-notice"); askingReason = false; fineMode = null;
+    clear("member-notice"); askingReason = false; fineMode = null; issuing = false;
     try {
       const next = await api("/api/circulation/members/identify", {json: {uid}});
       if (!member || member.member_no !== next.member_no) $("result-panel").classList.add("hidden");  // not this patron's result
@@ -276,6 +341,8 @@
 
   // ------------------------------------------------------------------ wiring
   $("card-btn").onclick = identify;
+  $("member-q").addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(findMembers, 250); });
+  if ($("add-member-btn")) $("add-member-btn").onclick = () => { fill($("member-form"), memberForm()); $("nm-name").focus(); };
   $("card").addEventListener("keydown", e => { if (e.key === "Enter") identify(); });
   $("item-btn").onclick = () => lookup();
   $("item-ref").addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });

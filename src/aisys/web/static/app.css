@@ -210,6 +210,7 @@ details.sim .actions { margin-top: 10px; }
 .btn.danger { background: var(--bad); color: #fff; } .btn.danger:hover { background: color-mix(in srgb, var(--bad) 85%, #000); }
 .btn.ghost.danger-text { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
 .confirm { border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); background: var(--bad-soft); border-radius: 12px; padding: 14px; margin-top: 12px; flex-basis: 100%; }
+.confirm.neutral { border-color: var(--line); background: var(--surface); }
 .confirm input:not([type=radio]):not([type=checkbox]) { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; }
 .confirm input:not([type=radio]):not([type=checkbox]):focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .tagcard { flex-wrap: wrap; } .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }

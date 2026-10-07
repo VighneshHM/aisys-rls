@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aisys.catalogue.service import active_tag
-from aisys.circulation import fines, service
+from aisys.circulation import fines, members, service
 from aisys.circulation.connector import CirculationConfig
 from aisys.circulation.mock_ilms import MockIlms
 from aisys.circulation.resilience import ResilientConnector
@@ -56,6 +56,16 @@ class BlockIn(BaseModel):
     reason: str = Field(default="", max_length=200)
 
 
+class NewMemberIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    member_no: str = Field(default="", max_length=32)  # empty = the next free number
+    card_uid: str = Field(default="", max_length=64)  # empty = no card yet
+
+
+class CardIn(BaseModel):
+    uid: str = Field(min_length=1, max_length=64)
+
+
 class MoneyIn(BaseModel):
     amount_cents: int = Field(gt=0, le=10_000_000)
     note: str = Field(default="", max_length=200)
@@ -77,6 +87,56 @@ def _http(exc: service.CircError) -> HTTPException:
 
 
 # ------------------------------------------------------------------ members
+@router.get("/members")
+def find_members(
+    q: str = "",
+    limit: int = 10,
+    _: Principal = Depends(require("member.read")),
+    db: Session = Depends(get_db),
+):
+    """Find a member by name or number (for a patron who has no card with them)."""
+    return {"members": members.search(db, q, min(max(limit, 1), 50))}
+
+
+@router.post("/members", status_code=201)
+def add_member(
+    body: NewMemberIn,
+    request: Request,
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
+):
+    try:
+        member = members.create_member(
+            db,
+            name=body.name,
+            member_no=body.member_no,
+            card_uid=body.card_uid,
+            actor=principal.user.username,
+            ip=client_ip(request),
+        )
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    return service.member_out(db, member, config)
+
+
+@router.post("/members/{member_no}/card")
+def issue_card(
+    member_no: str,
+    body: CardIn,
+    request: Request,
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
+):
+    """Issue a patron card. A card the member had before is switched off."""
+    try:
+        member = members.issue_card(db, member_no, body.uid, actor=principal.user.username, ip=client_ip(request))
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    return service.member_out(db, member, config)
+
+
 @router.post("/members/identify")
 def identify_member(
     body: IdentifyIn,
