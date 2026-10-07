@@ -72,7 +72,7 @@
         h("td", {class: "mono"}, i.accession_no),
         h("td", {}, h("b", {}, i.title), h("div", {class: "sub"}, [i.author, i.isbn].filter(Boolean).join(" · "))),
         h("td", {}, i.location || "—"),
-        h("td", {}, h("span", {class: "badge " + (i.status === "available" ? "good" : "warn")}, i.status), i.is_reference ? h("span", {class: "badge", style: "margin-left:6px"}, "reference") : null),
+        h("td", {}, h("span", {class: "badge " + (i.status === "available" ? "good" : "warn")}, i.status === "on_loan" ? "On loan" : i.status), i.is_reference ? h("span", {class: "badge", style: "margin-left:6px"}, "reference") : null),
         h("td", {}, i.tag ? [h("span", {class: "badge good"}, "Tagged"), " ", h("span", {class: "tag-pill muted"}, short(i.tag.uid))] : i.matched_tag ? [h("span", {class: "badge warn"}, "Matched " + i.matched_tag.status + " tag"), " ", h("span", {class: "tag-pill muted"}, short(i.matched_tag.uid))] : h("span", {class: "badge"}, "Untagged")))))
     ) : h("div", {class: "empty"}, "No items match."));
     const from = data.total ? offset + 1 : 0, to = offset + rows.length;
@@ -97,7 +97,7 @@
     UI.fill($("detail-body"),
       h("dl", {class: "kv tight"}, kv("Accession no.", it.accession_no), kv("Barcode", it.barcode), kv("Author", it.author), kv("ISBN", it.isbn),
         kv("Publisher", [it.publisher, it.pub_year].filter(Boolean).join(", ")), kv("Call number", it.call_number), kv("Location", it.location),
-        kv("Type / status", it.item_type + " · " + it.status), kv("Price", it.price)),
+        kv("Type / status", it.item_type + " · " + (it.status === "on_loan" ? "on loan" : it.status)), kv("Price", it.price)),
       h("h4", {style: "margin:20px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"}, "Tag-to-item relationship"),
       tag ? h("div", {class: "relation"},
           h("div", {class: "node"}, h("h4", {}, "RFID tag"), h("b", {class: "mono"}, tag.uid),

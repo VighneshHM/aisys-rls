@@ -16,6 +16,7 @@ from aisys.circulation_routes import router as circulation_router
 from aisys.config import Settings, load_settings
 from aisys.db import make_engine, make_sessionmaker
 from aisys.integrations.credentials import CredentialProvider, MockCredentialProvider
+from aisys.inventory_routes import router as inventory_router
 from aisys.logging_setup import configure_logging
 from aisys.migration_routes import router as migration_router
 from aisys.rfid.registry import DeviceRegistry
@@ -62,6 +63,7 @@ def create_app(
     app.include_router(catalogue_router)
     app.include_router(rfid_router)
     app.include_router(circulation_router)
+    app.include_router(inventory_router)
 
     app.mount(
         "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"

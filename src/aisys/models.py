@@ -266,3 +266,53 @@ class CircEvent(Base):
     loan_id: Mapped[int | None] = mapped_column(ForeignKey("loans.id"), nullable=True)
     actor: Mapped[str] = mapped_column(String(64), default="")
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+# ---------------------------------------------------------------- inventory (shelf reading)
+class InventorySession(Base):
+    """One shelf-reading run: a location, a handheld, and the tags it has seen so far."""
+
+    __tablename__ = "inventory_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    location: Mapped[str] = mapped_column(String(100), index=True)
+    handheld_id: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(10), default="open")  # open | closed
+    started_by: Mapped[str] = mapped_column(String(64))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    closed_by: Mapped[str] = mapped_column(String(64), default="")
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sweeps: Mapped[int] = mapped_column(Integer, default=0)
+    summary: Mapped[dict] = mapped_column(JSON, default=dict)  # final counts, frozen when the session is closed
+
+
+class InventoryScan(Base):
+    """A distinct tag seen in a session, how it was classified, and the beep/flash it earned."""
+
+    __tablename__ = "inventory_scans"
+    __table_args__ = (Index("uq_inventory_scans_session_tag", "session_id", "tag_uid", unique=True),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("inventory_sessions.id", ondelete="CASCADE"), index=True)
+    tag_uid: Mapped[str] = mapped_column(String(32))
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
+    result: Mapped[str] = mapped_column(String(16))  # found | shelved_on_loan | misplaced | unknown
+    signal: Mapped[str] = mapped_column(String(8))  # ok | warning | error: what the handheld beeped and flashed
+    home_location: Mapped[str] = mapped_column(String(100), default="")  # where the item belongs
+    note: Mapped[str] = mapped_column(String(200), default="")
+    reads: Mapped[int] = mapped_column(Integer, default=1)  # times the tag was read (duplicates are normal)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class FineEntry(Base):
+    """Fine ledger, append-only (DB triggers, migration 0007). Balance = opening + charges - payments - waivers."""
+
+    __tablename__ = "fine_entries"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), index=True)
+    loan_id: Mapped[int | None] = mapped_column(ForeignKey("loans.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(10))  # opening | charge | payment | waiver
+    amount_cents: Mapped[int] = mapped_column(Integer)  # always positive; the kind says which way it moves the balance
+    note: Mapped[str] = mapped_column(String(300), default="")
+    actor: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)

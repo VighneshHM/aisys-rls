@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from aisys import audit
+from aisys.circulation import fines
 from aisys.circulation.connector import (
     CirculationConfig,
     CirculationConnector,
@@ -33,7 +34,7 @@ from aisys.rfid.registry import DeviceRegistry
 from aisys.timeutil import aware, iso
 
 log = logging.getLogger("aisys.circulation")
-UNLOANABLE_STATUSES = {"lost", "withdrawn"}
+LENDABLE_STATUSES = {"available", "on_loan"}  # anything else (damaged, lost, withdrawn) cannot be lent
 
 
 class CircError(Exception):
@@ -66,7 +67,8 @@ def resolve_item(db: Session, ref: str) -> Item:
     ref = ref.strip()
     if not ref:
         raise CircError(422, "no_item", "Give an accession number, barcode or tag")
-    item = db.scalar(select(Item).where(or_(Item.accession_no == ref, Item.barcode == ref)))
+    key = ref.lower()
+    item = db.scalar(select(Item).where(or_(func.lower(Item.accession_no) == key, func.lower(Item.barcode) == key)))
     if item is None:
         item = db.scalar(
             select(Item)
@@ -88,9 +90,10 @@ def open_count(db: Session, member_id: int) -> int:
     )
 
 
-def loan_out(loan: Loan, now: datetime | None = None) -> dict:
+def loan_out(loan: Loan, now: datetime | None = None, config: CirculationConfig | None = None) -> dict:
     now = now or utcnow()
     overdue = loan.returned_at is None and aware(loan.due_at) < aware(now)
+    accruing = fines.assess(loan.due_at, now, config) if overdue and config else None
     return {
         "id": loan.id,
         "member_no": loan.member.member_no,
@@ -104,6 +107,7 @@ def loan_out(loan: Loan, now: datetime | None = None) -> dict:
         "returned_at": iso(loan.returned_at),
         "overdue": overdue,
         "days_overdue": (aware(now) - aware(loan.due_at)).days if overdue else 0,
+        "fine_so_far_cents": accruing["amount_cents"] if accruing else 0,
         "out_by": loan.out_by,
         "returned_by": loan.returned_by,
     }
@@ -124,7 +128,8 @@ def member_out(db: Session, member: Member, config: CirculationConfig, *, with_l
         "open_loans": len(loans),
         "max_loans": config.max_loans,
         "can_borrow": member.status == "active" and member.fines_cents <= config.fine_limit_cents,
-        "loans": [loan_out(x) for x in loans] if with_loans else [],
+        "loans": [loan_out(x, config=config) for x in loans] if with_loans else [],
+        "fine_entries": fines.recent(db, member.id) if with_loans else [],
     }
 
 
@@ -205,7 +210,7 @@ def _local_refusal(member: Member | None, item: Item, loan: Loan | None, config:
     """The first rule that stops a loan, from our own records, or ('', '') if none does."""
     if item.is_reference or item.item_type == "reference":
         return "reference_item", f"'{item.bib.title}' is a reference item and cannot be borrowed"
-    if item.status in UNLOANABLE_STATUSES:
+    if item.status not in LENDABLE_STATUSES:
         return "item_unavailable", f"This item is marked {item.status} and cannot be lent"
     if loan is not None:
         return "item_on_loan", "This item is already on loan"
@@ -245,7 +250,7 @@ def _security(db: Session, devices: DeviceRegistry, item: Item, *, armed: bool, 
             "message": f"The reader could not change the tag ({exc}). {todo}",
         }
     tag.security_armed = armed
-    return {"status": "armed" if armed else "disarmed", "ok": True, "message": f"Security bit {verb} on the tag."}
+    return {"status": "armed" if armed else "disarmed", "ok": True, "message": f"Security bit {verb}."}
 
 
 def _beep(devices: DeviceRegistry, reader_id: str, pattern: str) -> None:
@@ -405,6 +410,8 @@ def renew(
         outcome = "failed" if result.code == "ilms_unavailable" else "refused"
         _refuse(db, code=result.code, message=result.message, status=409, source="ilms", outcome=outcome, **common)
     old_due = loan.due_at
+    # renewing restarts the clock, so any fine earned so far is charged now (otherwise renewing would erase it)
+    fine = fines.charge_overdue(db, loan, now, config, actor)
     loan.due_at, loan.renewals = result.due_at, loan.renewals + 1
     out = _finish(
         db,
@@ -418,8 +425,9 @@ def renew(
         actor=actor,
         reader_id=reader_id,
         armed=None,
-        extra={"previous_due_at": iso(old_due)},
+        extra={"previous_due_at": iso(old_due), "fine_cents": fine["amount_cents"] if fine else 0},
     )
+    out["fine"] = fine
     return out
 
 
@@ -456,7 +464,8 @@ def checkin(
     loan.returned_at, loan.returned_by = now, actor
     if item.status == "on_loan":
         item.status = "available"
-    return _finish(
+    fine = fines.charge_overdue(db, loan, now, config, actor)  # joins the same commit as the return
+    out = _finish(
         db,
         devices,
         action="checkin",
@@ -468,8 +477,11 @@ def checkin(
         actor=actor,
         reader_id=reader_id,
         armed=True,
-        extra={"was_overdue": was_overdue},
+        extra={"was_overdue": was_overdue, "fine_cents": fine["amount_cents"] if fine else 0},
     )
+    out["fine"] = fine
+    out["was_overdue"] = was_overdue
+    return out
 
 
 def due_date(db: Session, connector: CirculationConnector, item_ref: str) -> dict:
@@ -493,7 +505,15 @@ def due_date(db: Session, connector: CirculationConnector, item_ref: str) -> dic
 
 
 # ------------------------------------------------------------------ history
-def list_loans(db: Session, *, member_no: str = "", open_only: bool = True, limit: int = 25, offset: int = 0) -> dict:
+def list_loans(
+    db: Session,
+    *,
+    member_no: str = "",
+    open_only: bool = True,
+    limit: int = 25,
+    offset: int = 0,
+    config: CirculationConfig | None = None,
+) -> dict:
     q = select(Loan).join(Member, Loan.member_id == Member.id)
     if member_no:
         q = q.where(Member.member_no == member_no.strip().upper())
@@ -501,7 +521,7 @@ def list_loans(db: Session, *, member_no: str = "", open_only: bool = True, limi
         q = q.where(Loan.returned_at.is_(None))
     total = db.scalar(select(func.count()).select_from(q.subquery()))
     rows = db.scalars(q.order_by(Loan.id.desc()).limit(limit).offset(offset)).unique().all()
-    return {"total": total, "loans": [loan_out(x) for x in rows]}
+    return {"total": total, "loans": [loan_out(x, config=config) for x in rows]}
 
 
 def event_out(e: CircEvent, member_no: str | None, accession_no: str | None) -> dict:

@@ -340,3 +340,27 @@ def test_simulated_failures_can_be_counted_and_cleared(client, lib, ilms):
     client.post("/api/circulation/mock/ilms/fail", headers=lib, json={"mode": "error", "times": 5})
     assert client.delete("/api/circulation/mock/ilms/fail", headers=lib).json()["pending"] == 0
     assert out(client, lib, "M0001", "F1").status_code == 200  # nothing left to fail
+
+
+@pytest.mark.req("AC04", "FR04")
+def test_a_damaged_item_cannot_be_lent(client, lib):
+    book(client, lib, "DM1", status="damaged")
+    r = out(client, lib, "M0001", "DM1")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "item_unavailable" and "damaged" in r.text
+
+
+@pytest.mark.req("AC03")
+def test_staff_can_type_an_item_in_any_case(client, lib):
+    book(client, lib, "Mixed-Case-1", barcode="bc-MiXeD")
+    assert out(client, lib, "m0001 ", "mixed-case-1").status_code == 200  # member no. and accession no.
+    assert back(client, lib, "BC-MIXED").status_code == 200  # barcode
+
+
+@pytest.mark.req("AC03", "FR08")
+def test_the_dashboard_shows_library_figures(client, lib):
+    book(client, lib, "DB1")
+    out(client, lib, "M0001", "DB1")
+    page = client.get("/dashboard", headers=lib).text
+    for label in ("Catalogue items", "Items with a tag", "On loan now", "Overdue loans"):
+        assert label in page
+    assert client.get("/dashboard", headers=login_card(client, "STAFFAUDIT01")).status_code == 200  # no catalogue.read

@@ -22,6 +22,7 @@ class _TagMemory:
 
 class MockStaffReader:
     kind = "staff_reader"
+    is_mock = True
 
     def __init__(self, device_id: str = "staff-1", **_options: object) -> None:
         self.device_id = device_id
@@ -108,6 +109,53 @@ class MockStaffReader:
         with self._lock:
             tag = self._tag(uid)
             tag.item_ref, tag.armed = None, False
+
+    def indicate(self, pattern: str) -> None:
+        self.indications.append(pattern)
+
+
+class MockHandheld:
+    """Mock handheld reader: whatever the simulator loads is "in range" and is returned by every sweep.
+
+    Like real UHF hardware it may return the same tag more than once in a sweep; the application must cope.
+    """
+
+    kind = "handheld"
+    is_mock = True
+
+    def __init__(self, device_id: str = "handheld-1", **_options: object) -> None:
+        self.device_id = device_id
+        self.online = True
+        self.indications: list[str] = []
+        self._in_range: list[str] = []
+        self._fail_next: set[str] = set()
+        self._lock = RLock()
+
+    # ---- simulator controls ---------------------------------------------------------------------
+    def load(self, uids: list[str]) -> None:
+        """Replace what is in range (repeat a UID to simulate a duplicate read)."""
+        with self._lock:
+            self._in_range = [normalize_tag_uid(u) for u in uids]
+
+    def clear(self) -> None:
+        with self._lock:
+            self._in_range = []
+
+    def fail_next(self, command: str = "scan") -> None:
+        self._fail_next.add(command)
+
+    # ---- Handheld interface ---------------------------------------------------------------------
+    def health(self) -> DeviceHealth:
+        return DeviceHealth(self.online, "mock handheld" if self.online else "mock handheld switched off")
+
+    def scan(self) -> list[TagObserved]:
+        if not self.online:
+            raise DeviceUnavailable(f"{self.device_id} is offline")
+        if "scan" in self._fail_next:
+            self._fail_next.discard("scan")
+            raise DeviceError(f"{self.device_id}: simulated scan failure")
+        with self._lock:
+            return [TagObserved(uid, self.device_id, TagObserved.now()) for uid in self._in_range]
 
     def indicate(self, pattern: str) -> None:
         self.indications.append(pattern)

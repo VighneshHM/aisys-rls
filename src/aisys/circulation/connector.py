@@ -28,6 +28,9 @@ class CirculationConfig:
     loan_days: int = 14
     max_renewals: int = 2
     max_loans: int = 5
+    fine_per_day_cents: int = 25  # charged for each billable day an item comes back late
+    grace_days: int = 1  # whole days late that cost nothing
+    max_fine_per_loan_cents: int = 1000  # one loan never costs more than this
     ilms_driver: str = "mock"
     ilms_protocol: str = "sip2"  # which dialect the mock imitates in its messages: sip2 | ncip
     ilms_retries: int = 2  # extra attempts after the first

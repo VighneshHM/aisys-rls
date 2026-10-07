@@ -35,6 +35,17 @@ class Device(Protocol):
 
 
 @runtime_checkable
+class Handheld(Device, Protocol):
+    """Handheld reader for walking a shelf: one sweep returns every tag in range (the same tag may repeat)."""
+
+    def scan(self) -> list[TagObserved]:
+        """One sweep. Raises DeviceUnavailable if the handheld is off or out of reach."""
+
+    def indicate(self, pattern: str) -> None:
+        """Audible/visible confirmation: 'ok' (one beep, green), 'warning' (two beeps, amber), 'error' (long, red)."""
+
+
+@runtime_checkable
 class StaffReader(Device, Protocol):
     """Staff-station reader/encoder: reads tags on the pad and writes the item identifier + security bit."""
 

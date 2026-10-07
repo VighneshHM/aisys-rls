@@ -86,7 +86,7 @@
   const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
   const money = c => (c / 100).toFixed(2);
   const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
-  let member = null, item = null;
+  let member = null, item = null, askingReason = false, fineMode = null;
 
   // ------------------------------------------------------------------ patron
   function renderMember() {
@@ -100,17 +100,57 @@
         h("dt", {}, "Status"), h("dd", {}, m.status === "blocked" ? "Blocked" + (m.block_reason ? " · " + m.block_reason : "") : "Active"),
         h("dt", {}, "Fines"), h("dd", {}, money(m.fines_cents) + " (limit " + money(m.fine_limit_cents) + ")" + (m.fines_over_limit ? " · over the limit" : "")),
         h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans)),
+      CAN_BLOCK && m.fines_cents > 0 ? fineControls(m) : null,
       m.loans.length ? h("div", {class: "table-wrap", style: "margin:0 -4px"}, h("table", {},
         h("thead", {}, h("tr", {}, ["Item", "Due", ""].map(t => h("th", {}, t)))),
         h("tbody", {}, m.loans.map(l => h("tr", {},
           h("td", {}, h("b", {}, l.accession_no), h("div", {class: "sub"}, l.title)),
           h("td", {}, day(l.due_at), l.overdue ? h("div", {}, h("span", {class: "badge warn"}, l.days_overdue + " d overdue")) : null,
+            l.fine_so_far_cents ? h("div", {class: "sub"}, "fine so far " + money(l.fine_so_far_cents)) : null,
             l.renewals ? h("div", {class: "sub"}, "renewed ×" + l.renewals) : null),
           h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => pick(l.accession_no)}, "Select")))))))
         : h("div", {class: "sub"}, "No items on loan."),
-      CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
+      m.fine_entries.length ? h("details", {class: "sim", style: "margin-top:12px"}, h("summary", {}, "Fine history"),
+        h("ul", {class: "timeline", style: "margin-top:8px"}, m.fine_entries.map(e => h("li", {}, h("time", {}, when(e.ts)),
+          h("span", {}, h("b", {}, FINE_KIND[e.kind] + " " + money(e.amount_cents)), e.note && e.note !== FINE_KIND[e.kind] ? " · " + e.note : "", e.actor && e.actor !== "system" ? " · " + e.actor : ""))))) : null,
+      CAN_BLOCK && askingReason ? h("div", {class: "confirm", style: "margin-top:14px"},
+        h("label", {for: "block-reason"}, "Why is " + m.name + " being blocked? (shown to staff)"),
+        h("input", {id: "block-reason", maxlength: "200", placeholder: "e.g. lost card, overdue items"}),
+        h("div", {class: "actions"}, h("button", {class: "btn small danger", type: "button", onclick: () => setBlocked(true, $("block-reason").value.trim())}, "Block member"),
+          h("button", {class: "btn ghost small", type: "button", onclick: () => { askingReason = false; renderMember(); }}, "Cancel")))
+      : CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
         m.status === "blocked" ? "Unblock member" : "Block member")) : null);
+    if (askingReason && $("block-reason")) $("block-reason").focus();
     sync();
+  }
+
+  const FINE_KIND = {opening: "Opening balance", charge: "Fine charged", payment: "Paid", waiver: "Waived"};
+
+  function fineControls(m) {
+    if (!fineMode) {
+      return h("div", {class: "actions", style: "margin:10px 0 0"},
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = "payment"; renderMember(); }}, "Record payment"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = "waiver"; renderMember(); }}, "Waive fine"));
+    }
+    const paying = fineMode === "payment";
+    return h("div", {class: "confirm", style: "margin-top:12px"},
+      h("label", {for: "fine-amount"}, paying ? "Amount paid" : "Amount to waive"),
+      h("input", {id: "fine-amount", inputmode: "decimal", value: money(m.fines_cents), autocomplete: "off"}),
+      h("label", {for: "fine-note", style: "margin-top:8px"}, paying ? "Note (optional)" : "Why is it being waived? (required)"),
+      h("input", {id: "fine-note", maxlength: "200", placeholder: paying ? "e.g. paid at the desk" : "e.g. library error"}),
+      h("div", {class: "actions"},
+        h("button", {class: "btn small", type: "button", onclick: submitFine}, paying ? "Record payment" : "Waive fine"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = null; renderMember(); }}, "Cancel")));
+  }
+
+  async function submitFine() {
+    const cents = Math.round(parseFloat($("fine-amount").value.replace(",", ".")) * 100);
+    if (!(cents > 0)) { say("member-notice", "bad", "Enter an amount more than zero, like 2.50"); return; }
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/fines/" + fineMode, {json: {amount_cents: cents, note: $("fine-note").value.trim()}});
+      fineMode = null; renderMember(); loadEvents();
+    } catch (e) { say("member-notice", "bad", e.message); }
   }
 
   async function loadMember(no) {
@@ -121,20 +161,24 @@
   async function identify() {
     const uid = $("card").value.trim();
     if (!uid) return;
-    clear("member-notice");
+    clear("member-notice"); askingReason = false; fineMode = null;
     try {
-      member = await api("/api/circulation/members/identify", {json: {uid}});
+      const next = await api("/api/circulation/members/identify", {json: {uid}});
+      if (!member || member.member_no !== next.member_no) $("result-panel").classList.add("hidden");  // not this patron's result
+      member = next;
       renderMember();
     } catch (e) { member = null; renderMember(); say("member-notice", "bad", e.message); }
   }
 
-  async function toggleBlock() {
-    const blocking = member.status !== "blocked";
-    const reason = blocking ? (prompt("Why is " + member.name + " being blocked? (shown to staff)", "") ?? null) : "";
-    if (reason === null) return;
+  function toggleBlock() {
+    if (member.status === "blocked") setBlocked(false, "");
+    else { askingReason = true; renderMember(); }
+  }
+
+  async function setBlocked(blocked, reason) {
     try {
-      member = await api("/api/circulation/members/" + member.member_no + "/block", {json: {blocked: blocking, reason}});
-      renderMember(); loadEvents();
+      member = await api("/api/circulation/members/" + member.member_no + "/block", {json: {blocked, reason}});
+      askingReason = false; renderMember(); loadEvents();
     } catch (e) { say("member-notice", "bad", e.message); }
   }
 
@@ -185,12 +229,13 @@
     try {
       const r = await api("/api/circulation/" + action, {json: body});
       const sec = r.security;
-      showResult(sec.ok ? "good" : "warn", TITLES[action] + " · " + r.loan.accession_no,
-        [action === "checkin" ? "Returned" + (r.loan.overdue ? "" : " on time") + ": " + r.loan.title : (action === "renew" ? "New due date " : "Due ") + day(r.loan.due_at) + " · " + r.loan.member_name,
+      showResult(sec.ok && !r.fine ? "good" : "warn", TITLES[action] + " · " + r.loan.accession_no,
+        [action === "checkin" ? (r.was_overdue ? "Returned late: " : "Returned on time: ") + r.loan.title : (action === "renew" ? "New due date " : "Due ") + day(r.loan.due_at) + " · " + r.loan.member_name,
          h("p", {class: "sub", style: "margin:0 0 6px"}, r.protocol.toUpperCase() + " · " + r.message + (r.replayed ? " (repeated answer: the first reply was lost, nothing was done twice)" : "")),
          sec.message ? h("p", {class: sec.ok ? "sub" : "", style: "margin:0 0 6px" + (sec.ok ? "" : ";color:var(--warn-ink,#8a5a00)")}, sec.message) : null,
+         r.fine ? h("p", {style: "margin:0 0 6px"}, "Fine charged: " + money(r.fine.amount_cents) + " (" + r.fine.note + "). Balance now " + money(r.fine.balance_cents) + ".") : null,
          h("p", {class: "sub mono", style: "margin:0"}, r.txn_id)],
-        sec.ok ? "Done" : "Done · check tag");
+        r.fine ? "Done · fine charged" : sec.ok ? "Done" : "Done · check tag");
     } catch (e) {
       showResult(e.status === 503 ? "warn" : "bad", e.status === 503 ? "Library system unavailable" : "Not allowed", [e.message,
         h("p", {class: "sub", style: "margin:0"}, e.status === 503 ? "Nothing was changed. Try again in a moment." : "Nothing was changed. This attempt is recorded in the history.")],
