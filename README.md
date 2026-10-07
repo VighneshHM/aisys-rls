@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -55,6 +55,12 @@ Sign in as `STAFFADMIN01`, open **Gate events**, type a tagged book's accession 
 gate* and click **Walk through the gate**. Because the book was never checked out its security bit is still on, so it
 raises an alarm with a CCTV snapshot and queued messages. Click **Send queued messages** to deliver them and read them
 in the mock outbox. Check the book out first and walk it through again: no alarm. Details and design: `docs/gate.md`.
+
+## Try the reports (AC08)
+
+Sign in as `STAFFLIB0001` (or the auditor) and open **Reports**. Pick a report, set a filter (for example Circulation, outcome
+Refused) and click **Apply filters**; **Download CSV** gives exactly what you see. The **Dashboard** shows 14-day charts of
+completed transactions and gate alarms and the most overdue loans. Details and design: `docs/reports.md`.
 
 ## Develop
 

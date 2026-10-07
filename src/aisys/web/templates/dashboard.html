@@ -10,9 +10,20 @@
 
 <div class="grid stats">
   {% for s in stats %}
-  <div class="stat"><div class="ico">{{ icon(s.icon) }}</div><div><div class="num">{{ s.value }}</div><div class="lbl">{{ s.label }}</div></div></div>
+  <div class="stat"><div class="ico">{{ icon(s.icon) }}</div><div><div class="num">{{ "{:,}".format(s.value) if s.value is number else s.value }}</div><div class="lbl">{{ s.label }}</div></div></div>
   {% endfor %}
 </div>
+
+{% if can_reports %}
+<div class="grid two" style="margin-bottom:18px">
+  <section class="panel"><header><h3>Completed transactions</h3><span class="badge">last 14 days</span></header><div class="body" id="chart-circ"></div></section>
+  <section class="panel"><header><h3>Gate alarms</h3><span class="badge">last 14 days</span></header><div class="body" id="chart-alarms"></div></section>
+</div>
+<section class="panel hidden" id="overdue-panel" style="margin-bottom:18px">
+  <header><h3>Most overdue loans</h3><a class="btn ghost small" href="/reports?report=members&has_overdue=1" style="text-decoration:none">Members with overdue loans</a></header>
+  <div class="table-wrap" id="overdue"></div>
+</section>
+{% endif %}
 
 <div class="grid two">
   <div class="grid">
@@ -62,4 +73,24 @@
     </div>
   </section>
 </div>
+{% if can_reports %}
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(async () => {
+  const {$, h, fill, api, when, money} = UI;
+  try {
+    const d = await api("/api/reports/charts?days=14");
+    fill($("chart-circ"), UI.barChart(d.circulation, "No completed transactions in the last " + d.days + " days."));
+    fill($("chart-alarms"), UI.barChart(d.alarms, "No gate alarms in the last " + d.days + " days."));
+    if (d.overdue.length) {
+      $("overdue-panel").classList.remove("hidden");
+      fill($("overdue"), h("table", {}, h("thead", {}, h("tr", {}, ["Item", "Member", "Due", "Late", "Fine so far"].map(t => h("th", {}, t)))),
+        h("tbody", {}, d.overdue.map(l => h("tr", {}, h("td", {}, h("b", {}, l.accession_no), h("div", {class: "sub"}, l.title)),
+          h("td", {}, l.member_name, h("div", {class: "sub mono"}, l.member_no)), h("td", {class: "time"}, when(l.due_at)),
+          h("td", {}, l.days_overdue + " d"), h("td", {}, l.fine_so_far_cents ? money(l.fine_so_far_cents) : "-"))))));
+    }
+  } catch (e) { fill($("chart-circ"), h("div", {class: "empty"}, e.message)); }
+})();
+</script>
+{% endif %}
 {% endblock %}

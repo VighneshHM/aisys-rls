@@ -32,7 +32,7 @@ NAV = [
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "/inventory", "inventory.run", True),
     ("gate", "Gate events", "gate", "/gate", "gate.view", True),
-    ("reports", "Reports", "chart", "#", "reports.view", False),
+    ("reports", "Reports", "chart", "/reports", "reports.view", True),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
     ("audit", "Audit log", "list", "#", "audit.read", False),
     ("admin", "Administration", "users", "#", "admin.users", False),
@@ -199,6 +199,7 @@ def dashboard(
             principal,
             "dashboard",
             greeting=_greeting(),
+            can_reports="reports.view" in perms,
             perms=sorted(perms),
             perm_groups=_group_permissions(perms),
             stats=stats,
@@ -292,6 +293,15 @@ def circulation_page(
         can_block="member.write" in perms,
         protocol=settings.circulation.ilms_protocol.upper(),
     )
+
+
+@router.get("/reports", response_class=HTMLResponse)
+def reports_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "reports.view", "reports.html", "reports")
 
 
 @router.get("/gate", response_class=HTMLResponse)

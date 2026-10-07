@@ -1,0 +1,129 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Reports · {{ app_name }}{% endblock %}
+{% block heading %}Reports{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Library reports</h2>
+  <p>Pick a report, narrow it with the filters, and download exactly what you see as a CSV file. Dates are whole days in UTC. The figures at the top, the chart and the table all use the same filters.</p>
+</div>
+
+<nav class="tabs" id="picker" role="tablist" aria-label="Reports"></nav>
+
+<section class="panel" style="margin-top:14px">
+  <header><h3 id="rep-title"></h3><span class="badge" id="rep-count"></span></header>
+  <div class="body">
+    <p class="sub" id="rep-desc" style="margin:0 0 12px"></p>
+    <form id="filters" class="filters" autocomplete="off"></form>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn" id="apply" type="button">Apply filters</button>
+      <button class="btn ghost" id="reset" type="button">Reset</button>
+      <a class="btn ghost" id="csv" href="#" style="text-decoration:none">Download CSV</a>
+    </div>
+    <div id="rep-notice" class="notice" role="alert"></div>
+  </div>
+</section>
+
+<div class="grid stats" id="summary" style="margin-top:14px"></div>
+
+<section class="panel" style="margin-top:14px">
+  <header><h3 id="chart-title">Chart</h3></header>
+  <div class="body" id="chart"></div>
+</section>
+
+<section class="panel" style="margin-top:14px">
+  <header><h3>Results</h3><span class="badge" id="range-badge"></span></header>
+  <div class="table-wrap" id="results"></div>
+  <div class="pager" id="pager"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt, money} = UI;
+  const LIMIT = 20;
+  let catalogue = [], current = null, offset = 0;
+  const params = new URLSearchParams(location.search);
+
+  // ------------------------------------------------------------------ picker and filter form
+  function renderPicker() {
+    fill($("picker"), catalogue.map(r => h("button", {type: "button", role: "tab", "aria-selected": r.id === current.id ? "true" : "false", class: "tab" + (r.id === current.id ? " on" : ""), onclick: () => select(r.id, {})}, r.title)));
+  }
+
+  function renderFilters(values) {
+    fill($("filters"), current.filters.map(f => {
+      const id = "f-" + f.key, v = values[f.key] || "";
+      let input;
+      if (f.kind === "select") input = h("select", {id, "data-key": f.key}, h("option", {value: ""}, "Any"), f.options.map(o => h("option", {value: o.value, selected: o.value === v ? "" : false}, o.label)));
+      else if (f.kind === "bool") input = h("input", {id, type: "checkbox", "data-key": f.key, checked: v ? "" : false});
+      else input = h("input", {id, type: f.kind === "date" ? "date" : "text", "data-key": f.key, value: v, placeholder: f.placeholder || "", maxlength: "100"});
+      return f.kind === "bool"
+        ? h("label", {class: "filter check", for: id}, input, " " + f.label)
+        : h("div", {class: "filter"}, h("label", {for: id}, f.label), input);
+    }));
+    $("filters").querySelectorAll("input,select").forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") { ev.preventDefault(); apply(); } }));
+  }
+
+  function values() {
+    const out = {};
+    $("filters").querySelectorAll("[data-key]").forEach(e => { const v = e.type === "checkbox" ? (e.checked ? "1" : "") : e.value.trim(); if (v) out[e.dataset.key] = v; });
+    return out;
+  }
+
+  const query = (extra = {}) => new URLSearchParams({...values(), ...extra}).toString();
+
+  // ------------------------------------------------------------------ run
+  function cell(col, row) {
+    const v = row[col.key];
+    if (v == null || v === "") return col.kind === "number" ? "0" : "-";
+    if (col.kind === "money") return money(v);
+    if (col.kind === "number") return fmt(v);
+    if (col.kind === "datetime") return when(v);
+    if (col.kind === "mono") return h("span", {class: "mono", title: String(v)}, UI.short(String(v)));
+    if (col.kind === "badge") {
+      const s = String(v), bad = /^(refused|failed|alarm|offline|blocked|retired|waived)/i.test(s), good = /^(done|online|active|in use|paid)/i.test(s);
+      return h("span", {class: "badge " + (bad ? "bad" : good ? "good" : "")}, s);
+    }
+    return String(v);
+  }
+
+  async function load() {
+    clear("rep-notice");
+    history.replaceState(null, "", "?" + query({report: current.id}));
+    $("csv").href = "/api/reports/" + current.id + "/export.csv?" + query();
+    let d;
+    try { d = await api("/api/reports/" + current.id + "?" + query({limit: LIMIT, offset})); }
+    catch (e) { say("rep-notice", "bad", e.message); fill($("results")); fill($("summary")); fill($("chart")); $("rep-count").textContent = ""; return; }
+    $("rep-count").textContent = fmt(d.total) + " row" + (d.total === 1 ? "" : "s");
+    fill($("summary"), d.summary.map(s => h("div", {class: "stat"}, h("div", {}, h("div", {class: "num", style: s.kind === "text" ? "font-size:18px" : ""}, s.kind === "money" ? money(s.value) : s.kind === "text" ? s.value : fmt(s.value)), h("div", {class: "lbl"}, s.label)))));
+    $("chart-title").textContent = d.chart ? d.chart.title : "Chart";
+    fill($("chart"), d.chart ? UI.barChart(d.chart) : h("div", {class: "empty"}, "No chart for this report."));
+    fill($("results"), d.rows.length ? h("table", {}, h("thead", {}, h("tr", {}, current.columns.map(c => h("th", {class: c.kind === "number" || c.kind === "money" ? "num" : ""}, c.label)))),
+      h("tbody", {}, d.rows.map(r => h("tr", {}, current.columns.map(c => h("td", {class: c.kind === "datetime" ? "time" : c.kind === "number" || c.kind === "money" ? "num" : ""}, cell(c, r)))))))
+      : h("div", {class: "empty"}, "Nothing matches these filters."));
+    const to = offset + d.rows.length;
+    $("range-badge").textContent = d.total ? fmt(offset + 1) + "–" + fmt(to) + " of " + fmt(d.total) : "";
+    fill($("pager"), h("span", {class: "muted"}, d.total ? fmt(offset + 1) + "–" + fmt(to) + " of " + fmt(d.total) : "0 rows"),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - LIMIT); load(); }}, "Previous"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= d.total ? "" : false, onclick: () => { offset += LIMIT; load(); }}, "Next"));
+  }
+
+  function select(id, vals) {
+    current = catalogue.find(r => r.id === id) || catalogue[0];
+    offset = 0;
+    $("rep-title").textContent = current.title; $("rep-desc").textContent = current.description;
+    renderPicker(); renderFilters(vals); load();
+  }
+  const apply = () => { offset = 0; load(); };
+
+  $("apply").onclick = apply;
+  $("reset").onclick = () => { renderFilters({}); apply(); };
+  (async () => {
+    try { catalogue = (await api("/api/reports")).reports; }
+    catch (e) { say("rep-notice", "bad", e.message); return; }
+    const vals = {}; params.forEach((v, k) => { if (k !== "report") vals[k] = v; });
+    select(params.get("report") || catalogue[0].id, vals);
+  })();
+})();
+</script>
+{% endblock %}

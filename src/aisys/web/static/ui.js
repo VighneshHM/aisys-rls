@@ -97,5 +97,31 @@ window.UI = (() => {
     return h("ul", {class: "problems " + kind}, problems.map(p => h("li", {}, p.message)));
   }
 
-  return {$, h, fill, api, ApiError, say, clear, fmt, when, short, problemList, endTagPanel, stateBadge};
+  const money = cents => ((cents ?? 0) / 100).toFixed(2);
+
+  /** A bar chart as inline SVG: chart = {title, unit: "number"|"money", points: [{label, value}]}. */
+  function barChart(chart, emptyText) {
+    const points = chart && chart.points ? chart.points : [];
+    if (!points.length || points.every(p => !p.value)) return h("div", {class: "empty"}, emptyText || "Nothing to chart for these filters.");
+    const NS = "http://www.w3.org/2000/svg", W = 640, H = 200, left = 40, top = 18, bottom = 44;
+    const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
+    const show = v => chart.unit === "money" ? money(v) : fmt(v);
+    const max = Math.max(...points.map(p => p.value), 1), n = points.length, slot = (W - left - 8) / n, gap = Math.min(10, slot * 0.25);
+    const svg = el("svg", {viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": (chart.title || "Chart") + ": " + points.map(p => p.label + " " + show(p.value)).join(", "), style: "width:100%;height:auto;display:block"});
+    svg.append(el("line", {x1: left, y1: H - bottom, x2: W - 8, y2: H - bottom, style: "stroke:var(--line)"}));
+    svg.append(el("text", {x: left - 6, y: top + 8, "text-anchor": "end", style: "fill:var(--muted);font-size:10px"}, show(max)));
+    svg.append(el("text", {x: left - 6, y: H - bottom, "text-anchor": "end", style: "fill:var(--muted);font-size:10px"}, "0"));
+    const every = Math.ceil(n / 12), isDay = /^\d{4}-\d\d-\d\d$/;
+    points.forEach((p, i) => {
+      const x = left + i * slot + gap / 2, bh = (H - top - bottom) * (p.value / max), y = H - bottom - bh;
+      const bar = el("rect", {x, y, width: Math.max(slot - gap, 1), height: Math.max(bh, p.value ? 1 : 0), rx: 2, style: "fill:var(--accent)"});
+      bar.append(el("title", {}, p.label + ": " + show(p.value)));
+      svg.append(bar);
+      if (n <= 16 && p.value) svg.append(el("text", {x: x + (slot - gap) / 2, y: y - 4, "text-anchor": "middle", style: "fill:var(--ink);font-size:10px"}, show(p.value)));
+      if (i % every === 0) svg.append(el("text", {x: x + (slot - gap) / 2, y: H - bottom + 14, "text-anchor": "middle", style: "fill:var(--muted);font-size:10px"}, isDay.test(p.label) ? p.label.slice(5) : (p.label.length > 14 ? p.label.slice(0, 13) + "…" : p.label)));
+    });
+    return svg;
+  }
+
+  return {$, h, fill, api, ApiError, say, clear, fmt, when, short, problemList, endTagPanel, stateBadge, money, barChart};
 })();
