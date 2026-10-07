@@ -228,3 +228,17 @@ details.sim .actions { margin-top: 10px; }
 .field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 #replace { flex: none; width: 18px; height: 18px; margin-top: 2px; }
+
+/* reports */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: inherit; cursor: pointer; }
+.tab:hover { border-color: var(--accent); }
+.tab.on { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.filter label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.filter input[type=text], .filter input[type=date], .filter select { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; }
+.filter input[type=text]:focus, .filter input[type=date]:focus, .filter select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.filter.check { display: flex; align-items: center; gap: 8px; align-self: end; padding-bottom: 8px; color: var(--ink); font-size: 14px; }
+.filter.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+th.num, td.num { text-align: right; }
+

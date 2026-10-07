@@ -28,3 +28,4 @@ Items marked **[confirmed]** were agreed with the candidate; the rest are my own
 | A-18 | The gate decides an alarm from the security bit read at the gate, never from the ILMS; a repeat alarm for the same tag within 60 s is recorded but not re-sent. | own | See docs/gate.md. |
 | A-19 | Notifications are queued first and delivered by a separate step (button, API or CLI) with retries; recipients are staff users with per-channel preferences. | own | Patron notices are a later extension of the same queue. |
 | A-17 | Inventory works per location (the item's location text); items on loan and untagged items are counted, not called missing. | own | See docs/inventory.md. |
+| A-20 | Report dates are whole days in UTC; CSV exports follow the on-screen filters and neutralise spreadsheet formulas. | own | See docs/reports.md. |
