@@ -9,10 +9,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from aisys.rfid.devices import Device, DeviceHealth, StaffReader
-from aisys.rfid.mock import MockStaffReader
+from aisys.rfid.devices import Device, DeviceHealth, Handheld, StaffReader
+from aisys.rfid.mock import MockHandheld, MockStaffReader
 
-KINDS = {"staff_reader": StaffReader}
+KINDS = {"staff_reader": StaffReader, "handheld": Handheld}
 
 
 class DeviceConfigError(ValueError):
@@ -26,11 +26,15 @@ class DeviceConfig:
     driver: str = "mock"
 
 
-DEFAULT_DEVICES = (DeviceConfig("staff-1", "staff_reader", "mock"),)
+DEFAULT_DEVICES = (
+    DeviceConfig("staff-1", "staff_reader", "mock"),
+    DeviceConfig("handheld-1", "handheld", "mock"),
+)
 
 
 class DeviceRegistry:
-    _drivers: dict[str, Callable[..., Device]] = {"mock": MockStaffReader}
+    _drivers: dict[str, Callable[..., Device]] = {"mock": MockStaffReader}  # staff readers, by driver name
+    _kind_drivers: dict[tuple[str, str], Callable[..., Device]] = {("handheld", "mock"): MockHandheld}
 
     def __init__(self, configs: tuple[DeviceConfig, ...] = DEFAULT_DEVICES) -> None:
         self._devices: dict[str, Device] = {}
@@ -39,19 +43,24 @@ class DeviceRegistry:
                 raise DeviceConfigError(f"duplicate device id: {cfg.id}")
             if cfg.kind not in KINDS:
                 raise DeviceConfigError(f"device {cfg.id}: unknown kind '{cfg.kind}' (known: {sorted(KINDS)})")
-            factory = self._drivers.get(cfg.driver)
+            if cfg.kind == "staff_reader":
+                known = self._drivers
+            else:
+                known = {n: f for (k, n), f in self._kind_drivers.items() if k == cfg.kind}
+            factory = known.get(cfg.driver)
             if factory is None:
-                raise DeviceConfigError(
-                    f"device {cfg.id}: unknown driver '{cfg.driver}' (known: {sorted(self._drivers)})"
-                )
+                raise DeviceConfigError(f"device {cfg.id}: unknown driver '{cfg.driver}' (known: {sorted(known)})")
             device = factory(device_id=cfg.id)
             if not isinstance(device, KINDS[cfg.kind]):
                 raise DeviceConfigError(f"device {cfg.id}: driver '{cfg.driver}' does not implement {cfg.kind}")
             self._devices[cfg.id] = device
 
     @classmethod
-    def register_driver(cls, name: str, factory: Callable[..., Device]) -> None:
-        cls._drivers[name] = factory
+    def register_driver(cls, name: str, factory: Callable[..., Device], kind: str = "staff_reader") -> None:
+        if kind == "staff_reader":
+            cls._drivers[name] = factory
+        else:
+            cls._kind_drivers[(kind, name)] = factory
 
     def get(self, device_id: str, kind: str = "staff_reader") -> Device | None:
         device = self._devices.get(device_id)
@@ -64,6 +73,14 @@ class DeviceRegistry:
         out = []
         for d in self._devices.values():
             h: DeviceHealth = d.health()
-            out.append({"id": d.device_id, "kind": d.kind, "driver": type(d).__name__,
-                        "mock": isinstance(d, MockStaffReader), "online": h.online, "detail": h.detail})  # fmt: skip
+            out.append(
+                {
+                    "id": d.device_id,
+                    "kind": d.kind,
+                    "driver": type(d).__name__,
+                    "mock": bool(getattr(d, "is_mock", False)),
+                    "online": h.online,
+                    "detail": h.detail,
+                }
+            )
         return out

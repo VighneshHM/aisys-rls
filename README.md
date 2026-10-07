@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -38,7 +38,15 @@ Details and design: `docs/rfid.md`.
 Sign in (`STAFFLIB0001` or `STAFFCLERK01`), open **Circulation**, pick a simulated patron card, name an item (accession
 no., barcode or tag UID) and check it out, renew it and check it in. Demo members include a blocked one and one over the
 fine limit, so you can see each refusal; the simulator can also make the mock library system time out or lose a reply.
-Every attempt appears in the history. Details and design: `docs/circulation.md`.
+Every attempt appears in the history. Late returns are charged a fine (see `docs/circulation.md`); staff can record
+payments and waivers on the member panel. Details and design: `docs/circulation.md`.
+
+## Try inventory (AC05)
+
+Sign in as `STAFFLIB0001`, open **Inventory**, pick a shelf location and start a session. In the simulator controls
+click **Put this shelf in range**, then **Scan shelf**: the report shows found, missing, misplaced and unknown tags
+with the beep and light each earned. Items need a `location` (the import has one) and tags (tag them first). Details
+and design: `docs/inventory.md`.
 
 ## Develop
 

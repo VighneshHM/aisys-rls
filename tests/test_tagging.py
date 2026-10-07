@@ -137,7 +137,10 @@ def test_devices_are_configured_in_toml_not_in_code(tmp_path):
     cfg.write_text('[[devices]]\nid = "desk-7"\nkind = "staff_reader"\ndriver = "mock"\n', encoding="utf-8")
     s = load_settings(cfg)
     assert [d.id for d in s.devices] == ["desk-7"]
-    assert [d.id for d in load_settings(tmp_path / "missing.toml").devices] == ["staff-1"]  # sensible default
+    assert [d.id for d in load_settings(tmp_path / "missing.toml").devices] == [
+        "staff-1",
+        "handheld-1",
+    ]  # sensible default
 
 
 @pytest.mark.req("FR05")
@@ -451,7 +454,7 @@ def test_simulator_endpoints_do_not_exist_in_production(settings):
 
 @pytest.mark.req("FR03")
 def test_list_readers_reports_health(client, lib, reader):
-    [r] = client.get("/api/rfid/readers", headers=lib).json()
+    [r] = [d for d in client.get("/api/rfid/readers", headers=lib).json() if d["kind"] == "staff_reader"]
     assert r == {
         "id": "staff-1",
         "kind": "staff_reader",

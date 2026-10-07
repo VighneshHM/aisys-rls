@@ -17,7 +17,7 @@ from aisys.cli import DEMO_MEMBERS, DEMO_USERS
 from aisys.config import Settings
 from aisys.deps import Principal, get_db, get_principal_optional, get_settings
 from aisys.migration.mapping import FIELDS, REQUIRED
-from aisys.models import AuditEvent, AuthSession, Card, User
+from aisys.models import AuditEvent, AuthSession, Card, Item, Loan, RfidTag, User
 from aisys.routes import STARTED_AT
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
@@ -30,7 +30,7 @@ NAV = [
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
-    ("inventory", "Inventory", "scan", "#", "inventory.run", False),
+    ("inventory", "Inventory", "scan", "/inventory", "inventory.run", True),
     ("gate", "Gate events", "gate", "#", "gate.view", False),
     ("reports", "Reports", "chart", "#", "reports.view", False),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
@@ -152,6 +152,21 @@ def dashboard(
             "value": db.scalar(select(func.count(AuditEvent.id)).where(AuditEvent.ts >= since)),
         },
     ]
+
+    if "catalogue.read" in perms:  # the library at a glance (full reports come with AC08)
+        now = datetime.now(UTC)
+        tagged = select(func.count(RfidTag.id)).where(RfidTag.status == "active")
+        overdue = select(func.count(Loan.id)).where(Loan.returned_at.is_(None), Loan.due_at < now)
+        stats += [
+            {"icon": "book", "label": "Catalogue items", "value": db.scalar(select(func.count(Item.id)))},
+            {"icon": "tag", "label": "Items with a tag", "value": db.scalar(tagged)},
+            {
+                "icon": "swap",
+                "label": "On loan now",
+                "value": db.scalar(select(func.count(Loan.id)).where(Loan.returned_at.is_(None))),
+            },
+            {"icon": "pulse", "label": "Overdue loans", "value": db.scalar(overdue)},
+        ]
 
     recent = None
     if "audit.read" in perms:
@@ -276,6 +291,23 @@ def circulation_page(
         can_renew="circulation.renew" in perms,
         can_block="member.write" in perms,
         protocol=settings.circulation.ilms_protocol.upper(),
+    )
+
+
+@router.get("/inventory", response_class=HTMLResponse)
+def inventory_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "inventory.run",
+        "inventory.html",
+        "inventory",
+        simulator=settings.environment != "production",
     )
 
 

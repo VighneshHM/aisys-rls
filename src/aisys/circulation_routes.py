@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aisys.catalogue.service import active_tag
-from aisys.circulation import service
+from aisys.circulation import fines, service
 from aisys.circulation.connector import CirculationConfig
 from aisys.circulation.mock_ilms import MockIlms
 from aisys.circulation.resilience import ResilientConnector
@@ -54,6 +54,11 @@ class IdentifyIn(BaseModel):
 class BlockIn(BaseModel):
     blocked: bool
     reason: str = Field(default="", max_length=200)
+
+
+class MoneyIn(BaseModel):
+    amount_cents: int = Field(gt=0, le=10_000_000)
+    note: str = Field(default="", max_length=200)
 
 
 class CheckoutIn(BaseModel):
@@ -116,6 +121,63 @@ def block_member(
         )
     except service.CircError as exc:
         raise _http(exc) from exc
+    return service.member_out(db, member, config)
+
+
+def _fine_http(exc: fines.FineError) -> HTTPException:
+    return HTTPException(exc.status, detail={"message": exc.message, "code": exc.code, "problems": []})
+
+
+@router.get("/members/{member_no}/fines")
+def member_fines(
+    member_no: str,
+    limit: int = 50,
+    _: Principal = Depends(require("member.read")),
+    db: Session = Depends(get_db),
+):
+    """The fine ledger of one member, newest first, and the balance it adds up to."""
+    try:
+        member = service.find_member(db, member_no)
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    return {"balance_cents": member.fines_cents, "entries": fines.recent(db, member.id, min(max(limit, 1), 200))}
+
+
+@router.post("/members/{member_no}/fines/payment")
+def pay_fine(
+    member_no: str,
+    body: MoneyIn,
+    request: Request,
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
+):
+    try:
+        member = service.find_member(db, member_no)
+        fines.pay(db, member, body.amount_cents, body.note, actor=principal.user.username, ip=client_ip(request))
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    except fines.FineError as exc:
+        raise _fine_http(exc) from exc
+    return service.member_out(db, member, config)
+
+
+@router.post("/members/{member_no}/fines/waiver")
+def waive_fine(
+    member_no: str,
+    body: MoneyIn,
+    request: Request,
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
+):
+    try:
+        member = service.find_member(db, member_no)
+        fines.waive(db, member, body.amount_cents, body.note, actor=principal.user.username, ip=client_ip(request))
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    except fines.FineError as exc:
+        raise _fine_http(exc) from exc
     return service.member_out(db, member, config)
 
 
@@ -209,6 +271,7 @@ def resolve_item(
     ref: str,
     _: Principal = Depends(desk_staff),
     db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
 ):
     """Name an item by accession no., barcode or tag UID and see whether it is on loan."""
     try:
@@ -224,7 +287,7 @@ def resolve_item(
         "item_type": item.item_type,
         "status": item.status,
         "is_reference": is_reference,
-        "loan": service.loan_out(loan) if loan else None,
+        "loan": service.loan_out(loan, config=config) if loan else None,
     }
 
 
@@ -236,8 +299,11 @@ def list_loans(
     offset: int = 0,
     _: Principal = Depends(history_viewer),
     db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
 ):
-    return service.list_loans(db, member_no=member_no, open_only=open_only, limit=min(limit, 100), offset=offset)
+    return service.list_loans(
+        db, member_no=member_no, open_only=open_only, limit=min(limit, 100), offset=offset, config=config
+    )
 
 
 @router.get("/events")

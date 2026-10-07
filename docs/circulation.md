@@ -18,12 +18,27 @@ interface**, and every attempt is written to an append-only history.
 | **Patron card = identify only**. It shows the member; it creates no session | Specified by the owner of the exercise | - |
 | **Timestamps always carry a UTC offset in the API** (`timeutil.iso`) | SQLite returns bare timestamps and browsers read those as local time, which shifted displayed times; fixed for every endpoint | - |
 
+## Fines
+
+| Rule | Default | Config key |
+|---|---|---|
+| Days late = whole 24-hour periods past the due time | | |
+| Grace period: this many days late cost nothing | 1 | `grace_days` |
+| Fine per billable day | 0.25 | `fine_per_day_cents` |
+| Cap for one loan | 10.00 | `max_fine_per_loan_cents` |
+| Circulation stops when the balance **exceeds** | 5.00 | `fine_limit_cents` |
+
+- **Charged when an overdue item is returned or renewed**, in the same commit. A renewal restarts the clock, so it charges the fine so far first; otherwise renewing a late book would erase its fine. While an item is still out, staff see the fine so far, but it is not on the balance yet.
+- **Ledger, not just a number:** every change is a row in the append-only `fine_entries` table (`opening`, `charge`, `payment`, `waiver`), with who did it and why. The member's balance always equals the ledger (tested). Existing stored balances became an `opening` entry (migration 0007).
+- **Staff with `member.write`** can record a payment or waive a fine (a reason is required). Neither can exceed the balance. Both are also written to the audit log.
+- Paying the balance down to the limit or below lets the member borrow again.
+
 ## Rules
 
 | Situation | Where decided | Code | HTTP |
 |---|---|---|---|
 | Reference item | local | `reference_item` | 409 |
-| Item lost / withdrawn | local | `item_unavailable` | 409 |
+| Item damaged, lost or withdrawn | local | `item_unavailable` | 409 |
 | Item already on loan | local (and DB index) | `item_on_loan` | 409 |
 | Member blocked | local, then ILMS | `patron_blocked` | 409 |
 | Fines **over** `fine_limit_cents` | local, then ILMS | `fines_exceeded` | 409 |
@@ -65,6 +80,8 @@ To connect a real system: implement `CirculationConnector` (see `src/aisys/circu
 | POST | `/checkin` `{item_ref}` | `circulation.checkin` |
 | GET | `/due?item_ref=` due-date enquiry (asks the ILMS; not written to the history) | any circulation permission |
 | GET | `/items/resolve?ref=` an item by accession no., barcode or tag UID | any circulation permission |
+| GET | `/members/{member_no}/fines` the ledger and balance | `member.read` |
+| POST | `/members/{member_no}/fines/payment` and `/waiver` `{amount_cents, note}` | `member.write` |
 | GET | `/loans`, `/events` (history; filter by `member_no`, `item_ref`) | `member.read` or `audit.read` |
 | simulator | `/mock/patron-cards`, `/mock/present`, `/mock/ilms/fail` (404 in production) | any circulation permission |
 
@@ -82,7 +99,7 @@ To connect a real system: implement `CirculationConnector` (see `src/aisys/circu
 ## Known limits
 
 - No wire-level SIP2 / NCIP, and no certification claim.
-- Fines are a stored amount (no overdue-fine calculation yet). Overdue loans are flagged, not charged.
+- Fines follow one simple rule (see Fines above): no per-item or per-member rates, no lost-item replacement charge, no refunds.
 - The mock ILMS keeps no loan database; it applies policy to the request it receives and remembers answers by transaction id in memory (lost on restart).
 - No holds or reservations; no notices (FR09) yet; no offline queue for when the ILMS is down.
 - The security bit is only changed when the tag is on the reader; there is no later "verify" read.

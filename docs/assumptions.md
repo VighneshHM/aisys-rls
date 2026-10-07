@@ -24,4 +24,5 @@ Items marked **[confirmed]** were agreed with the candidate; the rest are my own
 2. Expected columns of the migration spreadsheet (importer is mapping-driven in the meantime).
 3. Performance targets (we will define and publish our own, see test plan).
 | A-15 | Circulation talks to the ILMS only through a connector interface; a mock stands in, worded as SIP2 or NCIP. No wire protocol is built or claimed. | confirmed | See docs/circulation.md. |
-| A-16 | Fines are a stored amount per member; circulation stops when it exceeds a configurable limit. Overdue fines are not calculated. | own | Reasonable for the exercise; real fines come from the ILMS. |
+| A-16 | Fines are charged on a late return (per-day rate, grace days, cap per loan, all configurable) and kept in an append-only ledger; circulation stops when the balance exceeds a configurable limit. | own | The SOP asks only for the limit; the calculation is an extra. A real ILMS would own it. |
+| A-17 | Inventory works per location (the item's location text); items on loan and untagged items are counted, not called missing. | own | See docs/inventory.md. |
