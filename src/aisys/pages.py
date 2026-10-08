@@ -35,6 +35,7 @@ NAV = [
     ("reports", "Reports", "chart", "/reports", "reports.view", True),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
     ("audit", "Audit log", "list", "#", "audit.read", False),
+    ("backups", "Backups", "shield", "/backups", "admin.config", True),
     ("admin", "Administration", "users", "#", "admin.users", False),
 ]
 
@@ -292,6 +293,23 @@ def circulation_page(
         can_renew="circulation.renew" in perms,
         can_block="member.write" in perms,
         protocol=settings.circulation.ilms_protocol.upper(),
+    )
+
+
+@router.get("/backups", response_class=HTMLResponse)
+def backups_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "admin.config",
+        "backups.html",
+        "backups",
+        simulator=settings.environment != "production",
     )
 
 

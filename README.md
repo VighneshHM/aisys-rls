@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** and **AC10 backup and restore** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -61,6 +61,13 @@ in the mock outbox. Check the book out first and walk it through again: no alarm
 Sign in as `STAFFLIB0001` (or the auditor) and open **Reports**. Pick a report, set a filter (for example Circulation, outcome
 Refused) and click **Apply filters**; **Download CSV** gives exactly what you see. The **Dashboard** shows 14-day charts of
 completed transactions and gate alarms and the most overdue loans. Details and design: `docs/reports.md`.
+
+## Try backup and restore (AC10)
+
+Sign in as `STAFFADMIN01`, open **Backups**, click **Back up now**, then **Compare** (everything identical). In the
+**Disaster drill** click **Run the full drill**: it damages the data, shows which tables changed, restores the backup
+and shows every table identical again. The command line does the same (`python -m aisys.cli backup --help`). Details
+and the restore procedure: `docs/backup-restore.md`.
 
 ## Develop
 

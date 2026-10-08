@@ -90,5 +90,5 @@ barcodes and bibliographic keys it compared against and **re-checks automaticall
 
 ## Known limitations
 * Only the first worksheet of an `.xlsx` is read. Dates stored as text are parsed day-first (dd/mm vs mm/dd is ambiguous).
-* Restoring a backup is a manual copy for now; a guided restore is part of AC10.
+* Restoring a backup is guided and proven (table by table): see docs/backup-restore.md.
 * Loans/fines/members are out of scope for this importer (holdings only).

@@ -15,6 +15,7 @@ def settings(tmp_path) -> Settings:
     return Settings(
         database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
         log_level="WARNING",
+        backup_dir=str(tmp_path / "backups"),  # never the real data/backups folder
         max_failed_logins=3,
         lockout_minutes=15,
         circulation=CirculationConfig(ilms_backoff_s=0.0),  # retries without waiting

@@ -65,6 +65,23 @@ def _get_fresh(db: Session, batch_id: int, principal: Principal, request: Reques
     return batch, refreshed
 
 
+@router.post("/mock/fail-next-commit", tags=["migration-simulator"])
+def arm_fault(_: Principal = Perm, settings: Settings = Depends(get_settings)):
+    """Make the next import commit fail after inserting its rows (development only; to practise restoring)."""
+    if settings.environment == "production":
+        raise HTTPException(404, "Not found")
+    service.FAULT["armed"] = True
+    return {"armed": True}
+
+
+@router.delete("/mock/fail-next-commit", tags=["migration-simulator"])
+def disarm_fault(_: Principal = Perm, settings: Settings = Depends(get_settings)):
+    if settings.environment == "production":
+        raise HTTPException(404, "Not found")
+    service.FAULT["armed"] = False
+    return {"armed": False}
+
+
 @router.post("", status_code=201)
 async def upload(
     request: Request,

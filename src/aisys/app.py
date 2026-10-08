@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from aisys import __version__, migrate, pages
 from aisys.auth.permissions import sync_rbac
+from aisys.backup_routes import router as backup_router
 from aisys.catalogue_routes import router as catalogue_router
 from aisys.circulation.registry import build_connector
 from aisys.circulation_routes import router as circulation_router
@@ -57,6 +60,7 @@ def create_app(
 
     app = FastAPI(title=settings.app_name, version=__version__)
     app.state.settings = settings
+    app.state.maintenance = threading.Event()  # set while a restore runs: everything else waits (see below)
     app.state.engine = engine
     app.state.session_factory = factory
     app.state.credential_provider = credential_provider or MockCredentialProvider()
@@ -72,6 +76,24 @@ def create_app(
     app.include_router(gate_router)
     app.include_router(notify_router)
     app.include_router(reports_router)
+    app.include_router(backup_router)
+
+    @app.middleware("http")
+    async def maintenance_gate(request: Request, call_next):
+        """While a restore replaces the data, nobody else may read or write it: a change made in the middle would be
+        lost or half-applied. Everyone else gets a clear, temporary 503 (and the restore finishes in seconds)."""
+        if app.state.maintenance.is_set() and not request.url.path.startswith("/static"):
+            return JSONResponse(
+                {
+                    "detail": {
+                        "message": "The library data is being restored from a backup. Please try again shortly.",
+                        "problems": [],
+                    }
+                },
+                status_code=503,
+                headers={"Retry-After": "5"},
+            )
+        return await call_next(request)
 
     app.mount(
         "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"
