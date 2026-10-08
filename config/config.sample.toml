@@ -77,6 +77,8 @@ auto_dispatch_seconds = 60
 
 [ilms]
 driver = "mock"
-protocol = "sip2"                # sip2 | ncip
+#endpoint = "192.168.1.50" # ip of ILMS server 
+port = "6001" #sip2/ncip port of ILMS server
+#protocol = "sip2"                # sip2 | ncip
 retries = 2
 backoff_s = 0.1
