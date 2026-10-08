@@ -1,0 +1,129 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Administration · {{ app_name }}{% endblock %}
+{% block heading %}Administration{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Staff, roles and cards</h2>
+  <p>Staff sign in with their staff card. A <b>patron card</b> only identifies a member at the desk and can never sign in. Deactivating a person or a card takes effect at once, and every change is written to the audit log.</p>
+</div>
+
+<div class="grid two">
+  <section class="panel">
+    <header><h3>Staff</h3><span class="badge" id="count"></span></header>
+    <div class="table-wrap" id="people" style="max-height:70vh;overflow:auto"></div>
+    <div id="people-notice" class="notice" role="alert" style="margin:12px 18px"></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Add a staff member</h3></header>
+      <div class="body">
+        <div class="field"><label for="u-name">Username</label><input id="u-name" autocomplete="off" maxlength="64" placeholder="lowercase letters, digits . _ - (3 or more)"></div>
+        <div class="field"><label for="u-display">Full name</label><input id="u-display" autocomplete="off" maxlength="120"></div>
+        <div class="field"><label for="u-role">Role</label><select id="u-role"></select><div class="sub" id="u-role-help"></div></div>
+        <div class="field"><label for="u-pass">Password (optional, 10 or more characters)</label><input id="u-pass" type="password" autocomplete="new-password" maxlength="256"></div>
+        <div class="actions"><button class="btn" id="add-user" type="button">Add staff member</button></div>
+        <div id="user-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Issue a card</h3></header>
+      <div class="body">
+        <div class="field"><label for="c-kind">Kind</label><select id="c-kind"><option value="staff">Staff card (signs in)</option><option value="patron">Patron card (identifies a member only)</option></select></div>
+        <div class="field"><label for="c-uid">Card number</label><input id="c-uid" autocomplete="off" maxlength="32" placeholder="6 to 32 capital letters or digits" style="text-transform:uppercase"></div>
+        <div class="field" id="c-user-row"><label for="c-user">Staff member</label><select id="c-user"></select></div>
+        <div class="field hidden" id="c-member-row"><label for="c-member">Member number</label><input id="c-member" autocomplete="off" maxlength="64" placeholder="e.g. M0001"></div>
+        <div class="actions"><button class="btn" id="issue" type="button">Issue card</button></div>
+        <div id="card-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, fmt} = UI;
+  const ME = {{ me|tojson }};
+  let roles = [];
+  async function busy(button, label, action) {
+    if (button.disabled) return;
+    const text = button.textContent; button.disabled = true; button.textContent = label;
+    try { return await action(); } finally { button.disabled = false; button.textContent = text; }
+  }
+  const why = e => e.problems && e.problems.length ? e.problems.map(p => (p.field ? p.field.replace(/_/g, " ") + ": " : "") + p.message).join("; ") : e.message;
+  const pill = (cls, text) => h("span", {class: "badge " + cls}, text);
+
+  async function patch(url, body) {
+    clear("people-notice");
+    try { await api(url, {method: "PATCH", json: body}); await load(); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } say("people-notice", "bad", e.message); await load(); }
+  }
+
+  function row(p) {
+    const you = p.username === ME;
+    return h("tr", {},
+      h("td", {}, h("b", {}, p.display_name), you ? h("span", {class: "sub"}, " (you)") : null, h("div", {class: "sub mono"}, p.username)),
+      h("td", {}, you ? p.role : h("select", {"aria-label": "Role of " + p.username, onchange: ev => patch("/api/admin/users/" + p.id, {role: ev.target.value})},
+        roles.map(r => h("option", {value: r.name, selected: r.name === p.role ? "" : false}, r.name)))),
+      h("td", {}, p.active ? pill("good", "Active") : pill("bad", "Deactivated"), p.locked ? h("div", {}, pill("warn", "Locked")) : null),
+      h("td", {}, p.cards.length ? p.cards.map(c => h("div", {style: "display:flex;gap:8px;align-items:center;margin:2px 0"},
+        h("span", {class: "mono" + (c.active ? "" : " muted")}, c.uid_hint), c.active ? null : pill("", "off"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => patch("/api/admin/cards/" + c.id, {active: !c.active})}, c.active ? "Deactivate" : "Reactivate"))) : h("span", {class: "sub"}, "no card")),
+      h("td", {}, h("div", {class: "actions", style: "margin:0;gap:6px"},
+        p.locked ? h("button", {class: "btn ghost small", type: "button", onclick: () => patch("/api/admin/users/" + p.id, {unlock: true})}, "Unlock") : null,
+        you ? null : h("button", {class: "btn ghost small" + (p.active ? " danger-text" : ""), type: "button", onclick: () => patch("/api/admin/users/" + p.id, {active: !p.active})}, p.active ? "Deactivate" : "Activate"))));
+  }
+
+  async function load() {
+    let d;
+    try { d = await api("/api/admin/people"); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("people"), h("div", {class: "empty"}, e.message)); return; }
+    roles = d.roles;
+    $("count").textContent = fmt(d.people.length) + " staff";
+    fill($("people"), h("table", {},
+      h("thead", {}, h("tr", {}, ["Person", "Role", "Status", "Staff cards", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.people.map(row))));
+    const keep = $("u-role").value;
+    fill($("u-role"), roles.map(r => h("option", {value: r.name, selected: r.name === keep ? "" : false}, r.name)));
+    $("u-role-help").textContent = (roles.find(r => r.name === $("u-role").value) || {}).description || "";
+    const ku = $("c-user").value;
+    fill($("c-user"), d.people.filter(p => p.active).map(p => h("option", {value: p.username, selected: p.username === ku ? "" : false}, p.display_name + " (" + p.username + ")")));
+  }
+
+  $("u-role").onchange = () => { $("u-role-help").textContent = (roles.find(r => r.name === $("u-role").value) || {}).description || ""; };
+  $("c-kind").onchange = () => { const staff = $("c-kind").value === "staff"; $("c-user-row").classList.toggle("hidden", !staff); $("c-member-row").classList.toggle("hidden", staff); };
+
+  $("add-user").onclick = async () => {
+    clear("user-notice");
+    await busy($("add-user"), "Adding…", async () => {
+      try {
+        const body = {username: $("u-name").value.trim(), display_name: $("u-display").value.trim(), role: $("u-role").value};
+        if ($("u-pass").value) body.password = $("u-pass").value;
+        const u = await api("/api/admin/users", {json: body});
+        say("user-notice", "ok", "Added " + u.display_name + ". Now issue them a staff card.");
+        ["u-name", "u-display", "u-pass"].forEach(i => $(i).value = "");
+        await load();
+      } catch (e) { say("user-notice", "bad", why(e)); }
+    });
+  };
+  $("issue").onclick = async () => {
+    clear("card-notice");
+    await busy($("issue"), "Issuing…", async () => {
+      try {
+        const staff = $("c-kind").value === "staff";
+        const body = {uid: $("c-uid").value.trim().toUpperCase(), kind: $("c-kind").value};
+        if (staff) body.username = $("c-user").value; else body.member_ref = $("c-member").value.trim();
+        await api("/api/admin/cards", {json: body});
+        say("card-notice", "ok", (staff ? "Staff" : "Patron") + " card issued.");
+        $("c-uid").value = ""; $("c-member").value = "";
+        await load();
+      } catch (e) { say("card-notice", "bad", why(e)); }
+    });
+  };
+  load();
+})();
+</script>
+{% endblock %}

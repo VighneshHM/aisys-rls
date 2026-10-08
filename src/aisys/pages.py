@@ -34,10 +34,10 @@ NAV = [
     ("gate", "Gate events", "gate", "/gate", "gate.view", True),
     ("reports", "Reports", "chart", "/reports", "reports.view", True),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
-    ("audit", "Audit log", "list", "#", "audit.read", False),
+    ("audit", "Audit log", "list", "/audit", "audit.read", True),
     ("backups", "Backups", "shield", "/backups", "admin.config", True),
     ("updates", "Updates", "server", "/updates", "admin.config", True),
-    ("admin", "Administration", "users", "#", "admin.users", False),
+    ("admin", "Administration", "users", "/admin", "admin.users", True),
 ]
 
 ROLE_LABELS = {
@@ -312,6 +312,25 @@ def backups_page(
         "backups",
         simulator=settings.environment != "production",
     )
+
+
+@router.get("/audit", response_class=HTMLResponse)
+def audit_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "audit.read", "audit.html", "audit")
+
+
+@router.get("/admin", response_class=HTMLResponse)
+def admin_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    me = principal.user.username if principal else ""
+    return _gated_page(request, settings, principal, "admin.users", "admin.html", "admin", me=me)
 
 
 @router.get("/updates", response_class=HTMLResponse)

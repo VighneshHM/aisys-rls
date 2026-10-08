@@ -9,8 +9,10 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import StatementError
 
 from aisys import __version__, migrate, pages
+from aisys.admin_routes import router as admin_router
 from aisys.auth.permissions import sync_rbac
 from aisys.backup_routes import router as backup_router
 from aisys.catalogue_routes import router as catalogue_router
@@ -78,7 +80,21 @@ def create_app(
     app.include_router(notify_router)
     app.include_router(reports_router)
     app.include_router(backup_router)
+    app.include_router(admin_router)
     app.include_router(updates_router)
+
+    def too_large(_request: Request, _exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            {"detail": {"message": "A number in the request is too large.", "problems": []}}, status_code=422
+        )
+
+    app.add_exception_handler(OverflowError, too_large)  # e.g. offset=99999999999999999999 or an id that big
+
+    @app.exception_handler(StatementError)
+    async def statement_error(request: Request, exc: StatementError):
+        if isinstance(exc.orig, OverflowError):  # SQLite cannot hold the number: the caller's mistake, not ours
+            return too_large(request, exc)
+        raise exc
 
     @app.middleware("http")
     async def maintenance_gate(request: Request, call_next):

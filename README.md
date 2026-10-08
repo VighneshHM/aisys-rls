@@ -100,3 +100,15 @@ tests/                            pytest suite, tagged with requirement IDs
 (backup, rehearsal on a copy, migration, start-up check, switch) and rolls back with the data proven unchanged. The
 **Updates** page of an installed copy shows the versions, licence and history and can dry-run check a waiting package.
 How to build, install, update, roll back and recover: `docs/deployment.md`.
+
+## Audit log and administration
+
+Sign in as the administrator (or the auditor for the audit log). **Audit log** filters by person, action, outcome and
+text, pages through the events, and exports CSV. **Administration** adds staff, issues staff or patron cards, activates or
+deactivates people and cards, unlocks locked accounts and changes roles; you cannot deactivate or demote yourself.
+Details: `docs/administration.md`.
+
+## More documentation
+
+`docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),
+`docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).

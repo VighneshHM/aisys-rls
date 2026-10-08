@@ -1,0 +1,68 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Audit log · {{ app_name }}{% endblock %}
+{% block heading %}Audit log{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Who did what, and when</h2>
+  <p>Every sign-in, denial and change to library data is written here. The log can only be added to: the database refuses to edit or delete a line.</p>
+</div>
+
+<section class="panel">
+  <header><h3>Events</h3><span class="badge" id="count"></span></header>
+  <div class="body">
+    <div class="toolbar" style="margin:0 0 12px">
+      <div class="field" style="margin:0"><label for="f-actor">Who</label><select id="f-actor"><option value="">Anyone</option></select></div>
+      <div class="field" style="margin:0"><label for="f-action">Action starts with</label><input id="f-action" placeholder="e.g. circulation." autocomplete="off" maxlength="64"></div>
+      <div class="field" style="margin:0"><label for="f-outcome">Outcome</label><select id="f-outcome"><option value="">Any</option><option>success</option><option>denied</option><option>failure</option></select></div>
+      <div class="field grow" style="margin:0"><label for="f-q">Record, item or IP contains</label><input id="f-q" autocomplete="off" maxlength="64"></div>
+      <div class="actions" style="margin:0;align-self:end"><button class="btn" id="apply" type="button">Search</button><button class="btn ghost" id="reset" type="button">Clear</button><a class="btn ghost" id="export" href="#" download>Export CSV</a></div>
+    </div>
+    <div id="notice" class="notice" role="alert"></div>
+  </div>
+  <div class="table-wrap" id="list"></div>
+  <div class="pager" id="pager"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt} = UI;
+  const PAGE = 25;
+  let offset = 0;
+  const ids = ["actor", "action", "outcome", "q"];
+  const query = () => ids.map(k => [k, $("f-" + k).value.trim()]).filter(([, v]) => v).map(([k, v]) => k + "=" + encodeURIComponent(v)).join("&");
+  const badge = o => h("span", {class: "badge " + (o === "success" ? "good" : o === "denied" ? "warn" : "bad")}, o);
+
+  async function load() {
+    clear("notice");
+    let d;
+    try { d = await api("/api/audit/events?limit=" + PAGE + "&offset=" + offset + (query() ? "&" + query() : "")); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } say("notice", "bad", e.message); return; }
+    const keep = $("f-actor").value;
+    fill($("f-actor"), h("option", {value: ""}, "Anyone"), d.actors.map(a => h("option", {value: a, selected: a === keep ? "" : false}, a)));
+    $("count").textContent = fmt(d.total) + " event" + (d.total === 1 ? "" : "s");
+    $("export").href = "/api/audit/export.csv" + (query() ? "?" + query() : "");
+    fill($("list"), d.events.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["When", "Who", "Action", "Record", "Outcome", "IP"].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.events.map(e => h("tr", {},
+        h("td", {class: "time"}, when(e.ts)),
+        h("td", {}, e.actor),
+        h("td", {}, h("span", {class: "mono"}, e.action), Object.keys(e.detail || {}).length ? h("details", {}, h("summary", {class: "sub"}, "details"), h("pre", {class: "mono", style: "margin:4px 0 0;white-space:pre-wrap;word-break:break-word"}, JSON.stringify(e.detail, null, 2))) : null),
+        h("td", {class: "mono"}, e.entity ? e.entity + (e.entity_id ? " #" + e.entity_id : "") : ""),
+        h("td", {}, badge(e.outcome)),
+        h("td", {class: "mono"}, e.ip || ""))))) : h("div", {class: "empty"}, "No events match."));
+    const to = offset + d.events.length;
+    fill($("pager"), h("span", {class: "muted"}, d.total ? fmt(offset + 1) + "–" + fmt(to) + " of " + fmt(d.total) : "0 events"),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - PAGE); load(); }}, "Newer"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= d.total ? "" : false, onclick: () => { offset += PAGE; load(); }}, "Older"));
+  }
+  const search = () => { offset = 0; load(); };
+  $("apply").onclick = search;
+  $("reset").onclick = () => { ids.forEach(k => $("f-" + k).value = ""); search(); };
+  ids.forEach(k => $("f-" + k).addEventListener("keydown", e => { if (e.key === "Enter") search(); }));
+  $("f-actor").addEventListener("change", search); $("f-outcome").addEventListener("change", search);
+  load();
+})();
+</script>
+{% endblock %}

@@ -22,7 +22,7 @@ ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and doc
 | AC09 | Offline install, update, rollback | Signed packages, install, update with rehearsal, rollback, recover, SBOM and licence inventory, Updates page | `aisys_lifecycle/`, `scripts/release.py`, `docs/deployment.md` |
 | AC10 | Restore after a failed migration or integration change, proving the original data is intact | Verified backups, table-by-table fingerprint proof, guided restore with safety copy | `backup.py`, `docs/backup-restore.md` |
 
-Beyond the scenarios: member management and a fines ledger, role-based access, an append-only audit log, health endpoints,
+Beyond the scenarios: member management and a fines ledger, role-based access, an append-only audit log with a searchable page, staff and card administration, health endpoints,
 a requirements-to-tests traceability matrix (`docs/traceability.md`: 31 requirements), CI, and Dependabot.
 
 **Required by the PDF** vs **my recommendation**: the ten scenarios, mocks for devices and services, synthetic data,
@@ -88,12 +88,13 @@ src/aisys/
   notifications/    providers.py, queue.py, prefs.py, messages.py
   reports/          core.py, definitions.py, service.py
   backup.py         backups, fingerprint, compare, restore (AC10)
+  admin_routes.py   Audit log search/export and staff/card administration (pages /audit and /admin)
   backup_routes.py, lifecycle_routes.py   HTTP for backups and the Updates page
   pages.py, web/    templates (Jinja) and static (app.css, ui.js), no CDN
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              14 test files, 309 tests
+tests/              15 test files, 328 tests
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
 
@@ -258,7 +259,7 @@ Every endpoint other than login and health needs a session and a named permissio
   password for the demo admin (hashed). Session tokens are random and stored hashed; they expire; users lock after
   repeated failures.
 - **Authorisation:** permission-based roles (admin, librarian, circulation clerk, auditor); every route declares its
-  permission; pages show the friendly 403 page; navigation hides what you cannot use.
+  permission; pages show the friendly 403 page; navigation hides what you cannot use. Administration cannot lock the system out: you cannot deactivate or demote yourself, deactivating someone ends their open sessions at once, and every change is audited (`docs/administration.md`). Any request carrying a number too large for the database gets a clean 422.
 - **Input handling:** pydantic models validate bodies; file names are limited to a plain-name pattern and resolved inside
   their folder (no path traversal for backups, packages, uploads); SQL is parameterised and `LIKE` wildcards are escaped;
   CSV exports neutralise formulas; HTML from notes is shown as text.
@@ -274,7 +275,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **309 automated tests, all passing** (about 4 minutes), `ruff` format and lint clean (including security rules), CI on
+- **328 automated tests, all passing** (about 6 minutes), `ruff` format and lint clean (including security rules), CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -307,7 +308,7 @@ Every endpoint other than login and health needs a session and a named permissio
   `AISYS_BACKUP_DIR`, `AISYS_SECRET_KEY` (required in production), `AISYS_HOST`, `AISYS_PORT`.
 - **Dependencies:** Python 3.12+, FastAPI, Uvicorn, SQLAlchemy, Alembic, Jinja2, python-multipart, openpyxl (runtime);
   pytest, httpx, ruff, cryptography (development only).
-- **Infrastructure:** one process, one SQLite file, one backup folder. TLS is expected from a reverse proxy.
+- **Infrastructure:** one process, one SQLite file, one backup folder. TLS is expected from a reverse proxy. Service wrappers, scheduled delivery of notifications and example proxy configuration are in `docs/deployment.md` (untested examples). Guides: `docs/user-guide.md`, `docs/troubleshooting.md`, `docs/remaining-work.md`.
 
 ## 12. Limitations and future improvements
 
@@ -317,7 +318,7 @@ Every endpoint other than login and health needs a session and a named permissio
 - Fines are a simple configurable rule; a real ILMS would own them.
 - Only staff are users; there is no patron self-service and no patron notifications (the queue could carry them).
 - SQLite only (backup and restore use SQLite's API).
-- The "Audit log" and "Administration" menu entries are placeholders (the API exists; the pages do not).
+- Administration has no password reset, role editor or permission editor; roles are the four built-in ones, and users are deactivated, never deleted.
 
 **Operational limits**
 - A restore replaces everything, including the audit log up to the backup's moment; there is no automatic backup
@@ -330,7 +331,7 @@ Every endpoint other than login and health needs a session and a named permissio
 **Reasonable next steps**
 1. Real driver for one reader family and one SIP2 server, behind the existing interfaces.
 2. PostgreSQL option, with backup hooks for it.
-3. Audit-log and administration pages; patron notices through the queue.
+3. Password reset and custom roles in Administration; patron notices through the queue.
 4. A Windows service or systemd unit wrapper around `manage.py run`; verify the lifecycle on Linux.
 5. Automatic backup retention and off-machine copy.
 6. A browser-driven end-to-end test suite and a multi-user load test in CI.
