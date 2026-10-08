@@ -15,7 +15,7 @@ from aisys.config import Settings
 from aisys.deps import Principal, client_ip, get_db, get_settings, require
 from aisys.gate import service
 from aisys.models import RfidTag
-from aisys.notifications import prefs, queue
+from aisys.notifications import prefs, queue, reminders
 from aisys.notifications.providers import CHANNELS, MockProvider, NotificationProvider, address_hint
 from aisys.rfid.mock import MockCamera, MockGate
 from aisys.rfid.registry import DeviceRegistry
@@ -181,6 +181,16 @@ def dispatch(
 ):
     """Deliver every queued message that is due (failures are retried later, up to the configured limit)."""
     return queue.dispatch(db, providers, settings.notifications)
+
+
+@notify_router.post("/reminders/run")
+def run_reminders(
+    _: Principal = CanAdmin,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    """Queue the patron reminders that are due today (the background loop does this by itself)."""
+    return reminders.scan(db, settings.notifications, library_name=settings.app_name)
 
 
 @notify_router.post("/{notification_id}/retry")

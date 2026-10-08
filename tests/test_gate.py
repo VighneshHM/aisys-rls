@@ -101,7 +101,7 @@ def test_queued_messages_are_delivered_by_channel_with_the_right_words(client, l
     )
     assert len(box["sms"]["body"]) <= 160 and "G2" in box["sms"]["body"]
     assert "SECURITY ALERT" in box["print"]["body"] and box["print"]["to"] == "front-desk"
-    assert queue(client, lib)["counts"] == {"queued": 0, "sent": 4, "failed": 0}
+    assert queue(client, lib)["counts"] == {"queued": 0, "sent": 4, "failed": 0, "cancelled": 0}
 
 
 # ================================================================== the alarm rules
@@ -222,7 +222,7 @@ def test_failed_deliveries_are_retried_then_given_up_and_can_be_retried_by_hand(
     second = client.post("/api/notifications/dispatch", headers=admin_h).json()
     assert second["sent"] == 1 and second["retry_later"] == 1  # the next send fails, then the provider recovers
     third = client.post("/api/notifications/dispatch", headers=admin_h).json()
-    assert third["sent"] == 1 and queue(client, lib)["counts"] == {"queued": 0, "sent": 3, "failed": 0}
+    assert third["sent"] == 1 and queue(client, lib)["counts"] == {"queued": 0, "sent": 3, "failed": 0, "cancelled": 0}
 
 
 @pytest.mark.req("FR09", "NFR06")
@@ -253,7 +253,7 @@ def test_a_message_is_marked_failed_after_the_attempt_limit_and_can_be_retried(c
     for _ in range(3):
         client.post("/api/notifications/dispatch", headers=admin_h)
     counts = queue(client, lib)["counts"]
-    assert counts == {"queued": 0, "sent": 0, "failed": 1}  # gave up after the 3 attempts
+    assert counts == {"queued": 0, "sent": 0, "failed": 1, "cancelled": 0}  # gave up after the 3 attempts
     [row] = queue(client, lib, status="failed")["notifications"]
     assert row["attempts"] == 3 and "timed out" in row["last_error"]
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 200

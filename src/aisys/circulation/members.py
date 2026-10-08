@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from aisys import audit
 from aisys.circulation.service import CircError, find_member
 from aisys.models import Card, Member
+from aisys.notifications.providers import valid_address
 
 CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
 MEMBER_NO_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,31}$")
@@ -37,8 +38,60 @@ def _check_card_free(db: Session, uid: str) -> None:
         raise CircError(409, "card_in_use", "That card number is already registered to someone")
 
 
+def clean_email(value: str) -> str:
+    value = (value or "").strip()
+    if value and (len(value) > 200 or not valid_address("email", value)):
+        raise CircError(422, "bad_email", "That is not an e-mail address like name@example.org")
+    return value
+
+
+def clean_phone(value: str) -> str:
+    value = re.sub(r"[\s().-]", "", value or "")
+    if value and not valid_address("sms", value):
+        raise CircError(422, "bad_phone", "A phone number has 7 to 15 digits, like +441234567890")
+    return value
+
+
+def set_contact(
+    db: Session,
+    member_no: str,
+    *,
+    email: str | None = None,
+    phone: str | None = None,
+    reminders_on: bool | None = None,
+    actor: str,
+    ip: str = "",
+) -> Member:
+    """Change where reminders go. A field left out (None) is unchanged; an empty text clears it."""
+    member = find_member(db, member_no)
+    changed: dict[str, str] = {}
+    if email is not None:
+        member.email = clean_email(email)
+        changed["email"] = "set" if member.email else "cleared"
+    if phone is not None:
+        member.phone = clean_phone(phone)
+        changed["phone"] = "set" if member.phone else "cleared"
+    if reminders_on is not None:
+        member.reminders_on = reminders_on
+        changed["reminders"] = "on" if reminders_on else "off"
+    if changed:  # the addresses themselves are personal data: the log records only what was done
+        audit.record(
+            db, actor=actor, action="member.contact", entity="member", entity_id=member.member_no, detail=changed, ip=ip
+        )
+        db.commit()
+    return member
+
+
 def create_member(
-    db: Session, *, name: str, member_no: str = "", card_uid: str = "", actor: str, ip: str = ""
+    db: Session,
+    *,
+    name: str,
+    member_no: str = "",
+    card_uid: str = "",
+    email: str = "",
+    phone: str = "",
+    actor: str,
+    ip: str = "",
 ) -> Member:
     name = " ".join(name.split())
     if not name:
@@ -51,7 +104,7 @@ def create_member(
     uid = _clean_card(card_uid) if card_uid.strip() else ""
     if uid:
         _check_card_free(db, uid)
-    member = Member(member_no=number, name=name)
+    member = Member(member_no=number, name=name, email=clean_email(email), phone=clean_phone(phone))
     db.add(member)
     db.flush()
     if uid:

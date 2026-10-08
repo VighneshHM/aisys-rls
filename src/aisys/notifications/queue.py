@@ -9,10 +9,11 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm import Session
 
 from aisys.models import Notification, utcnow
+from aisys.notifications import reminders
 from aisys.notifications.providers import (
     NotificationConfig,
     NotificationProvider,
@@ -57,10 +58,27 @@ def dispatch(
         .order_by(Notification.id)
         .limit(limit)
     ).all()
-    sent = retry_later = failed = 0
+    sent = retry_later = failed = cancelled = tried = 0
     for n in due:
+        stale = reminders.still_relevant(db, n)
+        if stale:  # a reminder about a loan that was returned or renewed is dropped, not sent
+            n.status, n.last_error = "cancelled", stale
+            cancelled += 1
+            db.commit()
+            continue
+        # Claim it: only one dispatcher (this app's loop, the command line, a button) wins the row, so a message is
+        # never sent twice however many run at once. A crash after the claim means one more try later, not a loss.
+        claimed = db.execute(
+            update(Notification)
+            .where(Notification.id == n.id, Notification.status == "queued", Notification.attempts == n.attempts)
+            .values(attempts=n.attempts + 1)
+        ).rowcount
+        db.commit()
+        if claimed != 1:
+            continue
+        db.refresh(n)
+        tried += 1
         provider = providers.get(n.channel)
-        n.attempts += 1
         try:
             if provider is None:
                 raise ProviderError(f"no {n.channel} provider is configured")
@@ -79,10 +97,11 @@ def dispatch(
         db.commit()  # each message is settled on its own
     next_at = db.scalar(select(func.min(Notification.next_attempt_at)).where(Notification.status == "queued"))
     return {
-        "tried": len(due),
+        "tried": tried + cancelled,
         "sent": sent,
         "retry_later": retry_later,
         "failed": failed,
+        "cancelled": cancelled,
         "waiting": counts(db)["queued"],
         "next_attempt_at": iso(next_at),  # when the earliest waiting message is due again
     }
@@ -90,7 +109,12 @@ def dispatch(
 
 def counts(db: Session) -> dict[str, int]:
     rows = dict(db.execute(select(Notification.status, func.count()).group_by(Notification.status)).all())
-    return {"queued": rows.get("queued", 0), "sent": rows.get("sent", 0), "failed": rows.get("failed", 0)}
+    return {
+        "queued": rows.get("queued", 0),
+        "sent": rows.get("sent", 0),
+        "failed": rows.get("failed", 0),
+        "cancelled": rows.get("cancelled", 0),
+    }
 
 
 def retry(db: Session, notification_id: int) -> Notification | None:
@@ -118,6 +142,9 @@ def notification_out(n: Notification) -> dict:
         "sent_at": iso(n.sent_at),
         "provider_ref": n.provider_ref,
         "event_id": n.event_id,
+        "kind": n.kind,
+        "loan_id": n.loan_id,
+        "member_id": n.member_id,
         "due": n.status == "queued" and aware(n.next_attempt_at) <= utcnow(),
     }
 

@@ -93,7 +93,7 @@
   const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
   const money = c => (c / 100).toFixed(2);
   const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
-  let member = null, item = null, askingReason = false, fineMode = null, issuing = false;
+  let member = null, item = null, askingReason = false, fineMode = null, issuing = false, editingContact = false;
 
   // ------------------------------------------------------------------ patron
   // the card box and the demo-card list always describe the member shown, however they were chosen
@@ -134,7 +134,8 @@
           : [h("span", {class: "sub"}, "No card issued yet"), m.cards_withdrawn ? h("div", {class: "sub"}, m.cards_withdrawn + " earlier card" + (m.cards_withdrawn === 1 ? "" : "s") + " withdrawn") : null]),
         h("dt", {}, "Status"), h("dd", {}, m.status === "blocked" ? "Blocked" + (m.block_reason ? " · " + m.block_reason : "") : "Active"),
         h("dt", {}, "Fines"), h("dd", {}, money(m.fines_cents) + " (limit " + money(m.fine_limit_cents) + ")" + (m.fines_over_limit ? " · over the limit" : "")),
-        h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans)),
+        h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans),
+        h("dt", {}, "Reminders"), h("dd", {}, reminderSummary(m))),
       CAN_BLOCK && m.fines_cents > 0 ? fineControls(m) : null,
       m.loans.length ? h("div", {class: "table-wrap", style: "margin:0 -4px"}, h("table", {},
         h("thead", {}, h("tr", {}, ["Item", "Due", ""].map(t => h("th", {}, t)))),
@@ -143,8 +144,15 @@
           h("td", {}, day(l.due_at), l.overdue ? h("div", {}, h("span", {class: "badge warn"}, l.days_overdue + " d overdue")) : null,
             l.fine_so_far_cents ? h("div", {class: "sub"}, "fine so far " + money(l.fine_so_far_cents)) : null,
             l.renewals ? h("div", {class: "sub"}, "renewed ×" + l.renewals) : null),
-          h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => pick(l.accession_no)}, "Select")))))))
+          h("td", {}, h("div", {class: "actions", style: "margin:0;gap:6px;flex-wrap:wrap"},
+            h("button", {class: "btn ghost small", type: "button", onclick: () => pick(l.accession_no)}, "Select"),
+            SIM ? [h("button", {class: "btn ghost small", type: "button", title: "Demo: make this loan due tomorrow, to try the reminder", onclick: () => setDue(l.id, 1)}, "Due tomorrow"),
+              h("button", {class: "btn ghost small", type: "button", title: "Demo: make this loan due today", onclick: () => setDue(l.id, 0)}, "Due today")] : null)))))))
         : h("div", {class: "sub"}, "No items on loan."),
+      m.reminders && m.reminders.length ? h("details", {class: "sim", style: "margin-top:12px"}, h("summary", {}, "Reminders sent to this member (" + m.reminders.length + ")"),
+        h("ul", {class: "timeline", style: "margin-top:8px"}, m.reminders.map(r => h("li", {}, h("time", {}, when(r.created_at)),
+          h("span", {}, h("b", {}, REMINDER_KIND[r.kind] || r.kind), " by " + r.channel + " · due " + day(r.due_on),
+            " · ", h("span", {class: "badge " + (r.status === "sent" ? "good" : r.status === "failed" ? "bad" : "")}, r.status), r.note ? h("div", {class: "sub"}, r.note) : null))))) : null,
       m.fine_entries.length ? h("details", {class: "sim", style: "margin-top:12px"}, h("summary", {}, "Fine history"),
         h("ul", {class: "timeline", style: "margin-top:8px"}, m.fine_entries.map(e => h("li", {}, h("time", {}, when(e.ts)),
           h("span", {}, h("b", {}, FINE_KIND[e.kind] + " " + money(e.amount_cents)), e.note && e.note !== FINE_KIND[e.kind] ? " · " + e.note : "", e.actor && e.actor !== "system" ? " · " + e.actor : ""))))) : null,
@@ -154,12 +162,51 @@
         h("div", {class: "actions"}, h("button", {class: "btn small danger", type: "button", onclick: () => setBlocked(true, $("block-reason").value.trim())}, "Block member"),
           h("button", {class: "btn ghost small", type: "button", onclick: () => { askingReason = false; renderMember(); }}, "Cancel")))
       : CAN_BLOCK && issuing ? cardForm(m)
+      : CAN_BLOCK && editingContact ? contactForm(m)
       : CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
         m.status === "blocked" ? "Unblock member" : "Block member"),
-        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = true; renderMember(); }}, "Issue or replace card")) : null);
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = true; renderMember(); }}, "Issue or replace card"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = true; renderMember(); }}, "Contact and reminders")) : null);
     if (askingReason && $("block-reason")) $("block-reason").focus();
     if (issuing && $("new-card")) $("new-card").focus();
+    if (editingContact && $("ct-email")) $("ct-email").focus();
     sync();
+  }
+
+  // ------------------------------------------------------------------ reminders: contact details
+  const REMINDER_KIND = {due_soon: "Due tomorrow", due_today: "Due today"};
+  function reminderSummary(m) {
+    const c = m.contact;
+    if (!c) return h("span", {class: "sub"}, "Not shown: restart the app to load the latest version");
+    if (!c.reminders_on) return h("span", {class: "sub"}, "Switched off for this member");
+    const where = [c.email, c.phone].filter(Boolean);
+    return where.length ? [where.join(" · "), h("div", {class: "sub"}, "A message a day before each due date and on it")]
+      : h("span", {class: "sub"}, "No e-mail or phone, so no reminders");
+  }
+  function contactForm(m) {
+    const c = m.contact || {};
+    return h("div", {class: "confirm neutral", style: "margin-top:14px"},
+      h("label", {for: "ct-email"}, "E-mail for reminders"), h("input", {id: "ct-email", type: "email", value: c.email || "", maxlength: "200", autocomplete: "off", placeholder: "name@example.org"}),
+      h("label", {for: "ct-phone", style: "margin-top:8px"}, "Phone for text reminders"), h("input", {id: "ct-phone", value: c.phone || "", maxlength: "40", autocomplete: "off", placeholder: "+441234567890"}),
+      h("label", {style: "display:flex;gap:8px;align-items:center;margin-top:10px"}, h("input", {id: "ct-on", type: "checkbox", checked: c.reminders_on !== false ? "" : false}), "Send this member loan reminders"),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: saveContact}, "Save"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = false; renderMember(); }}, "Cancel")));
+  }
+  async function saveContact() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/contact", {method: "PATCH", json: {email: $("ct-email").value, phone: $("ct-phone").value, reminders_on: $("ct-on").checked}});
+      editingContact = false; renderMember();
+      say("member-notice", "ok", "Saved the reminder settings for " + member.name + ".");
+    } catch (e) { say("member-notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
+  }
+  async function setDue(loanId, days) {
+    clear("member-notice");
+    try {
+      await api("/api/circulation/mock/loans/" + loanId + "/due", {json: {days_from_today: days}});
+      await loadMember(member.member_no);
+      say("member-notice", "ok", "Demo: that loan is now due " + (days === 0 ? "today" : "tomorrow") + ". Reminders go out on the next pass of the notification loop (or press Send queued messages on Gate events).");
+    } catch (e) { say("member-notice", "bad", e.message); }
   }
 
   // ------------------------------------------------------------------ members: find, add, issue a card
@@ -190,6 +237,8 @@
       h("label", {for: "nm-name"}, "Full name"), h("input", {id: "nm-name", maxlength: "200", autocomplete: "off"}),
       h("label", {for: "nm-no", style: "margin-top:8px"}, "Member number (leave empty for the next one)"), h("input", {id: "nm-no", maxlength: "32", placeholder: "automatic", autocomplete: "off"}),
       h("label", {for: "nm-card", style: "margin-top:8px"}, "Patron card (optional, can be issued later)"), cardField("nm-card"),
+      h("label", {for: "nm-email", style: "margin-top:8px"}, "E-mail for loan reminders (optional)"), h("input", {id: "nm-email", type: "email", maxlength: "200", autocomplete: "off"}),
+      h("label", {for: "nm-phone", style: "margin-top:8px"}, "Phone for text reminders (optional)"), h("input", {id: "nm-phone", maxlength: "40", autocomplete: "off"}),
       h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: submitMember}, "Add member"),
         h("button", {class: "btn ghost small", type: "button", onclick: () => fill($("member-form"))}, "Cancel")));
   }
@@ -197,8 +246,8 @@
   async function submitMember() {
     clear("member-notice");
     try {
-      member = await api("/api/circulation/members", {json: {name: $("nm-name").value, member_no: $("nm-no").value, card_uid: $("nm-card").value}});
-      fill($("member-form")); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden"); renderMember(); loadDemoCards();
+      member = await api("/api/circulation/members", {json: {name: $("nm-name").value, member_no: $("nm-no").value, card_uid: $("nm-card").value, email: $("nm-email").value, phone: $("nm-phone").value}});
+      fill($("member-form")); askingReason = fineMode = issuing = editingContact = false; $("result-panel").classList.add("hidden"); renderMember(); loadDemoCards();
       say("member-notice", "ok", member.name + " was added as " + member.member_no + ".");
     } catch (e) { say("member-notice", "bad", e.message); }
   }
@@ -210,7 +259,7 @@
     try {
       const r = await api("/api/circulation/members?q=" + encodeURIComponent(q));
       fill($("member-results"), r.members.length ? r.members.map(m => h("button", {type: "button", class: "pick", onclick: async () => {
-          clear("member-notice"); askingReason = fineMode = issuing = false; $("result-panel").classList.add("hidden");
+          clear("member-notice"); askingReason = fineMode = issuing = editingContact = false; $("result-panel").classList.add("hidden");
           await loadMember(m.member_no); fill($("member-results")); $("member-q").value = "";
         }}, h("b", {}, m.name), h("span", {}, m.member_no + " · " + (m.card ? "card " + m.card : "no card") + (m.status === "blocked" ? " · blocked" : "") + (m.fines_cents ? " · owes " + money(m.fines_cents) : ""))))
         : h("div", {class: "sub"}, "No member matches."));

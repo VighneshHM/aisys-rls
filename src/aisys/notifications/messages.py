@@ -42,3 +42,40 @@ def gate_alert(channel: str, event: dict, when: str) -> tuple[str, str]:
     if channel == "print":
         lines = ["*** SECURITY ALERT ***", *lines, "", "Please check the gate."]
     return subject, "\n".join(lines)
+
+
+REMINDER_WHEN = {"due_soon": "due tomorrow", "due_today": "due today"}
+
+
+def patron_reminder(
+    channel: str,
+    kind: str,
+    *,
+    member_name: str,
+    title: str,
+    accession_no: str,
+    due_day: str,
+    library: str,
+    days_before: int,
+) -> tuple[str, str]:
+    """(subject, body) for one loan reminder. `due_day` is the due date as text, for example '12 Oct 2026'."""
+    title = " ".join(title.split())  # a title from a spreadsheet may hold line breaks: never put them in a header
+    when = REMINDER_WHEN.get(kind, "due soon")
+    if kind == "due_soon" and days_before != 1:
+        when = f"due in {days_before} days"
+    subject = f"Reminder: '{title}' is {when}"[:200]
+    if channel == "sms":
+        return subject, f"{library}: '{title}' is {when} ({due_day}). Please return or renew it."[:160]
+    first = member_name.split()[0] if member_name.strip() else "there"
+    lines = [
+        f"Hello {first},",
+        "",
+        f"This is a reminder from {library} that the item below is {when}.",
+        "",
+        f"Title:      {title}",
+        f"Item:       {accession_no}",
+        f"Due date:   {due_day}",
+        "",
+        "Please return it, or renew it at the desk, to avoid an overdue fine.",
+    ]
+    return subject, "\n".join(lines)

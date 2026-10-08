@@ -68,6 +68,12 @@ sms = "mock"
 print = "mock"
 max_attempts = 3                 # delivery attempts before a message is marked failed
 backoff_s = 60                   # wait before a retry grows with each failure (backoff_s x attempts so far)
+# Patron reminders: a message one day before a loan is due and another on the due day (to the member's e-mail / phone).
+reminders = true
+remind_days_before = 1           # days before the due date for the first reminder (1 to 30)
+# While the app runs, look for reminders and deliver queued messages this often. 0 = off (then run
+# `python -m aisys.cli notify-dispatch --every 60` as a separate process, or schedule it).
+auto_dispatch_seconds = 60
 
 [ilms]
 driver = "mock"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -27,6 +28,7 @@ from aisys.inventory_routes import router as inventory_router
 from aisys.lifecycle_routes import router as updates_router
 from aisys.logging_setup import configure_logging
 from aisys.migration_routes import router as migration_router
+from aisys.notifications import runner
 from aisys.notifications.providers import build_providers
 from aisys.reports_routes import router as reports_router
 from aisys.rfid.registry import DeviceRegistry
@@ -61,7 +63,29 @@ def create_app(
     with factory() as db:
         sync_rbac(db)
 
-    app = FastAPI(title=settings.app_name, version=__version__)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Run the notification loop (if `auto_dispatch_seconds` is set) for as long as the application runs."""
+        loop = None
+        if settings.notifications.auto_dispatch_s > 0:
+            loop = runner.Loop(
+                lambda: runner.run_once(
+                    app.state.session_factory,
+                    app.state.providers,
+                    settings.notifications,
+                    library_name=settings.app_name,
+                ),
+                settings.notifications.auto_dispatch_s,
+                paused=app.state.maintenance.is_set,
+            ).start()
+        app.state.notify_loop = loop
+        try:
+            yield
+        finally:
+            if loop is not None:
+                loop.stop()
+
+    app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.maintenance = threading.Event()  # set while a restore runs: everything else waits (see below)
     app.state.engine = engine

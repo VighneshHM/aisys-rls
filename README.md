@@ -112,3 +112,9 @@ Details: `docs/administration.md`.
 
 `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),
 `docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).
+
+## Loan reminders (FR09)
+
+Patrons with an e-mail or phone are reminded a day before a loan is due and on the due day, by a loop that runs inside the app
+(`auto_dispatch_seconds` in the config) or as `python -m aisys.cli notify-dispatch --every 60`. Set a member's contact on
+**Circulation**; in the demo use **Due tomorrow / Due today** beside a loan to try it. Details: `docs/reminders.md`.

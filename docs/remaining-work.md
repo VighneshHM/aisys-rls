@@ -7,7 +7,7 @@ outside the exercise** (SOP section 3 and assumptions A-02, A-11) or need a prod
 |---|---|---|---|
 | Core ILMS | FR01 | Scoped out | Acquisition, serials, OPAC, labels. The product is an RFID add-on that talks to an ILMS through the connector, not an ILMS replacement (A-02). |
 | Search | FR02 | Basic search done | Catalogue search is SQL `LIKE`. SQLite FTS5 full-text indexing, real-time indexing, net cataloguing and a virtual bookshelf view are future work. |
-| Notifications | FR09 | Queue and mock adapters done | Patron notices (overdue, holds) are not generated. Delivery is a command, button or API call; scheduling it is documented in `docs/deployment.md`, not built as a daemon. |
+| Notifications | FR09 | Done | Reminders a day before and on the due day, with a background loop (`docs/reminders.md`). Not built: repeated overdue notices, hold-ready notices, a combined digest, real e-mail/SMS gateways. |
 | Real integrations | FR03 | Interfaces and mocks | A real SIP2 or NCIP wire adapter and a real reader, gate, handheld, camera, e-mail and SMS driver, each a class behind an existing interface. No certification is claimed. |
 | Security | NFR02 | Partial | TLS termination, service wrappers and scheduled jobs are documented examples (`docs/deployment.md`), not tested here. No password reset or custom roles. |
 | Compatibility | NFR03 | Partial | Developed on Windows 11; CI on Windows (Python 3.12 and 3.13). Linux and a real Windows Server 2022 deployment are unverified. |

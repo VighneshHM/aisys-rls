@@ -27,7 +27,7 @@ from aisys.circulation.connector import (
     ItemView,
     MemberView,
 )
-from aisys.models import Card, CircEvent, Item, Loan, Member, RfidTag, utcnow
+from aisys.models import Card, CircEvent, Item, Loan, Member, Notification, RfidTag, utcnow
 from aisys.rfid.devices import DeviceError, DeviceUnavailable
 from aisys.rfid.events import normalize_tag_uid
 from aisys.rfid.registry import DeviceRegistry
@@ -115,6 +115,25 @@ def loan_out(loan: Loan, now: datetime | None = None, config: CirculationConfig 
     }
 
 
+def _recent_reminders(db: Session, member: Member, limit: int = 6) -> list[dict]:
+    rows = db.scalars(
+        select(Notification).where(Notification.member_id == member.id).order_by(Notification.id.desc()).limit(limit)
+    )
+    return [
+        {
+            "id": n.id,
+            "kind": n.kind,
+            "channel": n.channel,
+            "status": n.status,
+            "due_on": n.due_on,
+            "created_at": iso(n.created_at),
+            "sent_at": iso(n.sent_at),
+            "note": n.last_error,
+        }
+        for n in rows
+    ]
+
+
 def member_out(db: Session, member: Member, config: CirculationConfig, *, with_loans: bool = True) -> dict:
     loans = list(
         db.scalars(select(Loan).where(Loan.member_id == member.id, Loan.returned_at.is_(None)).order_by(Loan.due_at))
@@ -132,6 +151,8 @@ def member_out(db: Session, member: Member, config: CirculationConfig, *, with_l
         "cards_withdrawn": sum(1 for c in cards if not c.active),
         "status": member.status,
         "block_reason": member.block_reason,
+        "contact": {"email": member.email, "phone": member.phone, "reminders_on": member.reminders_on},
+        "reminders": _recent_reminders(db, member),
         "fines_cents": member.fines_cents,
         "fine_limit_cents": config.fine_limit_cents,
         "fines_over_limit": member.fines_cents > config.fine_limit_cents,

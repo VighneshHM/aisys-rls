@@ -36,6 +36,12 @@ class Settings:
     secret_key: str = field(default="", repr=False)
 
 
+def _interval(value) -> float:
+    """0 turns the loop off; anything else is at least one second (a smaller number would spin the CPU)."""
+    seconds = float(value)
+    return 0.0 if seconds <= 0 else max(seconds, 1.0)
+
+
 def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     """Load settings. Precedence: env vars > config file > built-in defaults."""
     cfg_path = Path(path or os.environ.get("AISYS_CONFIG", DEFAULT_CONFIG_PATH))
@@ -79,6 +85,9 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         print_driver=str(notif.get("print", dn.print_driver)),
         max_attempts=int(notif.get("max_attempts", dn.max_attempts)),
         backoff_s=float(notif.get("backoff_s", dn.backoff_s)),
+        reminders=bool(notif.get("reminders", dn.reminders)),
+        remind_days_before=min(max(int(notif.get("remind_days_before", dn.remind_days_before)), 1), 30),
+        auto_dispatch_s=_interval(notif.get("auto_dispatch_seconds", dn.auto_dispatch_s)),
     )
     gate = GateConfig(duplicate_window_s=int(gate_raw.get("duplicate_window_s", dg.duplicate_window_s)))
     d = Settings()
