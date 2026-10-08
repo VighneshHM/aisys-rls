@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "aisys"
 version = "0.1.0"
 description = "RFID-enabled library integration layer (AISYS candidate exercise)"
+license = "LicenseRef-AISYS-Candidate-Exercise"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.142.2",
@@ -18,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1", "httpx==0.28.1", "ruff==0.16.10"]
+dev = ["cryptography==48.0.0", "pytest==9.1.1", "httpx==0.28.1", "ruff==0.16.10"]
 
 [project.scripts]
 aisys = "aisys.cli:main"

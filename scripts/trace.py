@@ -13,18 +13,29 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _req_ids(node: ast.expr) -> list[str]:
+    is_req = isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "req"
+    return [ast.literal_eval(arg) for arg in node.args] if is_req else []
+
+
 def collect_evidence() -> dict[str, list[str]]:
     evidence: dict[str, list[str]] = defaultdict(list)
     for path in sorted((ROOT / "tests").glob("test_*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        module_ids = []  # `pytestmark = pytest.mark.req(...)` covers every test in the file
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "pytestmark" for t in node.targets
+            ):
+                module_ids = _req_ids(node.value)
         for node in ast.walk(tree):
             if not isinstance(node, ast.FunctionDef) or not node.name.startswith("test_"):
                 continue
+            ids = list(module_ids)
             for deco in node.decorator_list:
-                is_req = isinstance(deco, ast.Call) and isinstance(deco.func, ast.Attribute) and deco.func.attr == "req"
-                if is_req:
-                    for arg in deco.args:
-                        evidence[ast.literal_eval(arg)].append(f"{path.name}::{node.name}")
+                ids += [i for i in _req_ids(deco) if i not in ids]
+            for rid in ids:
+                evidence[rid].append(f"{path.name}::{node.name}")
     return evidence
 
 
