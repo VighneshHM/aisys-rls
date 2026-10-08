@@ -84,4 +84,5 @@ def require(permission: str) -> Callable[..., Principal]:
             raise HTTPException(status_code=403, detail=f"Missing permission: {permission}")
         return principal
 
+    dependency.permission = permission  # type: ignore[attr-defined]  # lets the API reference list who may call what
     return dependency

@@ -29,11 +29,26 @@ class Settings:
     log_level: str = "INFO"
     log_format: str = "json"
     backup_dir: str = "data/backups"
+    opac_enabled: bool = True  # the public catalogue search
+    tls_certfile: str = ""  # serve HTTPS directly (otherwise put a TLS proxy in front)
+    tls_keyfile: str = ""
+    netcat_driver: str = "mock"  # where net cataloguing looks books up
     devices: tuple[DeviceConfig, ...] = DEFAULT_DEVICES
     circulation: CirculationConfig = CirculationConfig()
     notifications: NotificationConfig = NotificationConfig()
     gate: GateConfig = GateConfig()
     secret_key: str = field(default="", repr=False)
+
+
+def _port(value) -> int:
+    """A TCP port, or 0 for "not set". A bad value stops the application at start with a plain message."""
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        raise RuntimeError(f"[ilms] port must be a number from 1 to 65535, not {value!r}") from None
+    if port != 0 and not 1 <= port <= 65535:
+        raise RuntimeError(f"[ilms] port must be a number from 1 to 65535, not {port}")
+    return port
 
 
 def _interval(value) -> float:
@@ -55,6 +70,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     sec = raw.get("security", {})
     log = raw.get("logging", {})
     backup = raw.get("backup", {})
+    opac, netcat, server = raw.get("opac", {}), raw.get("netcat", {}), raw.get("server", {})
     devices = (
         tuple(
             DeviceConfig(id=str(d["id"]), kind=str(d.get("kind", "staff_reader")), driver=str(d.get("driver", "mock")))
@@ -74,6 +90,8 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         max_fine_per_loan_cents=int(circ.get("max_fine_per_loan_cents", dc.max_fine_per_loan_cents)),
         ilms_driver=str(ilms.get("driver", dc.ilms_driver)),
         ilms_protocol=str(ilms.get("protocol", dc.ilms_protocol)),
+        ilms_endpoint=str(ilms.get("endpoint", dc.ilms_endpoint)).strip(),
+        ilms_port=_port(ilms.get("port", dc.ilms_port)),
         ilms_retries=int(ilms.get("retries", dc.ilms_retries)),
         ilms_backoff_s=float(ilms.get("backoff_s", dc.ilms_backoff_s)),
     )
@@ -104,6 +122,10 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         log_level=log.get("level", d.log_level),
         log_format=log.get("format", d.log_format),
         backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
+        opac_enabled=bool(opac.get("enabled", d.opac_enabled)),
+        tls_certfile=os.environ.get("AISYS_TLS_CERTFILE", str(server.get("tls_certfile", d.tls_certfile))),
+        tls_keyfile=os.environ.get("AISYS_TLS_KEYFILE", str(server.get("tls_keyfile", d.tls_keyfile))),
+        netcat_driver=str(netcat.get("driver", d.netcat_driver)),
         devices=devices,
         circulation=circulation,
         notifications=notifications,

@@ -433,3 +433,80 @@ class Notification(Base):
     member_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # members.id
     loan_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # loans.id
     due_on: Mapped[str] = mapped_column(String(10), default="")
+
+
+# ---------------------------------------------------------------- shelves, acquisitions, serials
+class Shelf(Base):
+    """A shelf location the library manages. `code` equals the `location` text on its items."""
+
+    __tablename__ = "shelves"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(100), unique=True)
+    description: Mapped[str] = mapped_column(String(200), default="")
+    capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PurchaseOrder(Base):
+    """An order to a supplier. draft -> ordered -> part_received -> received (or cancelled)."""
+
+    __tablename__ = "purchase_orders"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    po_no: Mapped[str] = mapped_column(String(32), unique=True)
+    supplier: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(16), default="draft")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ordered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    lines: Mapped[list[PoLine]] = relationship(order_by="PoLine.id", lazy="selectin", cascade="all, delete-orphan")
+
+
+class PoLine(Base):
+    __tablename__ = "po_lines"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    author: Mapped[str] = mapped_column(String(300), default="")
+    isbn: Mapped[str | None] = mapped_column(String(13), nullable=True)
+    publisher: Mapped[str] = mapped_column(String(300), default="")
+    pub_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer)
+    unit_price_cents: Mapped[int] = mapped_column(Integer, default=0)
+    location: Mapped[str] = mapped_column(String(100), default="")
+    received: Mapped[int] = mapped_column(Integer, default=0)
+    bib_id: Mapped[int | None] = mapped_column(ForeignKey("bib_records.id"), nullable=True)
+
+
+class SerialTitle(Base):
+    """A subscription: a journal or magazine that arrives on a schedule."""
+
+    __tablename__ = "serial_titles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(500))
+    issn: Mapped[str] = mapped_column(String(9), default="")
+    frequency: Mapped[str] = mapped_column(String(12))  # weekly | monthly | quarterly | yearly
+    supplier: Mapped[str] = mapped_column(String(200), default="")
+    location: Mapped[str] = mapped_column(String(100), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    bib_id: Mapped[int | None] = mapped_column(ForeignKey("bib_records.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    issues: Mapped[list[SerialIssue]] = relationship(
+        order_by="SerialIssue.expected_on", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+
+class SerialIssue(Base):
+    __tablename__ = "serial_issues"
+    __table_args__ = (Index("uq_serial_issues_label", "serial_id", "label", unique=True),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    serial_id: Mapped[int] = mapped_column(ForeignKey("serial_titles.id", ondelete="CASCADE"))
+    label: Mapped[str] = mapped_column(String(40))
+    expected_on: Mapped[date] = mapped_column(Date)
+    received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="expected", index=True)  # expected|received|claimed|missing
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
+    note: Mapped[str] = mapped_column(String(200), default="")

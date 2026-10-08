@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased, contains_eager
 
 from aisys import audit
+from aisys.catalogue import fts
 from aisys.migration import validation
 from aisys.models import BibRecord, Item, RfidTag
 from aisys.rfid.events import is_valid_tag_uid, normalize_tag_uid
@@ -97,8 +98,11 @@ def get_item(db: Session, item_id: int) -> Item:
     return item
 
 
-def create_item(db: Session, values: dict[str, str], *, actor: str, ip: str = "") -> Item:
-    """Validate, then insert a bibliographic record (reused if the same title/ISBN exists) and one copy."""
+def create_item(db: Session, values: dict[str, str], *, actor: str, ip: str = "", commit: bool = True) -> Item:
+    """Validate, then insert a bibliographic record (reused if the same title/ISBN exists) and one copy.
+
+    With `commit=False` the rows are flushed but not committed, so a caller can save a whole batch or none of it.
+    """
     res = validation.validate_row({k: str(v) for k, v in values.items() if k in ITEM_FIELDS and v is not None})
     if not res.ok:
         raise CatalogueError(
@@ -165,7 +169,10 @@ def create_item(db: Session, values: dict[str, str], *, actor: str, ip: str = ""
         detail={"accession_no": item.accession_no, "bib_id": bib.id, "title": bib.title},
         ip=ip,
     )
-    db.commit()
+    if commit:
+        db.commit()
+    else:  # the caller saves several things together (receiving an order) and commits once
+        db.flush()
     db.refresh(item)
     return item
 
@@ -177,7 +184,10 @@ def _like(q: str) -> str:
 def search(
     db: Session, q: str = "", *, tagged: bool | None = None, status: str | None = None, limit: int = 25, offset: int = 0
 ) -> tuple[int, list[tuple[Item, RfidTag | None]], dict[int, str]]:
-    """Locate items by title, author, ISBN, accession no., barcode or tag UID. Plain LIKE for now (FTS comes later).
+    """Locate items by title, author, ISBN, publisher, accession no., barcode, call number or tag UID.
+
+    Full-text first (every typed word must match, the last may be unfinished, best match first); the older
+    "contains" matching is kept alongside it so a fragment in the middle of a word still finds its item.
 
     A tag UID matches the item it is on now AND any item it was on before (removed or retired tags too), so a stray
     tag can be traced back. The third result maps item id -> that tag's status for items matched only through it.
@@ -192,7 +202,19 @@ def search(
         .options(contains_eager(Item.bib))
     )
     q = q.strip()
-    if q:
+    ranked = None
+    match = fts.match_query(q) if q and fts.available(db) else ""
+    indexed = bool(match) and fts.has_hits(db, match)
+    if indexed:  # the index answers in milliseconds; scanning every row for "contains" is only for what it cannot find
+        ranked = fts.ranked_subquery(match)
+        stmt = stmt.outerjoin(ranked, ranked.c.id == Item.id)
+        stmt = stmt.where(
+            or_(
+                ranked.c.id.is_not(None),
+                exists().where(any_link.item_id == Item.id, any_link.tag_uid == uid) if uid else False,
+            )
+        )
+    elif q:
         like = _like(q.lower())
         stmt = stmt.where(
             or_(
@@ -211,9 +233,12 @@ def search(
     if status:
         stmt = stmt.where(Item.status == status)
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
-    rows = db.execute(
-        stmt.order_by(BibRecord.title, Item.accession_no).limit(min(max(limit, 1), 200)).offset(max(offset, 0))
+    order = (
+        [func.coalesce(ranked.c.rank, 0.0), BibRecord.title, Item.accession_no]
+        if ranked is not None
+        else [BibRecord.title, Item.accession_no]
     )
+    rows = db.execute(stmt.order_by(*order).limit(min(max(limit, 1), 200)).offset(max(offset, 0)))
     found = [(item, tag) for item, tag in rows.unique()]
     matched: dict[int, str] = {}
     if uid and found:

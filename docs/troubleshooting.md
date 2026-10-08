@@ -13,6 +13,13 @@
 | Gate alert not e-mailed | Alerts are queued first | **Gate events** then **Send queued messages**, or schedule `notify-dispatch` (`docs/deployment.md`) |
 | A patron got no reminder | No e-mail or phone on the member, reminders switched off for them, `auto_dispatch_seconds = 0` with no scheduler, or the loan is not due tomorrow or today | **Circulation**, the member's *Reminders* line and **Contact and reminders**; see `docs/reminders.md` |
 | A reminder shows "cancelled" | The item was returned or renewed before it went out | Nothing to do; this is intended |
+| A search finds nothing for a word you know is there | The index finds whole words and the start of a word; a piece from the middle of a word is found only when nothing else matches | Type the start of the word, or a longer piece |
+| Search says it has no full-text index | This SQLite was built without FTS5 | Search still works (plain matching, slower); `python -m aisys.cli doctor` says so |
+| The public catalogue says "Too many searches" | One address made more than 60 searches in a minute | Wait a minute |
+| "No card printer is configured" or "The card was not printed" | No `card_printer` device, or it is jammed or offline | Check `[[devices]]` and the printer; the failure is in the audit log |
+| An order cannot be booked in | More received than ordered, the order is cancelled, or an accession number clashes | The message says which; nothing is booked in on a failure |
+| A label barcode is blank | The barcode value has characters a barcode cannot hold | The accession number is used instead; check the item's barcode |
+| `doctor` reports FAIL | A folder is not writable, a TLS file is missing, or the production key is short | The line names the item; fix it and run `doctor` again |
 | Update refused: "running" | The application is up | Stop it, then update |
 | Update refused: "altered" or "trusted key" | Damaged copy, or signed by someone else | Copy the package again; check you have the right vendor key |
 | Install: "too deep for Windows" | Folder path over the Windows limit | Install into a short folder such as `C:\aisys` |

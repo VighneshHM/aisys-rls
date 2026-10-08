@@ -1,0 +1,100 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Shelves · {{ app_name }}{% endblock %}
+{% block heading %}Shelves{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>The shelves and the virtual bookshelf</h2>
+  <p>Pick a shelf to see its books laid out in call-number order, coloured by status. After an inventory sweep, books that were read out of order are outlined in red: those are the ones to move.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Shelves</h3><span class="badge" id="count"></span></header>
+      <div class="table-wrap" id="list" style="max-height:60vh;overflow:auto"></div>
+    </section>
+    {% if can_manage %}
+    <section class="panel">
+      <header><h3>Manage a shelf</h3></header>
+      <div class="body">
+        <div class="field"><label for="s-code">Shelf code (the location on its items)</label><input id="s-code" maxlength="100" autocomplete="off" placeholder="e.g. Main/A1"></div>
+        <div class="field"><label for="s-desc">Description</label><input id="s-desc" maxlength="200" autocomplete="off" placeholder="e.g. Fiction A to L"></div>
+        <div class="field"><label for="s-cap">Capacity (books, optional)</label><input id="s-cap" type="number" min="0" max="100000"></div>
+        <div class="actions"><button class="btn" id="s-add" type="button">Add shelf</button></div>
+        <div id="s-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <section class="panel">
+    <header><h3 id="shelf-title">Choose a shelf</h3><span class="badge" id="shelf-badge"></span></header>
+    <div class="body">
+      <div id="shelf-info" class="sub" style="margin-bottom:10px"></div>
+      <div id="bookshelf" class="bookshelf" role="list" aria-label="Books on the shelf"></div>
+      <div class="legend"><span><i style="background:var(--good-soft)"></i>Available</span><span><i style="background:var(--warn-soft)"></i>On loan</span><span><i style="background:var(--accent-soft)"></i>Reference</span><span><i style="border-style:dashed"></i>No tag</span><span><i style="outline:2px solid var(--bad)"></i>Out of order</span></div>
+      <div id="book" class="sub" style="margin-top:14px" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt} = UI;
+  const CAN_MANAGE = {{ 'true' if can_manage else 'false' }};
+  let current = "", start = 0;
+  const PAGE = 300;
+  const STATUS = {available: "Available", on_loan: "On loan", damaged: "Damaged"};
+
+  async function loadList() {
+    let d;
+    try { d = await api("/api/shelves"); } catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("list"), h("div", {class: "empty"}, e.message)); return; }
+    $("count").textContent = fmt(d.shelves.length) + " shelves";
+    fill($("list"), d.shelves.length ? h("table", {}, h("tbody", {}, d.shelves.map(s => h("tr", {style: s.code === current ? "background:var(--accent-soft)" : ""},
+      h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => open(s.code)}, s.code),
+        s.description ? h("div", {class: "sub"}, s.description) : null,
+        s.capacity != null ? h("div", {class: "meter" + (s.over_capacity ? " full" : "")}, h("b", {style: "width:" + Math.min(100, Math.round(100 * s.items / Math.max(1, s.capacity))) + "%"})) : null),
+      h("td", {class: "num"}, fmt(s.items) + (s.capacity != null ? " / " + fmt(s.capacity) : ""), h("div", {class: "sub"}, s.on_loan + " on loan")),
+      CAN_MANAGE ? h("td", {}, s.managed ? h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => remove(s)}, "Stop managing") : h("span", {class: "sub"}, "not managed")) : null)))) : h("div", {class: "empty"}, "No shelves yet: add items with a location."));
+  }
+
+  async function open(code, from = 0) {
+    current = code; start = from; clear("s-notice");
+    let v;
+    try { v = await api("/api/shelves/view?code=" + encodeURIComponent(code) + "&limit=" + PAGE + "&offset=" + from); } catch (e) { fill($("shelf-info"), e.message); return; }
+    $("shelf-title").textContent = v.shelf.code;
+    $("shelf-badge").textContent = fmt(v.total) + " book" + (v.total === 1 ? "" : "s") + (v.total > v.books.length ? " · showing " + fmt(v.offset + 1) + "–" + fmt(v.offset + v.books.length) : "");
+    const sw = v.last_sweep;
+    fill($("shelf-info"), (v.shelf.description ? v.shelf.description + " · " : "") + (v.shelf.capacity != null ? v.shelf.items + " of " + v.shelf.capacity + " places used" + (v.shelf.over_capacity ? " (over capacity)" : "") + " · " : "") +
+      (sw ? "Last inventory sweep " + when(sw.closed_at) + ": " + (sw.out_of_order ? sw.out_of_order + " book(s) out of order" : "all in order") : "No inventory sweep has been closed for this shelf yet."));
+    fill($("bookshelf"), v.books.length ? v.books.map(b => h("button", {type: "button", role: "listitem", class: "spine" + (b.status === "on_loan" ? " loan" : "") + (b.is_reference ? " ref" : "") + (b.status === "damaged" ? " off" : "") + (b.tagged ? "" : " untagged") + (b.out_of_order ? " stray" : ""),
+      title: b.title + " · " + (b.call_number || "no call number"), "aria-label": b.title + ", " + (b.call_number || "no call number") + (b.out_of_order ? ", out of order" : ""),
+      style: "height:" + (110 + (b.title.length * 7) % 60) + "px", onclick: () => show(b)},
+      h("span", {class: "t"}, b.title), h("span", {class: "n"}, (b.call_number || "").slice(0, 7)))) : h("div", {class: "empty", style: "width:100%"}, "There are no books on this shelf."));
+    clear("s-notice"); loadList();
+    fill($("book"), v.total > PAGE ? h("div", {class: "actions", style: "margin:0"},
+      h("button", {class: "btn ghost small", type: "button", disabled: v.offset === 0 ? "" : false, onclick: () => open(code, Math.max(0, from - PAGE))}, "Earlier books"),
+      h("button", {class: "btn ghost small", type: "button", disabled: v.offset + v.books.length >= v.total ? "" : false, onclick: () => open(code, from + PAGE)}, "Later books")) : null);
+  }
+  function show(b) {
+    fill($("book"), h("b", {}, b.title), b.author ? " · " + b.author : "", h("div", {}, "Call number " + (b.call_number || "none") + " · item " + b.accession_no + " · " + (STATUS[b.status] || b.status) + (b.is_reference ? " · reference" : "") + (b.tagged ? "" : " · no RFID tag") + (b.out_of_order ? " · OUT OF ORDER" : "")));
+  }
+
+  async function add() {
+    clear("s-notice");
+    const body = {code: $("s-code").value.trim(), description: $("s-desc").value.trim()};
+    if ($("s-cap").value !== "") body.capacity = +$("s-cap").value;
+    try { const s = await api("/api/shelves", {json: body}); say("s-notice", "ok", "Added shelf " + s.code + "."); ["s-code", "s-desc", "s-cap"].forEach(i => $(i).value = ""); loadList(); }
+    catch (e) { say("s-notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
+  }
+  async function remove(s) {
+    if (!confirm("Stop managing shelf " + s.code + "? Its books are not touched.")) return;
+    try { await api("/api/shelves/" + s.id, {method: "DELETE"}); loadList(); } catch (e) { say("s-notice", "bad", e.message); }
+  }
+  if (CAN_MANAGE) $("s-add").onclick = add;
+  loadList().then(() => { const q = new URLSearchParams(location.search).get("code"); if (q) open(q); });
+})();
+</script>
+{% endblock %}

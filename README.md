@@ -108,9 +108,18 @@ text, pages through the events, and exports CSV. **Administration** adds staff, 
 deactivates people and cards, unlocks locked accounts and changes roles; you cannot deactivate or demote yourself.
 Details: `docs/administration.md`.
 
+## Search, shelves, orders, serials, labels, cards (FR01, FR02, FR04, FR06)
+
+* **Search**: the catalogue search is full-text (try `dispos` for *The Dispossessed*); the **public catalogue** at `/opac` needs no
+  sign-in and shows titles, shelves and availability only.
+* **Shelves** shows a shelf as a row of books in call-number order; after an inventory sweep, books out of order are outlined.
+* **Add item** has **Look up the ISBN** (net cataloguing; try `9780001000032`).
+* **Acquisitions**, **Serials** and **Labels** are in the menu for librarians; **Print the card** is under a member on Circulation.
+* `python -m aisys.cli doctor` checks the computer and configuration. `python scripts/perf_report.py` measures performance at 20,000 items.
+
 ## More documentation
 
-`docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),
+`docs/index.md` (every document against the SOP deliverable it satisfies), `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),
 `docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).
 
 ## Loan reminders (FR09)

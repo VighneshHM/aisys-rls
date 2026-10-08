@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from aisys import audit
+from aisys.auth.security import card_hint
 from aisys.deps import Principal, client_ip, get_db, require
 from aisys.models import AuditEvent, AuthSession, Card, Role, User
 from aisys.timeutil import aware, iso
@@ -129,11 +130,6 @@ def audit_export(
 
 
 # ---------------------------------------------------------------- administration
-def _hint(uid: str) -> str:
-    """Enough of a card number to recognise it, not enough to copy it from over someone's shoulder."""
-    return uid if len(uid) <= 6 else uid[:3] + "…" + uid[-3:]
-
-
 def _person(u: User, cards: list[Card], now: datetime) -> dict:
     locked = bool(u.locked_until and aware(u.locked_until) > now)
     return {
@@ -147,7 +143,7 @@ def _person(u: User, cards: list[Card], now: datetime) -> dict:
         "has_password": bool(u.password_hash),
         "created_at": iso(u.created_at),
         "cards": [
-            {"id": c.id, "uid_hint": _hint(c.uid), "active": c.active, "issued_at": iso(c.issued_at)} for c in cards
+            {"id": c.id, "uid_hint": card_hint(c.uid), "active": c.active, "issued_at": iso(c.issued_at)} for c in cards
         ],
     }
 
@@ -260,8 +256,8 @@ def patch_card(
             action="admin.card.activate" if body.active else "admin.card.deactivate",
             entity="card",
             entity_id=card.id,
-            detail={"uid_hint": _hint(card.uid), "kind": card.kind},
+            detail={"uid_hint": card_hint(card.uid), "kind": card.kind},
             ip=client_ip(request),
         )
         db.commit()
-    return {"id": card.id, "kind": card.kind, "uid_hint": _hint(card.uid), "active": card.active}
+    return {"id": card.id, "kind": card.kind, "uid_hint": card_hint(card.uid), "active": card.active}

@@ -72,7 +72,7 @@ def login_with_card(
         ) from exc
 
     card = db.scalar(select(Card).where(Card.uid == uid))
-    detail = {"uid": uid}
+    detail = {"uid": security.card_hint(uid)}  # the log shows which card, never the whole credential
     if card is None:
         raise _deny(
             db,

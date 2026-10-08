@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Select, case, func, or_, select
 
 from aisys.models import (
+    AuditEvent,
     BibRecord,
     Card,
     CircEvent,
@@ -371,7 +372,13 @@ def operators(ctx: Context, p: dict, limit: int, offset: int) -> Result:
 
 
 # ================================================================== 5. RFID clients (devices)
-DEVICE_KINDS = (("staff_reader", "Staff readers"), ("handheld", "Handhelds"), ("gate", "Gates"), ("camera", "Cameras"))
+DEVICE_KINDS = (
+    ("staff_reader", "Staff readers"),
+    ("handheld", "Handhelds"),
+    ("gate", "Gates"),
+    ("camera", "Cameras"),
+    ("card_printer", "Card printers"),
+)
 
 
 def rfid_clients(ctx: Context, p: dict, limit: int, offset: int) -> Result:
@@ -435,6 +442,20 @@ def rfid_clients(ctx: Context, p: dict, limit: int, offset: int) -> Result:
             )
             unit, detail = "snapshots", "taken for gate alarms"
             seen = last(GateImage.ts, GateImage.camera_id == did)
+        elif d["kind"] == "card_printer":
+            mine = (AuditEvent.action == "member.card_personalise", AuditEvent.detail["printer"].as_string() == did)
+            activity = db.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    *mine, AuditEvent.outcome == "success", *_between(AuditEvent.ts, lo, hi)
+                )
+            )
+            jams = db.scalar(
+                select(func.count(AuditEvent.id)).where(
+                    *mine, AuditEvent.outcome == "failure", *_between(AuditEvent.ts, lo, hi)
+                )
+            )
+            unit, detail = "cards printed", f"{jams} failed"
+            seen = last(AuditEvent.ts, *mine)
         rows.append(
             {
                 "device": did,
@@ -695,7 +716,7 @@ REPORTS: dict[str, Report] = {
         Report(
             "rfid_clients",
             "RFID clients",
-            "Readers, handhelds, gates and cameras: state and activity.",
+            "Readers, handhelds, gates, cameras and card printers: state and activity.",
             (*DATES, Filter("kind", "Kind", "select", DEVICE_KINDS)),
             (
                 Column("device", "Device", "mono"),

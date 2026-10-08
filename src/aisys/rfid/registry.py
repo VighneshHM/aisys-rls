@@ -9,10 +9,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from aisys.rfid.devices import Camera, Device, DeviceHealth, Gate, Handheld, StaffReader
-from aisys.rfid.mock import MockCamera, MockGate, MockHandheld, MockStaffReader
+from aisys.rfid.devices import Camera, CardPrinter, Device, DeviceHealth, Gate, Handheld, StaffReader
+from aisys.rfid.mock import MockCamera, MockCardPrinter, MockGate, MockHandheld, MockStaffReader
 
-KINDS = {"staff_reader": StaffReader, "handheld": Handheld, "gate": Gate, "camera": Camera}
+KINDS = {
+    "staff_reader": StaffReader,
+    "handheld": Handheld,
+    "gate": Gate,
+    "camera": Camera,
+    "card_printer": CardPrinter,
+}
 
 
 class DeviceConfigError(ValueError):
@@ -31,6 +37,7 @@ DEFAULT_DEVICES = (
     DeviceConfig("handheld-1", "handheld", "mock"),
     DeviceConfig("gate-1", "gate", "mock"),
     DeviceConfig("camera-1", "camera", "mock"),
+    DeviceConfig("card-printer-1", "card_printer", "mock"),
 )
 
 
@@ -40,6 +47,7 @@ class DeviceRegistry:
         ("handheld", "mock"): MockHandheld,
         ("gate", "mock"): MockGate,
         ("camera", "mock"): MockCamera,
+        ("card_printer", "mock"): MockCardPrinter,
     }
 
     def __init__(self, configs: tuple[DeviceConfig, ...] = DEFAULT_DEVICES) -> None:

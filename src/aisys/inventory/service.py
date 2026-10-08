@@ -28,6 +28,7 @@ from aisys.models import InventoryScan, InventorySession, Item, RfidTag, utcnow
 from aisys.rfid.devices import DeviceError, DeviceUnavailable
 from aisys.rfid.registry import DeviceRegistry
 from aisys.rfid.tagging import state_of, tag_links
+from aisys.shelves import service as shelves
 from aisys.timeutil import iso
 
 log = logging.getLogger("aisys.inventory")
@@ -200,6 +201,21 @@ def _entry(item: Item, tag_uid: str, **extra) -> dict:
     }
 
 
+def _shelf_order(db: Session, session: InventorySession) -> dict:
+    """Books the sweep read out of call-number order (they need moving), from the order the handheld read them."""
+    ids = shelves.out_of_order_items(db, session.id, session.location)
+    checked = db.scalar(
+        select(func.count(InventoryScan.id)).where(
+            InventoryScan.session_id == session.id, InventoryScan.result.in_(("found", "shelved_on_loan"))
+        )
+    )
+    books = []
+    for item_id in ids:
+        item = db.get(Item, item_id)
+        books.append({"accession_no": item.accession_no, "title": item.bib.title, "call_number": item.call_number})
+    return {"checked": checked or 0, "out_of_order": books, "in_order": not books}
+
+
 def report(db: Session, session_id: int) -> dict:
     session = get_session(db, session_id)
     scans = list(
@@ -245,7 +261,13 @@ def report(db: Session, session_id: int) -> dict:
         "reads": sum(s.reads for s in scans),
         "distinct_tags": len(scans),
     }
-    live = {"session": session_out(session), "counts": counts, "missing": missing, **by_result}
+    live = {
+        "session": session_out(session),
+        "counts": counts,
+        "missing": missing,
+        "shelf_order": _shelf_order(db, session),
+        **by_result,
+    }
     if session.status == "closed" and session.summary.get("lists"):  # a closed session is a record: frozen as closed
         return {**live, "counts": session.summary["counts"], **session.summary["lists"]}
     return live
@@ -257,7 +279,7 @@ def close(db: Session, session_id: int, *, actor: str, ip: str = "") -> dict:
         raise InventoryError(409, "This inventory session is already closed")
     final = report(db, session.id)
     summary = final["counts"]
-    lists = {k: final[k] for k in ("missing", *RESULTS)}
+    lists = {k: final[k] for k in ("missing", "shelf_order", *RESULTS)}
     session.status, session.closed_by, session.closed_at = "closed", actor, utcnow()
     session.summary = {"counts": summary, "lists": lists}
     audit.record(

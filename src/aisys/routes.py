@@ -211,7 +211,7 @@ def issue_card(
         action="admin.card.issue",
         entity="card",
         entity_id=card.id,
-        detail={"uid": card.uid, "kind": card.kind},
+        detail={"uid": security.card_hint(card.uid), "kind": card.kind},
         ip=client_ip(request),
     )
     db.commit()

@@ -1,0 +1,85 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Labels · {{ app_name }}{% endblock %}
+{% block heading %}Labels{% endblock %}
+{% block content %}
+<div class="hello no-print">
+  <h2>Spine and barcode labels</h2>
+  <p>Choose a shelf, or type item numbers, and preview the labels. Print them from the browser, or send them to a label printer. A barcode carries the item's barcode, or its accession number if it has none.</p>
+</div>
+
+<section class="panel no-print">
+  <header><h3>What to print</h3></header>
+  <div class="body">
+    <div class="toolbar" style="margin:0">
+      <div class="field" style="margin:0"><label for="kind">Kind</label><select id="kind"><option value="spine">Spine labels</option><option value="barcode">Barcode labels</option></select></div>
+      <div class="field" style="margin:0"><label for="loc">A whole shelf</label><select id="loc"><option value="">—</option></select></div>
+      <div class="field grow" style="margin:0"><label for="ids">Or item numbers (comma separated)</label><input id="ids" autocomplete="off" placeholder="e.g. 12, 13, 40"></div>
+      <div class="actions" style="margin:0;align-self:end"><button class="btn" id="preview" type="button">Preview</button><button class="btn ghost" id="print" type="button">Print</button></div>
+    </div>
+    <div class="toolbar" style="margin:12px 0 0">
+      <div class="field" style="margin:0"><label for="printer">Label printer</label><input id="printer" value="label-printer" maxlength="60" autocomplete="off"></div>
+      <div class="actions" style="margin:0;align-self:end"><button class="btn ghost" id="queue" type="button">Send to the label printer</button></div>
+    </div>
+    <div id="notice" class="notice" role="alert"></div>
+  </div>
+</section>
+
+<div id="sheet" class="sheet" aria-label="Label preview"></div>
+
+<style>
+  .sheet { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  .lbl { border: 1px dashed var(--line); border-radius: 6px; background: #fff; color: #000; padding: 8px; break-inside: avoid; }
+  .lbl.spine { width: 74px; min-height: 120px; text-align: center; font: 700 14px/1.15 var(--mono); display: flex; flex-direction: column; justify-content: center; }
+  .lbl.spine small { font: 400 9px/1.2 var(--mono); margin-top: 6px; color: #333; word-break: break-all; }
+  .lbl.barcode { width: 210px; text-align: center; font: 12px/1.2 system-ui, sans-serif; }
+  .lbl.barcode svg { width: 100%; height: 54px; display: block; }
+  .lbl.barcode .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  @media print { .no-print, nav, aside, header.topbar, .sidebar { display: none !important; } .lbl { border-color: #999; } body { background: #fff; } }
+</style>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear} = UI;
+  const SVG = "http://www.w3.org/2000/svg";
+  const params = () => ($("ids").value.trim() ? "ids=" + encodeURIComponent($("ids").value.replace(/\s+/g, "")) : "location=" + encodeURIComponent($("loc").value));
+  const ready = () => $("ids").value.trim() || $("loc").value;
+
+  // draw the bars as rectangles from the widths the server worked out (digits: bar, space, bar, ...)
+  function bars(modules) {
+    const total = [...modules].reduce((n, d) => n + +d, 0), svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("viewBox", "0 0 " + (total + 20) + " 40"); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("role", "img");
+    let x = 10;
+    [...modules].forEach((d, i) => { const w = +d; if (i % 2 === 0) { const r = document.createElementNS(SVG, "rect"); r.setAttribute("x", x); r.setAttribute("y", 0); r.setAttribute("width", w); r.setAttribute("height", 40); r.setAttribute("fill", "#000"); svg.appendChild(r); } x += w; });
+    return svg;
+  }
+  const spine = l => h("div", {class: "lbl spine"}, (l.spine.length ? l.spine : [l.accession_no]).map(t => h("div", {}, t)), h("small", {}, l.accession_no));
+  const barcode = l => h("div", {class: "lbl barcode"}, l.modules ? bars(l.modules) : h("div", {class: "sub"}, "(cannot be a barcode)"), h("div", {class: "mono"}, l.barcode), h("div", {class: "t"}, l.title));
+
+  async function preview() {
+    clear("notice");
+    if (!ready()) { say("notice", "warn", "Choose a shelf or type item numbers."); return false; }
+    try {
+      const d = await api("/api/labels/items?" + params());
+      fill($("sheet"), d.labels.length ? d.labels.map($("kind").value === "spine" ? spine : barcode) : h("div", {class: "empty"}, "No items to print labels for."));
+      if (d.labels.length) say("notice", "ok", d.labels.length + " label" + (d.labels.length === 1 ? "" : "s") + ".");
+      return d.labels.length > 0;
+    } catch (e) { say("notice", "bad", e.message); return false; }
+  }
+  $("preview").onclick = preview;
+  $("print").onclick = async () => { if (await preview()) window.print(); };
+  $("queue").onclick = async () => {
+    if (!ready()) { say("notice", "warn", "Choose a shelf or type item numbers."); return; }
+    try {
+      const body = {kind: $("kind").value, printer: $("printer").value.trim()};
+      if ($("ids").value.trim()) body.ids = $("ids").value.split(",").map(x => +x.trim()).filter(Boolean); else body.location = $("loc").value;
+      const r = await api("/api/labels/print", {json: body});
+      say("notice", "ok", r.queued + " label(s) queued for " + r.printer + ". They are delivered with the other queued messages.");
+    } catch (e) { say("notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
+  };
+  api("/api/shelves").then(d => fill($("loc"), h("option", {value: ""}, "—"), d.shelves.map(s => h("option", {value: s.code}, s.code + " (" + s.items + ")")))).catch(() => {});
+  const q = new URLSearchParams(location.search); if (q.get("ids")) { $("ids").value = q.get("ids"); preview(); }
+})();
+</script>
+{% endblock %}

@@ -252,7 +252,14 @@ def smoke(root: Root, version: str, database_url: str, log: Log = print) -> None
     """Start the release for real on a spare port and require it to report ready. Raises LifecycleError if it cannot."""
     port = _free_port()
     python = _release_python(root, version)
-    env = app_env(root, AISYS_DATABASE_URL=database_url, AISYS_PORT=str(port), AISYS_HOST="127.0.0.1")
+    env = app_env(
+        root,
+        AISYS_DATABASE_URL=database_url,
+        AISYS_PORT=str(port),
+        AISYS_HOST="127.0.0.1",
+        AISYS_TLS_CERTFILE="",  # the check talks plain HTTP on a spare local port
+        AISYS_TLS_KEYFILE="",
+    )
     with tempfile.TemporaryFile() as out:
         proc = subprocess.Popen(  # noqa: S603
             [str(python), "-m", "aisys.cli", "--config", str(root.config_file), "run"],

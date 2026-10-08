@@ -35,6 +35,7 @@
         <div id="member-form"></div>
         <div id="member-notice" class="notice" role="alert"></div>
         <div id="member"></div>
+        <div id="card-face"></div>
       </div>
     </section>
 
@@ -93,7 +94,7 @@
   const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
   const money = c => (c / 100).toFixed(2);
   const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
-  let member = null, item = null, askingReason = false, fineMode = null, issuing = false, editingContact = false;
+  let member = null, item = null, askingReason = false, fineMode = null, issuing = false, editingContact = false, faceFor = null;
 
   // ------------------------------------------------------------------ patron
   // the card box and the demo-card list always describe the member shown, however they were chosen
@@ -123,6 +124,7 @@
     const m = member;
     $("member-badge").className = "badge " + (!m ? "" : m.can_borrow ? "good" : "warn");
     $("member-badge").textContent = !m ? "none chosen" : m.can_borrow ? "Can borrow" : m.status === "blocked" ? "Blocked" : "Fines over limit";
+    if (faceFor !== (m ? m.member_no : null)) { fill($("card-face")); faceFor = null; }  // a card preview belongs to one member
     if (!m) { fill($("member")); return; }
     syncCardFields(m);
     fill($("member"),
@@ -166,7 +168,8 @@
       : CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
         m.status === "blocked" ? "Unblock member" : "Block member"),
         h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = true; renderMember(); }}, "Issue or replace card"),
-        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = true; renderMember(); }}, "Contact and reminders")) : null);
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = true; renderMember(); }}, "Contact and reminders"),
+        m.card ? h("button", {class: "btn ghost small", type: "button", onclick: personaliseCard}, "Print the card") : null) : null);
     if (askingReason && $("block-reason")) $("block-reason").focus();
     if (issuing && $("new-card")) $("new-card").focus();
     if (editingContact && $("ct-email")) $("ct-email").focus();
@@ -192,6 +195,32 @@
       h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: saveContact}, "Save"),
         h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = false; renderMember(); }}, "Cancel")));
   }
+  // print the member's name and number on their card, and show the card face (which the browser can also print)
+  async function personaliseCard() {
+    clear("member-notice");
+    try {
+      const [job, face] = await Promise.all([api("/api/circulation/members/" + member.member_no + "/card/personalise", {json: {}}), api("/api/circulation/members/" + member.member_no + "/card/face")]);
+      say("member-notice", "ok", "Sent to " + job.printer + " (job " + job.job + "). The card number was written to its chip.");
+      faceFor = member.member_no;
+      fill($("card-face"), h("div", {class: "cardface print-area"},
+        h("div", {class: "cf-lib"}, face.library), h("div", {class: "cf-name"}, face.name), h("div", {class: "cf-no mono"}, face.member_no),
+        face.modules ? barcodeSvg(face.modules) : null, h("div", {class: "cf-uid mono"}, face.card_uid)),
+        h("div", {class: "actions"}, h("button", {class: "btn ghost small", type: "button", onclick: printCardFace}, "Print this card from the browser")));
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+  function printCardFace() {
+    document.body.classList.add("printing-card");
+    window.addEventListener("afterprint", () => document.body.classList.remove("printing-card"), {once: true});
+    window.print();
+  }
+  function barcodeSvg(modules) {
+    const NS = "http://www.w3.org/2000/svg", total = [...modules].reduce((n, d) => n + +d, 0), svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + (total + 20) + " 40"); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("class", "cf-bars"); svg.setAttribute("role", "img");
+    let x = 10;
+    [...modules].forEach((d, i) => { if (i % 2 === 0) { const r = document.createElementNS(NS, "rect"); r.setAttribute("x", x); r.setAttribute("width", +d); r.setAttribute("height", 40); r.setAttribute("fill", "#000"); svg.appendChild(r); } x += +d; });
+    return svg;
+  }
+
   async function saveContact() {
     clear("member-notice");
     try {

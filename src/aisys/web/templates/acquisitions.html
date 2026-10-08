@@ -1,0 +1,129 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Acquisitions · {{ app_name }}{% endblock %}
+{% block heading %}Acquisitions{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Order books and book them in</h2>
+  <p>Make an order to a supplier, place it, and when the books arrive receive them: each copy is added to the catalogue with the next accession number, ready to tag.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Orders</h3>
+        <select id="filter" aria-label="Show orders"><option value="">All</option><option value="draft">Drafts</option><option value="ordered">Ordered</option><option value="part_received">Part received</option><option value="received">Received</option><option value="cancelled">Cancelled</option></select></header>
+      <div class="table-wrap" id="list" style="max-height:46vh;overflow:auto"></div>
+    </section>
+    <section class="panel">
+      <header><h3>New order</h3></header>
+      <div class="body">
+        <div class="field"><label for="n-supplier">Supplier</label><input id="n-supplier" maxlength="200" autocomplete="off"></div>
+        <div class="field"><label for="n-note">Note (optional)</label><input id="n-note" maxlength="300" autocomplete="off"></div>
+        <p class="sub" style="margin:0 0 8px">First book (you can add more lines before placing the order)</p>
+        {% include "_orderline.html" %}
+        <div class="actions"><button class="btn" id="n-create" type="button">Create draft order</button></div>
+        <div id="n-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel" id="detail-panel">
+    <header><h3 id="d-title">Choose an order</h3><span class="badge" id="d-badge"></span></header>
+    <div class="body" id="detail"><div class="empty">Pick an order from the list.</div></div>
+  </section>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt, money} = UI;
+  let current = null;
+  const STATUS = {draft: ["", "Draft"], ordered: ["warn", "Ordered"], part_received: ["warn", "Part received"], received: ["good", "Received"], cancelled: ["bad", "Cancelled"]};
+  const why = e => e.problems && e.problems.length ? e.problems.map(p => (p.field ? p.field.replace(/_/g, " ") + ": " : "") + p.message).join("; ") : e.message;
+  const lineBody = p => {
+    const v = id => $(p + id).value.trim();
+    const body = {title: v("title"), author: v("author"), publisher: v("publisher"), location: v("location"),
+      quantity: +v("qty") || 1, unit_price_cents: Math.round((parseFloat(v("price")) || 0) * 100)};
+    if (v("isbn")) body.isbn = v("isbn");
+    if (v("year")) body.pub_year = +v("year");
+    return body;
+  };
+
+  async function loadList() {
+    let d;
+    try { d = await api("/api/acquisitions?limit=50" + ($("filter").value ? "&status=" + $("filter").value : "")); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("list"), h("div", {class: "empty"}, e.message)); return; }
+    fill($("list"), d.orders.length ? h("table", {}, h("tbody", {}, d.orders.map(o => h("tr", {style: current === o.id ? "background:var(--accent-soft)" : ""},
+      h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => open(o.id)}, o.po_no), h("div", {class: "sub"}, o.supplier)),
+      h("td", {}, h("span", {class: "badge " + STATUS[o.status][0]}, STATUS[o.status][1]), h("div", {class: "sub"}, o.received + " of " + o.ordered + " in")),
+      h("td", {class: "num"}, money(o.total_cents)))))) : h("div", {class: "empty"}, "No orders yet."));
+  }
+
+  async function open(id) {
+    current = id; let o;
+    try { o = await api("/api/acquisitions/" + id); } catch (e) { fill($("detail"), h("div", {class: "empty"}, e.message)); return; }
+    render(o); loadList();
+  }
+
+  function render(o) {
+    $("d-title").textContent = o.po_no + " · " + o.supplier;
+    $("d-badge").className = "badge " + STATUS[o.status][0]; $("d-badge").textContent = STATUS[o.status][1];
+    const draft = o.status === "draft", canReceive = o.status === "ordered" || o.status === "part_received";
+    fill($("detail"),
+      o.note ? h("p", {class: "sub", style: "margin:0 0 10px"}, o.note) : null,
+      h("div", {class: "table-wrap"}, h("table", {},
+        h("thead", {}, h("tr", {}, ["Book", "Ordered", "Price", "In", canReceive ? "Receive now" : "", draft ? "" : null].filter(x => x !== null).map(t => h("th", {}, t)))),
+        h("tbody", {}, o.lines.map(l => h("tr", {},
+          h("td", {}, h("b", {}, l.title), h("div", {class: "sub"}, [l.author, l.isbn ? "ISBN " + l.isbn : "", l.location ? "→ " + l.location : ""].filter(Boolean).join(" · "))),
+          h("td", {class: "num"}, l.quantity), h("td", {class: "num"}, money(l.unit_price_cents)), h("td", {class: "num"}, l.received),
+          canReceive ? h("td", {}, l.outstanding ? h("input", {type: "number", min: "0", max: String(l.outstanding), value: String(l.outstanding), "data-line": String(l.id), style: "width:70px", "aria-label": "Receive " + l.title}) : h("span", {class: "sub"}, "complete")) : null,
+          draft ? h("td", {}, h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => removeLine(o, l)}, "Remove")) : null))))),
+      h("p", {class: "sub", style: "margin:10px 0"}, o.ordered + " ordered · " + o.received + " received · total " + money(o.total_cents)),
+      draft ? h("div", {class: "confirm neutral"}, h("p", {style: "margin:0 0 8px"}, h("b", {}, "Add a line")), lineForm("a-"),
+        h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: () => addLine(o)}, "Add line"))) : null,
+      h("div", {class: "actions"},
+        draft ? h("button", {class: "btn", type: "button", onclick: () => act(o, "place", "Placed " + o.po_no + ".")}, "Place order") : null,
+        canReceive ? h("button", {class: "btn", type: "button", onclick: () => receive(o)}, "Book in what arrived") : null,
+        (draft || o.status === "ordered") && !o.received ? h("button", {class: "btn ghost danger-text", type: "button", onclick: () => act(o, "cancel", "Cancelled " + o.po_no + ".")}, "Cancel order") : null),
+      h("div", {id: "d-notice", class: "notice", role: "alert"}), h("div", {id: "d-created"}));
+  }
+
+  const lineForm = p => h("div", {}, ...[["title", "Title"], ["author", "Author"], ["isbn", "ISBN"], ["publisher", "Publisher"], ["year", "Year"], ["qty", "Copies"], ["price", "Price each"], ["location", "Shelf"]].map(([k, l]) =>
+    h("div", {class: "field", style: "margin:0 0 6px"}, h("label", {for: p + k}, l), h("input", {id: p + k, autocomplete: "off", ...(k === "qty" ? {type: "number", min: "1", value: "1"} : {})}))));
+
+  async function act(o, what, ok) {
+    try { render(await api("/api/acquisitions/" + o.id + "/" + what, {json: {}})); say("d-notice", "ok", ok); loadList(); }
+    catch (e) { say("d-notice", "bad", why(e)); }
+  }
+  async function addLine(o) {
+    try { const r = await api("/api/acquisitions/" + o.id + "/lines", {json: lineBody("a-")}); render(r); loadList(); }
+    catch (e) { say("d-notice", "bad", why(e)); }
+  }
+  async function removeLine(o, l) {
+    try { render(await api("/api/acquisitions/" + o.id + "/lines/" + l.id, {method: "DELETE"})); loadList(); } catch (e) { say("d-notice", "bad", why(e)); }
+  }
+  async function receive(o) {
+    const receipts = [...document.querySelectorAll("#detail input[data-line]")].map(i => ({line_id: +i.dataset.line, quantity: +i.value})).filter(r => r.quantity > 0);
+    if (!receipts.length) { say("d-notice", "warn", "Enter how many of each book arrived."); return; }
+    try {
+      const r = await api("/api/acquisitions/" + o.id + "/receive", {json: {receipts}});
+      render(r.order); loadList();
+      say("d-notice", "ok", "Booked in " + r.created.length + " book" + (r.created.length === 1 ? "" : "s") + ". They have no RFID tag yet: tag them on the RFID tagging page.");
+      fill($("d-created"), h("ul", {class: "timeline", style: "margin-top:10px"}, r.created.map(c => h("li", {}, h("b", {}, c.accession_no), " · " + c.title))));
+    } catch (e) { say("d-notice", "bad", why(e)); }
+  }
+  $("n-create").onclick = async () => {
+    clear("n-notice");
+    try {
+      const lines = $("n-title").value.trim() ? [lineBody("n-")] : [];
+      const o = await api("/api/acquisitions", {json: {supplier: $("n-supplier").value, note: $("n-note").value, lines}});
+      say("n-notice", "ok", "Created " + o.po_no + "."); ["n-title", "n-author", "n-isbn", "n-publisher", "n-year", "n-price", "n-location"].forEach(i => $(i).value = "");
+      await loadList(); open(o.id);
+    } catch (e) { say("n-notice", "bad", why(e)); }
+  };
+  $("filter").onchange = loadList;
+  loadList();
+})();
+</script>
+{% endblock %}

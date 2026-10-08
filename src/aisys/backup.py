@@ -87,7 +87,8 @@ def fingerprint(path: Path) -> dict[str, dict]:
         names = [
             r[0]
             for r in con.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' "
+                "AND name NOT LIKE 'item_fts%' ORDER BY name"  # the search index is derived data, not records
             )
         ]
         for name in names:

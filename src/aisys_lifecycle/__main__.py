@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--json", action="store_true")
     v = sub.add_parser("verify", help="check a package without installing it")
     v.add_argument("bundle")
+    sub.add_parser("doctor", help="check this computer and the installation (environment checklist)")
     sub.add_parser("recover", help="finish or undo an interrupted update")
     sub.add_parser("prune", help="delete releases older than the previous one")
     sub.add_parser("run", help="start the application")
@@ -103,6 +104,13 @@ def main(argv: list[str] | None = None) -> int:
                 f"{len(b.manifest['files'])} files intact"
             )
             b.close()
+        elif args.cmd == "doctor":
+            state = ops.read_state(root)
+            if not state["current"]:
+                raise LifecycleError("Nothing is installed here yet. Run install first.")
+            proc = ops.run_release(root, state["current"], ["doctor"])
+            print(proc.stdout.rstrip())
+            return proc.returncode
         elif args.cmd == "recover":
             ops.recover(root)
         elif args.cmd == "prune":

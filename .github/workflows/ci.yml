@@ -16,13 +16,17 @@ concurrency:
 
 jobs:
   test:
-    name: Lint + tests (Python ${{ matrix.python }}, Windows)
-    runs-on: windows-latest        # the SOP targets Windows 11 / Windows Server 2022
+    name: Lint + tests (Python ${{ matrix.python }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}      # the SOP targets Windows 11 / Windows Server 2022
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
+        os: [windows-latest]
         python: ["3.12", "3.13"]
+        include:
+          - os: windows-2022   # Windows Server 2022, the SOP's server target
+            python: "3.12"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

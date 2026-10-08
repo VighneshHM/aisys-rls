@@ -169,6 +169,22 @@ def _backup_command(args, settings: Settings) -> int:
     return 0
 
 
+def serve_options(settings: Settings) -> dict:
+    """Arguments for uvicorn: where to listen and, when a certificate is configured, HTTPS. Fails early and plainly."""
+    from pathlib import Path
+
+    options = {"host": settings.host, "port": settings.port, "log_config": None}
+    cert, key = settings.tls_certfile, settings.tls_keyfile
+    if bool(cert) != bool(key):
+        raise SystemExit("error: set both tls_certfile and tls_keyfile (or neither)")
+    if cert:
+        for label, path in (("certificate", cert), ("private key", key)):
+            if not Path(path).is_file():
+                raise SystemExit(f"error: the TLS {label} file was not found: {path}")
+        options.update(ssl_certfile=cert, ssl_keyfile=key)
+    return options
+
+
 def _notify_command(args, settings: Settings) -> int:
     """One pass (queue due patron reminders, deliver what is queued), or with --every keep doing it until stopped."""
     import time
@@ -232,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run", help="start the web application")
     nd = sub.add_parser("notify-dispatch", help="queue due patron reminders and deliver queued notifications")
     nd.add_argument("--every", type=float, default=0, metavar="SECONDS", help="keep running, repeating every N seconds")
+    sub.add_parser("doctor", help="check this computer and configuration (environment checklist)")
     sub.add_parser("version", help="print version")
     args = parser.parse_args(argv)
 
@@ -248,6 +265,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
     elif args.cmd == "notify-dispatch":
         return _notify_command(args, settings)
+    elif args.cmd == "doctor":
+        from aisys import doctor
+
+        results = doctor.run(settings)
+        print(doctor.render(results))
+        return 1 if any(status == "FAIL" for status, _, _ in results) else 0
     elif args.cmd == "backup":
         return _backup_command(args, settings)
     elif args.cmd == "run":
@@ -255,7 +278,7 @@ def main(argv: list[str] | None = None) -> int:
 
         from aisys.app import create_app
 
-        uvicorn.run(create_app(settings), host=settings.host, port=settings.port, log_config=None)
+        uvicorn.run(create_app(settings), **serve_options(settings))
     return 0
 
 

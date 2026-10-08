@@ -22,7 +22,7 @@ ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and doc
 | AC09 | Offline install, update, rollback | Signed packages, install, update with rehearsal, rollback, recover, SBOM and licence inventory, Updates page | `aisys_lifecycle/`, `scripts/release.py`, `docs/deployment.md` |
 | AC10 | Restore after a failed migration or integration change, proving the original data is intact | Verified backups, table-by-table fingerprint proof, guided restore with safety copy | `backup.py`, `docs/backup-restore.md` |
 
-Beyond the scenarios: member management and a fines ledger, role-based access, an append-only audit log with a searchable page, staff and card administration, health endpoints,
+Beyond the scenarios: full-text search with a public catalogue (OPAC), shelves and a virtual bookshelf, acquisitions, serials, barcode and spine labels, net cataloguing by ISBN, patron card printing, patron loan reminders, member management and a fines ledger, role-based access, an append-only audit log with a searchable page, staff and card administration, health endpoints,
 a requirements-to-tests traceability matrix (`docs/traceability.md`: 31 requirements), CI, and Dependabot.
 
 **Required by the PDF** vs **my recommendation**: the ten scenarios, mocks for devices and services, synthetic data,
@@ -89,12 +89,16 @@ src/aisys/
   reports/          core.py, definitions.py, service.py
   backup.py         backups, fingerprint, compare, restore (AC10)
   admin_routes.py   Audit log search/export and staff/card administration (pages /audit and /admin)
+  opac_routes.py    the public catalogue (no sign-in), shelves_routes.py, acquisitions_routes.py (+ serials), labels_routes.py
+  catalogue/fts.py  full-text search (FTS5) helpers;  shelves/, acquisitions/, serials/, labels/ (Code 128)  services
+  integrations/netcat.py   net cataloguing by ISBN (interface + mock);  doctor.py   `aisys doctor` environment check
   backup_routes.py, lifecycle_routes.py   HTTP for backups and the Updates page
   pages.py, web/    templates (Jinja) and static (app.css, ui.js), no CDN
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              16 test files, 371 tests
+tests/              22 test files, 543 test cases
+scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
 
@@ -198,7 +202,7 @@ the pre-update backup only when the update changed the database layout; otherwis
 
 - **Sources:** a spreadsheet (`.csv` or `.xlsx`; samples of 200 and 20,000 rows in `samples/`, all synthetic), the mock
   readers/gate/handheld, the mock ILMS, and the user interface.
-- **Storage:** one SQLite file (`data/aisys.db`, WAL mode). 24 tables. Migrations `0001` to `0008` ship inside the package.
+- **Storage:** one SQLite file (`data/aisys.db`, WAL mode). 29 tables plus the full-text index. Migrations `0001` to `0010` ship inside the package.
 - **Lifecycle of important data:** import rows are staged then `migrated`; items are inserted only; tags have intervals
   (a re-tag creates a new row, history kept); loans stay forever (open while `returned_at` is null); the audit log,
   circulation events, fine ledger and gate events are append-only (database triggers reject UPDATE and DELETE).
@@ -216,6 +220,7 @@ the pre-update backup only when the update changed the database layout; otherwis
 | Circulation | `members`, `loans`, `circ_events`, `fine_entries` |
 | Inventory | `inventory_sessions`, `inventory_scans` |
 | Gate and messages | `gate_passages`, `gate_events`, `gate_images`, `notification_prefs`, `notifications` |
+| Shelves, acquisitions, serials | `shelves`, `purchase_orders`, `po_lines`, `serial_titles`, `serial_issues` (and the `item_fts` search index) |
 
 Key relationships and rules: `Item` -> `BibRecord`; `RfidTag` -> `Item` (partial unique indexes on active rows);
 `Loan` -> `Member` + `Item` (unique open loan per item); `Card` -> `User` (staff) or a member number (patron), with a
@@ -224,7 +229,7 @@ There are no AI or LLM models in this project.
 
 ## 7. APIs and integrations
 
-About 100 endpoints, all JSON, grouped by prefix: `/api/auth`, `/api/admin`, `/api/audit`, `/api/catalogue`, `/api/rfid`,
+About 130 endpoints (the list with the permission each needs is the generated `docs/api-reference.md`), all JSON, grouped by prefix: `/api/auth`, `/api/admin`, `/api/audit`, `/api/catalogue`, `/api/rfid`,
 `/api/circulation`, `/api/inventory`, `/api/gate`, `/api/notifications`, `/api/reports`, `/api/migrations`, `/api/backups`,
 `/api/updates`, plus `/health`, `/health/ready`, `/api/system/info`. The interactive OpenAPI page is served by FastAPI.
 Every endpoint other than login and health needs a session and a named permission.
@@ -277,7 +282,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **371 automated tests, all passing** (about 6 minutes), `ruff` format and lint clean (including security rules), CI on
+- **543 automated test cases, all passing** (about 7 minutes), `ruff` format and lint clean (including security rules), CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -314,26 +319,32 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 12. Limitations and future improvements
 
-**Not built or only simulated**
-- No real RFID readers, gate, handheld, camera, SMS or e-mail gateway: all mocks behind the interfaces.
-- No real SIP2 or NCIP wire protocol and no certification; the connector is protocol-shaped only.
-- Fines are a simple configurable rule; a real ILMS would own them.
-- Only staff are users; there is no patron self-service. Patrons are reminded (a day before and on the due day) but not told about overdue items or ready holds.
-- SQLite only (backup and restore use SQLite's API).
-- Administration has no password reset, role editor or permission editor; roles are the four built-in ones, and users are deactivated, never deleted.
+The authoritative list, with the requirement each item belongs to, is `docs/remaining-work.md`. In short:
+
+**Not built, by decision**
+- No real SIP2 or NCIP wire protocol and no certification; the connector is protocol-shaped only (the one requirement still
+  marked partial, FR03).
+- No real RFID reader, gate, handheld, camera, card printer, SMS, e-mail or outside-catalogue driver: all are mocks behind interfaces.
+- Acquisitions and serials are reference-level (orders, receiving, subscriptions, late issues); budgets, invoices, claim letters,
+  holds and inter-library loan are not built. Fines are a simple configurable rule; a real ILMS would own them.
+- Only staff are users. Patrons are reminded a day before and on the due day; overdue repeats and hold-ready notices are not built.
+- SQLite only (backups and the search index use SQLite features).
+- Administration has no password reset, role editor or permission editor; users are deactivated, never deleted.
+
+**Needs a production environment**
+- A site acceptance test with real staff and devices; a soak test on a server-class machine; the TLS proxy and service-wrapper
+  examples run for real; Linux verification; a penetration test and a content-security-policy; automatic backup retention and an
+  off-machine copy.
 
 **Operational limits**
-- A restore replaces everything, including the audit log up to the backup's moment; there is no automatic backup
-  pruning; backups sit on the same machine unless copied away.
+- A restore replaces everything, including the audit log up to the backup's moment; backups sit on the same machine unless copied away.
 - An update needs the application stopped; the Windows install folder path must be short (about 150 characters).
-- A first install trusts the key it is given; there is no certificate authority or key revocation; the licence has no
-  hardware binding.
-- Packages contain wheels for the platform and Python version they were built on.
+- A first install trusts the key it is given; no key revocation; the licence has no hardware binding.
 
 **Reasonable next steps**
-1. Real driver for one reader family and one SIP2 server, behind the existing interfaces.
-2. PostgreSQL option, with backup hooks for it.
-3. Password reset and custom roles in Administration; overdue and hold-ready notices to patrons through the same queue.
-4. A Windows service or systemd unit wrapper around `manage.py run`; verify the lifecycle on Linux.
-5. Automatic backup retention and off-machine copy.
-6. A browser-driven end-to-end test suite and a multi-user load test in CI.
+1. A real driver for one reader family and one SIP2 server, behind the existing interfaces.
+2. A PostgreSQL option, with backup hooks for it.
+3. Password reset and custom roles; overdue and hold-ready notices to patrons through the same queue.
+4. A service wrapper tested on Windows Server; verify the lifecycle on Linux.
+5. Automatic backup retention, an off-machine copy, monitoring of the health endpoints.
+6. A browser-driven end-to-end suite and a multi-user soak test in CI.

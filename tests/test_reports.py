@@ -161,12 +161,13 @@ def test_operators_report_shows_what_each_person_did(client, lib, world):
 def test_rfid_clients_report_covers_every_device_kind(client, lib, world):
     r = rep(client, lib, "rfid_clients")
     rows = {row["device"]: row for row in r["rows"]}
-    assert set(rows) == {"staff-1", "handheld-1", "gate-1", "camera-1"}
+    assert set(rows) == {"staff-1", "handheld-1", "gate-1", "camera-1", "card-printer-1"}
     assert (
         rows["gate-1"]["activity"] == 2
         and "3 people" in rows["gate-1"]["detail"]
         and "1 alarms" in rows["gate-1"]["detail"]
     )
+    assert rows["card-printer-1"]["activity"] == 0 and rows["card-printer-1"]["unit"] == "cards printed"
     assert rows["camera-1"]["activity"] == 1 and rows["camera-1"]["unit"] == "snapshots"  # one photo, for the one alarm
     assert rows["handheld-1"]["activity"] == 1 and "1 sessions" in rows["handheld-1"]["detail"]
     assert (
@@ -174,9 +175,10 @@ def test_rfid_clients_report_covers_every_device_kind(client, lib, world):
         and "3 linked" in rows["staff-1"]["detail"]
         and "1 taken off" in rows["staff-1"]["detail"]
     )
-    assert all(row["status"] == "Online" and row["last_activity"] for row in rows.values())
+    assert all(row["status"] == "Online" for row in rows.values())
+    assert all(row["last_activity"] for k, row in rows.items() if k != "card-printer-1"), "it has printed nothing here"
     assert [row["device"] for row in rep(client, lib, "rfid_clients", kind="gate")["rows"]] == ["gate-1"]
-    assert stats(r)["Devices"] == 4 and stats(r)["Offline"] == 0
+    assert stats(r)["Devices"] == 5 and stats(r)["Offline"] == 0
     client.app.state.devices.get("gate-1", "gate").online = False
     assert (
         next(row for row in rep(client, lib, "rfid_clients")["rows"] if row["device"] == "gate-1")["status"]
@@ -364,3 +366,17 @@ def test_dashboard_numbers_use_thousands_separators_like_the_rest_of_the_app(cli
 def test_the_dashboard_empty_chart_message_is_about_the_dashboard(client, lib):
     page = client.get("/dashboard", headers=lib).text
     assert "No gate alarms in the last" in page and "No completed transactions in the last" in page
+
+
+@pytest.mark.req("AC08", "FR04")
+def test_the_card_printer_appears_in_the_rfid_clients_report_with_its_work(client, lib):
+    client.post("/api/circulation/members/M0001/card/personalise", headers=lib)
+    client.post("/api/circulation/members/M0002/card/personalise", headers=lib)
+    client.app.state.devices.get("card-printer-1", "card_printer").fail_next()
+    client.post("/api/circulation/members/M0001/card/personalise", headers=lib)
+    row = {r["device"]: r for r in rep(client, lib, "rfid_clients")["rows"]}["card-printer-1"]
+    assert (
+        row["activity"] == 2 and row["unit"] == "cards printed" and row["detail"] == "1 failed" and row["last_activity"]
+    )
+    only = rep(client, lib, "rfid_clients", kind="card_printer")["rows"]
+    assert [r["device"] for r in only] == ["card-printer-1"]
