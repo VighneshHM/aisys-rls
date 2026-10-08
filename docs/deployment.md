@@ -147,6 +147,38 @@ trusted vendor key: no network, no phone-home. An invalid or expired licence sto
   copyleft. The AISYS code itself is marked `LicenseRef-AISYS-Candidate-Exercise`.
 * The private signing key and the secrets are never in a package. `config/secret.key` is generated at install.
 
+## Running in production: service, scheduled jobs, TLS
+
+These are **documented examples, not tested here**: the exercise has no production server. Adapt them to the site.
+
+**Run as a service.** The application is `python <root>/manage.py run`; it holds a lock so an update can tell it is running.
+- *Windows:* register it with a service wrapper such as NSSM (`nssm install AISYS C:\Python312\python.exe D:\aisys\manage.py run`),
+  or with Task Scheduler ("At startup", "Run whether user is logged on", restart on failure). Stop the service before `manage.py update`.
+- *Linux (systemd):* a unit with `ExecStart=/usr/bin/python3 /opt/aisys/manage.py run`, `Restart=on-failure` and a dedicated
+  `User=`. `systemctl stop aisys` before an update and `systemctl start aisys` after it.
+
+**Scheduled jobs.** Queued notifications are delivered by `python -m aisys.cli notify-dispatch` (also the **Send queued
+messages** button and `POST /api/notifications/dispatch`). To deliver automatically, schedule that command every minute or two
+(Task Scheduler or cron), using the installation's own python and settings:
+`<root>/releases/<current>/venv/Scripts/python.exe -m aisys.cli --config <root>/config/config.toml notify-dispatch`, with the
+environment variables `AISYS_DATABASE_URL` (the database in `<root>/data`) and `AISYS_SECRET_KEY` (from `config/secret.key`) set.
+A nightly backup is the same pattern with `backup create --label nightly`. Backups are not deleted automatically.
+
+**TLS and the reverse proxy.** The application speaks plain HTTP on `127.0.0.1` by default; terminate TLS in front of it.
+Example (Caddy, with a certificate from the site's own CA or Let's Encrypt):
+
+```
+library.example.org {
+    reverse_proxy 127.0.0.1:8000
+}
+```
+
+For nginx use `proxy_pass http://127.0.0.1:8000;` and pass `X-Forwarded-For` and `X-Forwarded-Proto`. In production
+(`AISYS_ENV=production`) session cookies are `Secure`, `HttpOnly` and `SameSite=Lax`, and the application refuses to start
+without a 32-character `AISYS_SECRET_KEY` (the installer generates one into `config/secret.key`). Uvicorn trusts forwarded
+headers only from `127.0.0.1`, so with a proxy on the same machine the audit log shows the real client address. Keep the
+reader, gate and handheld devices on the site's wired network, not exposed to the internet.
+
 ## Design decisions
 
 | Decision | Why | Cost |

@@ -26,7 +26,7 @@ from aisys.deps import (
     require,
 )
 from aisys.integrations.credentials import CardPresentation, CredentialProvider
-from aisys.models import AuditEvent, Card, Role, User
+from aisys.models import AuditEvent, Card, Member, Role, User
 from aisys.timeutil import iso
 
 router = APIRouter()
@@ -190,10 +190,14 @@ def issue_card(
         user = db.scalar(select(User).where(User.username == (body.username or "")))
         if user is None:
             raise HTTPException(422, "Staff card requires an existing username")
+        if not user.active:
+            raise HTTPException(409, "That staff member is deactivated; activate them before issuing a card.")
         card = Card(uid=body.uid, kind="staff", user_id=user.id)
     else:
         if not body.member_ref:
             raise HTTPException(422, "Patron card requires member_ref")
+        if db.scalar(select(Member.id).where(Member.member_no == body.member_ref)) is None:
+            raise HTTPException(422, f"There is no member numbered {body.member_ref}.")
         card = Card(uid=body.uid, kind="patron", member_ref=body.member_ref)
     db.add(card)
     try:
