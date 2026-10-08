@@ -271,6 +271,11 @@ def validate_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = 
 
 
 # ------------------------------------------------------------------ commit
+# Development drill only: when armed (through the simulator endpoint, which is 404 in production) the next commit fails
+# AFTER its rows were inserted, to prove the all-or-nothing transaction and the pre-migration backup.
+FAULT = {"armed": False}
+
+
 def _fingerprint(db: Session, exclude_batch_id: int) -> str:
     """Hash of every library record NOT created by this batch (proves existing data is untouched)."""
     h = hashlib.sha256()
@@ -409,6 +414,9 @@ def commit_batch(db: Session, settings: Settings, batch: MigrationBatch, *, acto
             .values(status="migrated")
         )
 
+        if FAULT["armed"]:
+            FAULT["armed"] = False
+            raise RuntimeError("simulated failure after the rows were inserted (disaster drill)")
         summary = dict(batch.summary)
         summary["reconciliation"] = _reconcile(db, summary, batch_id, items_before, bibs_before, before_print)
         batch.summary, batch.status = summary, "committed"

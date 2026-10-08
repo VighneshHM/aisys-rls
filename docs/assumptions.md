@@ -29,3 +29,4 @@ Items marked **[confirmed]** were agreed with the candidate; the rest are my own
 | A-19 | Notifications are queued first and delivered by a separate step (button, API or CLI) with retries; recipients are staff users with per-channel preferences. | own | Patron notices are a later extension of the same queue. |
 | A-17 | Inventory works per location (the item's location text); items on loan and untagged items are counted, not called missing. | own | See docs/inventory.md. |
 | A-20 | Report dates are whole days in UTC; CSV exports follow the on-screen filters and neutralise spreadsheet formulas. | own | See docs/reports.md. |
+| A-21 | A restore replaces all current data (sessions and audit log up to the backup's moment included) after saving a safety copy, and is confirmed by typing RESTORE. | own | See docs/backup-restore.md. |

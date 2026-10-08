@@ -11,7 +11,7 @@ FR09,Notifications,"Configurable email, SMS, print via provider-neutral adapters
 FR10,Data migration,"~20k records from spreadsheet: validation, duplicates, error logs, reconciliation, rollback",done,"See docs/migration.md; 20k rows validated in 6.6 s, committed in 5.1 s"
 FR11,Administration,"Users/roles, configuration, audit logs, version reporting, system health",partial,"Users, roles, cards, audit, version, health done; config UI planned"
 FR12,Offline lifecycle,"Offline activation, updates, upgrades, patches, security updates; update package with rollback",planned,
-NFR01,Data integrity,Back up before integration; never modify/delete/corrupt existing records,partial,"Backup before commit, insert-only, fingerprint check done; guided restore planned (AC10)"
+NFR01,Data integrity,Back up before integration; never modify/delete/corrupt existing records,done,"Verified backup before every import and restore, insert-only import, fingerprint proof, guided restore; see docs/backup-restore.md"
 NFR02,Security & privacy,"Least privilege, secure secrets, audit logging, input validation, encrypted transport",partial,TLS termination documented at deployment stage
 NFR03,Compatibility,"Windows 11 clients, Windows Server 2022+, Ethernet, isolated site",planned,
 NFR04,Licensing,"Identify dependencies/licences, pin versions, redistribution notes",partial,Versions pinned in pyproject; SBOM/licence inventory planned
@@ -29,4 +29,4 @@ AC06,Acceptance,"Gate mock unauthorised-removal event, accession number, mock CC
 AC07,Acceptance,Staff smart-card login via mock credential provider; role-based permissions enforced,done,Patron cards rejected for login (A-04)
 AC08,Acceptance,Dashboard statistics and filterable reports,done,See docs/reports.md
 AC09,Acceptance,"Install and run offline, apply offline update, documented rollback",planned,
-AC10,Acceptance,Restore from backup after simulated failed migration; original data intact,planned,
+AC10,Acceptance,Restore from backup after simulated failed migration; original data intact,done,See docs/backup-restore.md

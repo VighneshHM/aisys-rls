@@ -1,0 +1,210 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Backups · {{ app_name }}{% endblock %}
+{% block heading %}Backups{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Back up, check, restore</h2>
+  <p>A backup is a complete, verified copy of all library data. You can compare the live data with any backup, table by table, to prove nothing has changed, and restore one if something goes wrong. A restore first saves the current data as a safety copy, so it can be undone.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Back up now</h3><span class="badge" id="folder"></span></header>
+      <div class="body">
+        <div class="toolbar" style="margin:0">
+          <div class="grow field" style="margin:0"><label for="label">Name for this backup (optional)</label><input id="label" maxlength="40" placeholder="e.g. before-update" autocomplete="off"></div>
+          <button class="btn" id="make" type="button" style="align-self:end">Back up now</button>
+        </div>
+        <div id="make-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Backups</h3><button class="btn ghost small" id="refresh" type="button">Refresh</button></header>
+      <div class="table-wrap" id="list"></div>
+      <div id="skipped" class="sub" style="padding:0 18px 10px"></div>
+      <div class="pager" id="pager"></div>
+    </section>
+
+    {% if simulator %}
+    <section class="panel">
+      <header><h3>Disaster drill</h3><span class="badge">development only</span></header>
+      <div class="body">
+        <p class="sub" style="margin:0 0 12px">Practise the whole exercise without risk to real data (use a test database).</p>
+        <h4 style="margin:0 0 6px">A · A damaging change</h4>
+        <p class="sub" style="margin:0 0 8px">Takes a backup, then imitates a faulty sync that wipes balances, blanks locations, deletes tag links and closes loans. It then shows the damage, restores the backup and shows the proof.</p>
+        <div class="actions" style="margin:0 0 6px"><button class="btn" id="drill" type="button">Run the full drill</button></div>
+        <h4 style="margin:18px 0 6px">B · A failed spreadsheet import</h4>
+        <p class="sub" style="margin:0 0 8px">Makes the next import fail <b>after</b> its rows were inserted. Then go to <a href="/migration">Data migration</a>, import and commit a file: it fails and rolls back, and the backup it took stays. Compare it here to prove nothing changed.</p>
+        <div class="actions" style="margin:0"><button class="btn ghost" id="arm" type="button">Make the next import fail</button><button class="btn ghost small" id="disarm" type="button">Cancel</button></div>
+        <div id="drill-notice" class="notice" role="status"></div>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="grid">
+    <section class="panel hidden" id="confirm-panel">
+      <header><h3>Restore a backup</h3></header>
+      <div class="body">
+        <div class="confirm" role="group">
+          <p style="margin:0 0 10px"><b id="confirm-name"></b></p>
+          <p class="sub" style="margin:0 0 10px">This replaces <b>all</b> current data with this backup. Anything done since it was made is lost, but a safety copy of the current data is saved first, so you can undo this. People signed in may have to sign in again.</p>
+          <label for="confirm-word">Type <b>RESTORE</b> to confirm</label>
+          <input id="confirm-word" autocomplete="off" spellcheck="false">
+          <div class="actions"><button class="btn danger small" id="do-restore" type="button">Restore now</button><button class="btn ghost small" id="cancel-restore" type="button">Cancel</button></div>
+        </div>
+        <div id="restore-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="proof-panel">
+      <header><h3 id="proof-title">Proof</h3><span id="proof-badge"></span></header>
+      <div class="body" id="proof-body"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }};
+  let pending = null, offset = 0;
+  const PAGE = 15;
+  // run an action with its button disabled and relabelled, so it cannot be started twice
+  async function busy(button, label, action) {
+    if (button.disabled) return;
+    const text = button.textContent; button.disabled = true; button.textContent = label;
+    try { return await action(); } finally { button.disabled = false; button.textContent = text; }
+  }
+  const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+
+  // ------------------------------------------------------------------ the list
+  async function load() {
+    let d;
+    try { d = await api("/api/backups?limit=" + PAGE + "&offset=" + offset); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("list"), h("div", {class: "empty"}, e.message)); return; }
+    $("folder").textContent = d.total + " backup" + (d.total === 1 ? "" : "s");
+    $("folder").title = d.folder;
+    fill($("list"), d.backups.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Backup", "Made", "Size", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.backups.map(b => h("tr", {},
+        h("td", {}, h("b", {}, b.label), h("div", {class: "sub mono", title: b.name}, UI.short(b.name.replace(/\.db$/, ""))), b.note ? h("div", {class: "sub"}, b.note) : null,
+          b.revision && b.revision !== d.head ? h("div", {}, h("span", {class: "badge warn"}, "older schema " + b.revision)) : null),
+        h("td", {class: "time"}, when(b.created_at)),
+        h("td", {}, kb(b.size)),
+        h("td", {}, h("div", {class: "actions", style: "margin:0;gap:6px"},
+          h("button", {class: "btn ghost small", type: "button", onclick: () => verify(b.name)}, "Verify"),
+          h("button", {class: "btn ghost small", type: "button", onclick: () => compare(b.name)}, "Compare"),
+          h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => askRestore(b)}, "Restore…")))))))
+      : h("div", {class: "empty"}, "No backups yet. Click “Back up now”."));
+    fill($("skipped"), d.skipped.length ? "Ignored because their names have spaces or special characters (rename them to letters, digits, dots, dashes and underscores to use them): " + d.skipped.join(", ") : null);
+    const to = offset + d.backups.length;
+    fill($("pager"), h("span", {class: "muted"}, d.total ? fmt(offset + 1) + "–" + fmt(to) + " of " + fmt(d.total) : "0 backups"),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - PAGE); load(); }}, "Newer"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= d.total ? "" : false, onclick: () => { offset += PAGE; load(); }}, "Older"));
+  }
+
+  async function make() {
+    clear("make-notice");
+    await busy($("make"), "Backing up…", async () => {
+    try {
+      const b = await api("/api/backups", {json: {label: $("label").value.trim() || "manual"}});
+      say("make-notice", "ok", "Backup made: " + b.name + " (" + kb(b.size) + ").");
+      $("label").value = ""; load();
+    } catch (e) { say("make-notice", "bad", e.message); }
+    });
+  }
+
+  // ------------------------------------------------------------------ proof tables
+  const badge = (cls, text) => h("span", {class: "badge " + cls}, text);
+
+  function showProof(title, headline, tables, extra) {
+    $("proof-panel").classList.remove("hidden");
+    $("proof-title").textContent = title;
+    fill($("proof-badge"), headline);
+    fill($("proof-body"), extra || null, h("div", {class: "table-wrap"}, h("table", {},
+      h("thead", {}, h("tr", {}, ["Table", "Live rows", "Backup rows", "Result"].map(t => h("th", {}, t)))),
+      h("tbody", {}, tables.map(t => h("tr", {},
+        h("td", {class: "mono"}, t.table), h("td", {class: "num"}, t.live_rows == null ? "-" : fmt(t.live_rows)), h("td", {class: "num"}, t.backup_rows == null ? "-" : fmt(t.backup_rows)),
+        h("td", {}, t.match ? badge("good", "Identical") : t.activity ? badge("", "Changed with use") : badge("bad", t.status === "changed" ? "DIFFERENT" : t.status.replace(/_/g, " "))),
+      ))))),
+      h("p", {class: "sub", style: "margin:10px 0 0"}, "Rows are compared by a SHA-256 checksum of their content. Sessions and the audit log change just by using the app, so they are shown but not counted as damage."));
+    $("proof-panel").scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+
+  async function compare(name) {
+    say("make-notice", "ok", "Comparing the live data with " + name + ". This reads every row, so it can take a few seconds on a large library…");
+    try {
+      const c = await api("/api/backups/" + encodeURIComponent(name) + "/compare");
+      showProof("Live data compared with " + name,
+        c.data_intact ? badge("good", "Data identical to the backup") : c.library_data_intact ? badge("good", "Library data identical to the backup") : badge("bad", "Differs in " + c.differing.length + " table(s)"), c.tables,
+        c.data_intact ? h("div", {class: "notice show ok", style: "margin:0 0 12px"}, "Every table that holds library data is identical to this backup." + (c.activity_since.length ? " Only normal activity has happened since." : ""))
+          : c.library_data_intact ? h("div", {class: "notice show ok", style: "margin:0 0 12px"}, "All library data (catalogue, tags, members, loans, fines) is identical to this backup. Only the import log differs: it now records the failed import, as it should.")
+          : h("div", {class: "notice show bad", style: "margin:0 0 12px"}, "These tables are not the same as in the backup: " + c.differing.join(", ") + ". Restore the backup to put them back."));
+      clear("make-notice");
+    } catch (e) { say("make-notice", "bad", e.message); }
+  }
+
+  async function verify(name) {
+    say("make-notice", "ok", "Checking " + name + "…");
+    try {
+      const v = await api("/api/backups/" + encodeURIComponent(name) + "/verify");
+      say("make-notice", v.ok ? "ok" : "bad", name + ": " + (v.ok ? "healthy and restorable (integrity check passed, checksum " + (v.checksum_matches === false ? "DIFFERENT" : v.checksum_matches ? "matches" : "not recorded") + ", schema " + v.revision + (v.needs_upgrade ? ", will be upgraded on restore" : "") + ")." : v.problems.join("; ")));
+    } catch (e) { say("make-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ restore
+  function askRestore(b) {
+    pending = b; clear("restore-notice");
+    $("confirm-panel").classList.remove("hidden"); $("confirm-word").value = "";
+    $("confirm-name").textContent = b.label + " · " + b.name + " · made " + when(b.created_at);
+    $("confirm-word").focus(); $("confirm-panel").scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+  async function restore() {
+    if (!pending) return;
+    clear("restore-notice");
+    await busy($("do-restore"), "Restoring…", async () => {
+    try {
+      const r = await api("/api/backups/" + encodeURIComponent(pending.name) + "/restore", {json: {confirm: $("confirm-word").value.trim()}});
+      $("confirm-panel").classList.add("hidden");
+      showProof("Restored " + r.restored, r.proof.data_intact ? badge("good", "Every table matches the backup") : badge("bad", "Mismatch"), r.proof.tables,
+        h("div", {class: "notice show ok", style: "margin:0 0 12px"}, "Restored. Every table now matches the backup. A safety copy of the data from just before the restore was saved as " + r.safety_backup + (r.upgraded_to ? ". The backup was from an older version and has been upgraded to schema " + r.upgraded_to : "") + "."));
+      pending = null; load();
+    } catch (e) {
+      if (e.status === 401) { say("restore-notice", "warn", "The restore changed who is signed in. Please sign in again."); return; }
+      say("restore-notice", "bad", e.message);
+    }
+    });
+  }
+
+  // ------------------------------------------------------------------ drill
+  async function drill() {
+    clear("drill-notice");
+    await busy($("drill"), "Running the drill…", async () => {
+    try {
+      const d = await api("/api/backups/mock/drill", {method: "POST"});
+      say("drill-notice", "ok", "Backup " + d.backup + " made. The faulty change touched " + d.damage.rows_touched + " rows (" + d.damage.changes.map(c => c.rows + " in " + c.what.split(":")[0]).join(", ") + "). Restored; proof below.");
+      showProof("Drill: the damage, then the restore", badge("good", "Restored: every table matches"), d.restored.proof.tables,
+        h("div", {}, h("div", {class: "notice show bad", style: "margin:0 0 12px"}, "After the damaging change, " + d.after_damage.differing.length + " table(s) differed from the backup: " + d.after_damage.differing.join(", ") + "."),
+          h("div", {class: "notice show ok", style: "margin:0 0 12px"}, "After the restore, all " + d.restored.proof.tables.length + " tables are identical to the backup (table below). Safety copy: " + d.restored.safety_backup + ".")));
+      load();
+    } catch (e) { say("drill-notice", "bad", e.message); }
+    });
+  }
+
+  $("make").onclick = make; $("refresh").onclick = load;
+  $("do-restore").onclick = restore; $("cancel-restore").onclick = () => { $("confirm-panel").classList.add("hidden"); pending = null; };
+  $("confirm-word").addEventListener("keydown", e => { if (e.key === "Enter") restore(); });
+  if (SIM) {
+    $("drill").onclick = drill;
+    $("arm").onclick = async () => { try { await api("/api/migrations/mock/fail-next-commit", {method: "POST"}); say("drill-notice", "warn", "Armed: the next import you commit will fail after inserting its rows. Then use Compare on the backup it kept."); } catch (e) { say("drill-notice", "bad", e.message); } };
+    $("disarm").onclick = async () => { try { await api("/api/migrations/mock/fail-next-commit", {method: "DELETE"}); say("drill-notice", "ok", "No fault is armed."); } catch (e) { say("drill-notice", "bad", e.message); } };
+  }
+  load();
+})();
+</script>
+{% endblock %}
