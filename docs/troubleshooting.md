@@ -11,6 +11,8 @@
 | Import shows problems or duplicates | Bad rows in the spreadsheet | Download the error CSV, fix, upload again; a batch can be rolled back |
 | Check-out refused | Member blocked, fines over the limit, loan limit, or item status | The message names the reason; see `docs/circulation.md` |
 | Gate alert not e-mailed | Alerts are queued first | **Gate events** then **Send queued messages**, or schedule `notify-dispatch` (`docs/deployment.md`) |
+| A patron got no reminder | No e-mail or phone on the member, reminders switched off for them, `auto_dispatch_seconds = 0` with no scheduler, or the loan is not due tomorrow or today | **Circulation**, the member's *Reminders* line and **Contact and reminders**; see `docs/reminders.md` |
+| A reminder shows "cancelled" | The item was returned or renewed before it went out | Nothing to do; this is intended |
 | Update refused: "running" | The application is up | Stop it, then update |
 | Update refused: "altered" or "trusted key" | Damaged copy, or signed by someone else | Copy the package again; check you have the right vendor key |
 | Install: "too deep for Windows" | Folder path over the Windows limit | Install into a short folder such as `C:\aisys` |

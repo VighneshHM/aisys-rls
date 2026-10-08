@@ -157,7 +157,9 @@ These are **documented examples, not tested here**: the exercise has no producti
 - *Linux (systemd):* a unit with `ExecStart=/usr/bin/python3 /opt/aisys/manage.py run`, `Restart=on-failure` and a dedicated
   `User=`. `systemctl stop aisys` before an update and `systemctl start aisys` after it.
 
-**Scheduled jobs.** Queued notifications are delivered by `python -m aisys.cli notify-dispatch` (also the **Send queued
+**Scheduled jobs.** Patron loan reminders and queued notifications are handled by a loop inside the running application when
+`[notifications] auto_dispatch_seconds` is set (the sample config sets 60; see `docs/reminders.md`). If you would rather run it as a
+separate process, `python -m aisys.cli notify-dispatch --every 60` does the same. Otherwise queued notifications are delivered by `python -m aisys.cli notify-dispatch` (also the **Send queued
 messages** button and `POST /api/notifications/dispatch`). To deliver automatically, schedule that command every minute or two
 (Task Scheduler or cron), using the installation's own python and settings:
 `<root>/releases/<current>/venv/Scripts/python.exe -m aisys.cli --config <root>/config/config.toml notify-dispatch`, with the

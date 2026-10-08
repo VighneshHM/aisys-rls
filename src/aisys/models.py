@@ -238,6 +238,9 @@ class Member(Base):
     status: Mapped[str] = mapped_column(String(10), default="active")  # active | blocked
     block_reason: Mapped[str] = mapped_column(String(200), default="")
     fines_cents: Mapped[int] = mapped_column(Integer, default=0)
+    email: Mapped[str] = mapped_column(String(200), default="")  # where reminders go (optional)
+    phone: Mapped[str] = mapped_column(String(32), default="")
+    reminders_on: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -405,6 +408,12 @@ class Notification(Base):
     """A message waiting to go out (or already sent / given up on). Delivery is a separate step with retries."""
 
     __tablename__ = "notifications"
+    __table_args__ = (
+        Index(
+            "uq_notifications_reminder", "loan_id", "kind", "channel", "due_on", unique=True,
+            sqlite_where=text("loan_id IS NOT NULL"),
+        ),
+    )  # fmt: skip
     id: Mapped[int] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     channel: Mapped[str] = mapped_column(String(10))
@@ -419,3 +428,8 @@ class Notification(Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     provider_ref: Mapped[str] = mapped_column(String(100), default="")
     event_id: Mapped[int | None] = mapped_column(ForeignKey("gate_events.id"), nullable=True, index=True)
+    # patron reminders: which loan and due date a reminder is about (a reminder is sent once per loan, kind, due date)
+    kind: Mapped[str] = mapped_column(String(20), default="")  # "" = staff alert | due_soon | due_today
+    member_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # members.id
+    loan_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # loans.id
+    due_on: Mapped[str] = mapped_column(String(10), default="")

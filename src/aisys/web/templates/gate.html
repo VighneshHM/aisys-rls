@@ -108,7 +108,8 @@
     authorised: ["good", "Authorised exit"], bit_off: ["warn", "Bit off, not on loan"],
   };
   const kindBadge = e => h("span", {class: "badge " + (e.alarm ? "bad" : (KIND[e.kind] || ["", ""])[0])}, (e.alarm ? "ALARM · " : "") + (KIND[e.kind] || ["", e.kind])[1]);
-  const NSTATUS = {queued: ["warn", "Queued"], sent: ["good", "Sent"], failed: ["bad", "Failed"]};
+  const NSTATUS = {queued: ["warn", "Queued"], sent: ["good", "Sent"], failed: ["bad", "Failed"], cancelled: ["", "Cancelled"]};
+  const REMINDER = {due_soon: "Patron reminder: due tomorrow", due_today: "Patron reminder: due today"};
   const CHANNEL = {email: "Email", sms: "SMS", print: "Print"};
 
   // ------------------------------------------------------------------ tiles
@@ -172,14 +173,14 @@
     let d;
     try { d = await api("/api/notifications?limit=10"); } catch (e) { fill($("queue"), h("div", {class: "empty"}, e.message)); return; }
     const c = d.counts;
-    $("queue-badge").textContent = c.queued + " queued · " + c.sent + " sent · " + c.failed + " failed";
+    $("queue-badge").textContent = c.queued + " queued · " + c.sent + " sent · " + c.failed + " failed" + (c.cancelled ? " · " + c.cancelled + " cancelled" : "");
     fill($("queue"), d.notifications.length ? h("table", {},
       h("thead", {}, h("tr", {}, ["Channel", "To", "Status", ""].map(t => h("th", {}, t)))),
       h("tbody", {}, d.notifications.map(n => h("tr", {},
         h("td", {}, CHANNEL[n.channel]),
-        h("td", {}, n.recipient, h("div", {class: "sub"}, n.subject)),
+        h("td", {}, n.recipient, h("div", {class: "sub"}, (REMINDER[n.kind] ? REMINDER[n.kind] + " · " : "") + n.subject)),
         h("td", {title: n.last_error || ""}, h("span", {class: "badge " + NSTATUS[n.status][0]}, NSTATUS[n.status][1]),
-          n.status === "queued" && n.attempts ? h("div", {class: "sub"}, "tried " + n.attempts + "×: " + n.last_error) : n.status === "failed" ? h("div", {class: "sub"}, n.last_error) : null),
+          n.status === "queued" && n.attempts ? h("div", {class: "sub"}, "tried " + n.attempts + "×: " + n.last_error) : n.status === "failed" || n.status === "cancelled" ? h("div", {class: "sub"}, n.last_error) : null),
         h("td", {}, ADMIN && n.status === "failed" ? h("button", {class: "btn ghost small", type: "button", onclick: () => retry(n.id)}, "Retry") : null)))))
       : h("div", {class: "empty"}, "Nothing in the queue."));
   }

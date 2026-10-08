@@ -94,7 +94,7 @@ src/aisys/
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              15 test files, 328 tests
+tests/              16 test files, 371 tests
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
 
@@ -153,6 +153,8 @@ sequenceDiagram
   S->>Q: queue alert (email / print / SMS) for staff with preferences
   Q-->>Q: delivered later with retry/backoff
 ```
+Patron loan reminders reuse the same queue (`notifications/reminders.py`, `runner.py`): one message per loan, kind, channel and due date, enforced by a unique index, delivered by a loop that can run inside the app or as `notify-dispatch --every` (`docs/reminders.md`).
+
 The alarm comes only from the tag's security bit, so the gate works while the ILMS is down. A repeat alarm for the same tag
 inside a window (default 60 s) is recorded but not re-sent. Notifications are queued first and delivered by a button, the
 API or `aisys notify-dispatch`; failures retry with back-off.
@@ -275,7 +277,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **328 automated tests, all passing** (about 6 minutes), `ruff` format and lint clean (including security rules), CI on
+- **371 automated tests, all passing** (about 6 minutes), `ruff` format and lint clean (including security rules), CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -316,7 +318,7 @@ Every endpoint other than login and health needs a session and a named permissio
 - No real RFID readers, gate, handheld, camera, SMS or e-mail gateway: all mocks behind the interfaces.
 - No real SIP2 or NCIP wire protocol and no certification; the connector is protocol-shaped only.
 - Fines are a simple configurable rule; a real ILMS would own them.
-- Only staff are users; there is no patron self-service and no patron notifications (the queue could carry them).
+- Only staff are users; there is no patron self-service. Patrons are reminded (a day before and on the due day) but not told about overdue items or ready holds.
 - SQLite only (backup and restore use SQLite's API).
 - Administration has no password reset, role editor or permission editor; roles are the four built-in ones, and users are deactivated, never deleted.
 
@@ -331,7 +333,7 @@ Every endpoint other than login and health needs a session and a named permissio
 **Reasonable next steps**
 1. Real driver for one reader family and one SIP2 server, behind the existing interfaces.
 2. PostgreSQL option, with backup hooks for it.
-3. Password reset and custom roles in Administration; patron notices through the queue.
+3. Password reset and custom roles in Administration; overdue and hold-ready notices to patrons through the same queue.
 4. A Windows service or systemd unit wrapper around `manage.py run`; verify the lifecycle on Linux.
 5. Automatic backup retention and off-machine copy.
 6. A browser-driven end-to-end test suite and a multi-user load test in CI.

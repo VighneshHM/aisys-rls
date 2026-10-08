@@ -16,9 +16,9 @@ from typing import Protocol, runtime_checkable
 
 CHANNELS = ("email", "sms", "print")
 ADDRESS_RULES = {
-    "email": (re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$"), "an email address like name@example.org"),
-    "sms": (re.compile(r"^\+?[0-9]{7,15}$"), "a phone number of 7 to 15 digits, like +441234567890"),
-    "print": (re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$"), "a printer name like front-desk"),
+    "email": (re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+"), "an email address like name@example.org"),
+    "sms": (re.compile(r"\+?[0-9]{7,15}"), "a phone number of 7 to 15 digits, like +441234567890"),
+    "print": (re.compile(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}"), "a printer name like front-desk"),
 }
 
 
@@ -39,6 +39,9 @@ class NotificationConfig:
     print_driver: str = "mock"
     max_attempts: int = 3  # delivery attempts before a message is marked failed
     backoff_s: float = 60.0  # wait between attempts grows with each failure: backoff x attempts so far
+    reminders: bool = True  # tell patrons their loan is due soon / today (needs the member's e-mail or phone)
+    remind_days_before: int = 1  # the "due soon" reminder goes out this many days before the due date
+    auto_dispatch_s: float = 0.0  # > 0: the running app scans for reminders and delivers messages this often (0 = off)
 
 
 @dataclass(frozen=True)
@@ -60,7 +63,7 @@ class NotificationProvider(Protocol):
 
 def valid_address(channel: str, address: str) -> bool:
     rule = ADDRESS_RULES.get(channel)
-    return bool(rule and rule[0].match(address or ""))
+    return bool(rule and rule[0].fullmatch(address or ""))
 
 
 def address_hint(channel: str) -> str:

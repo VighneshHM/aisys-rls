@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -14,9 +16,10 @@ from aisys.circulation.mock_ilms import MockIlms
 from aisys.circulation.resilience import ResilientConnector
 from aisys.config import Settings
 from aisys.deps import Principal, client_ip, get_db, get_principal, get_settings, require
-from aisys.models import Card, Member
+from aisys.models import Card, Loan, Member, utcnow
 from aisys.rfid.mock import MockStaffReader
 from aisys.rfid.registry import DeviceRegistry
+from aisys.timeutil import iso
 
 router = APIRouter(prefix="/api/circulation", tags=["circulation"])
 CIRC_PERMISSIONS = ("circulation.checkout", "circulation.checkin", "circulation.renew")
@@ -60,6 +63,14 @@ class NewMemberIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     member_no: str = Field(default="", max_length=32)  # empty = the next free number
     card_uid: str = Field(default="", max_length=64)  # empty = no card yet
+    email: str = Field(default="", max_length=200)
+    phone: str = Field(default="", max_length=40)
+
+
+class ContactIn(BaseModel):
+    email: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=40)
+    reminders_on: bool | None = None
 
 
 class CardIn(BaseModel):
@@ -112,6 +123,8 @@ def add_member(
             name=body.name,
             member_no=body.member_no,
             card_uid=body.card_uid,
+            email=body.email,
+            phone=body.phone,
             actor=principal.user.username,
             ip=client_ip(request),
         )
@@ -164,6 +177,31 @@ def get_member(
         return service.member_out(db, service.find_member(db, member_no), config)
     except service.CircError as exc:
         raise _http(exc) from exc
+
+
+@router.patch("/members/{member_no}/contact")
+def set_member_contact(
+    member_no: str,
+    body: ContactIn,
+    request: Request,
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    config: CirculationConfig = Depends(get_config),
+):
+    """Where a member's loan reminders go (e-mail, phone) and whether they get them."""
+    try:
+        member = members.set_contact(
+            db,
+            member_no,
+            email=body.email,
+            phone=body.phone,
+            reminders_on=body.reminders_on,
+            actor=principal.user.username,
+            ip=client_ip(request),
+        )
+    except service.CircError as exc:
+        raise _http(exc) from exc
+    return service.member_out(db, member, config)
 
 
 @router.post("/members/{member_no}/block")
@@ -430,6 +468,29 @@ def mock_present_item(
         return {"on_reader": False, "message": "This item has no tag to hold up to the reader"}
     reader.place_tag(tag.tag_uid, replace=True)
     return {"on_reader": True, "uid": tag.tag_uid, "message": "Tag is on the reader"}
+
+
+class DueIn(BaseModel):
+    days_from_today: int = Field(ge=-60, le=60)
+
+
+@router.post("/mock/loans/{loan_id}/due", tags=["circulation-simulator"])
+def mock_set_due(
+    loan_id: int,
+    body: DueIn,
+    _: Principal = Depends(desk_staff),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
+    """Demo only: make an open loan fall due N days from today (0 = today, 1 = tomorrow), to try the reminders."""
+    _simulator(settings)
+    loan = db.get(Loan, loan_id)
+    if loan is None or loan.returned_at is not None:
+        raise HTTPException(404, "No open loan with that number")
+    day = utcnow() + timedelta(days=body.days_from_today)
+    loan.due_at = day.replace(hour=17, minute=0, second=0, microsecond=0)
+    db.commit()
+    return {"id": loan.id, "due_at": iso(loan.due_at)}
 
 
 def _mock_ilms(connector: ResilientConnector, settings: Settings) -> MockIlms:

@@ -7,6 +7,7 @@ card never signs anyone in. Your menu shows only what your role may do.
 |---|---|---|
 | Check an item out | **Circulation** | Present the patron card (or search the member), place the item's tag on the reader, **Check out**. If it is refused, the message says why. |
 | Return or renew | **Circulation** | Check in or Renew the item. A late return adds a fine to the member. |
+| Set where a member's reminders go | **Circulation** | Choose the member, **Contact and reminders**: e-mail, phone, on or off. They are told a day before a loan is due and on the due day. |
 | Tag a new book | **Catalogue**, then **RFID tagging** | Open the item, **Tag this item**, read the reader, generate or read a tag, **Check**, **Link tag to item**. |
 | Take a tag off a book | **Tag registry** | Choose the tag, then remove it (it can be reused) or retire it (never again). |
 | Count a shelf | **Inventory** | Start a session for a location, run the handheld sweep, close it: found, missing, unexpected. Export CSV. |

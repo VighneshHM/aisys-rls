@@ -130,7 +130,7 @@ def test_the_page_offers_member_tools_only_to_those_who_may_use_them(client, lib
 def test_ordinary_forms_do_not_use_the_red_danger_style(client, lib):
     """Add-member, card and fine forms are not warnings; only block-member and tag removal use the red box."""
     page = client.get("/circulation", headers=lib).text
-    assert page.count('class: "confirm neutral"') == 3  # fine form, card form, member form
+    assert page.count('class: "confirm neutral"') == 4  # fine form, card form, member form, contact form
     assert page.count('class: "confirm"') == 1  # the block-member reason box
     css = client.get("/static/app.css").text
     assert ".confirm.neutral" in css

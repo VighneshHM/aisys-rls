@@ -111,3 +111,18 @@ def test_text_box_styles_do_not_leak_onto_radio_buttons():
         if ".confirm" in sel:  # panels that contain radios must only style text-like inputs
             assert ":not([type=radio])" in sel or "[type=radio]" in sel, f"selector styles radios too: {sel}"
     assert ".radio input[type=radio]" in css and ".radio.on" in css
+
+
+def test_no_page_script_declares_the_same_name_twice():
+    """A duplicate `const` makes the browser drop the page's whole script (it once broke the gate page silently)."""
+    import re
+    from collections import Counter
+    from pathlib import Path
+
+    templates = Path(__file__).parent.parent / "src" / "aisys" / "web" / "templates"
+    for path in sorted(templates.glob("*.html")):
+        names = re.findall(
+            r"^  (?:const|let|function|async function) ([A-Za-z_$][\w$]*)", path.read_text("utf-8"), re.M
+        )
+        dupes = [n for n, c in Counter(names).items() if c > 1]
+        assert not dupes, f"{path.name} declares {dupes} twice"

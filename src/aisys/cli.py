@@ -34,6 +34,12 @@ DEMO_MEMBERS = [
 
 
 # staff who get gate alerts in the demo: username -> (channel, address). SYNTHETIC .example addresses only.
+# synthetic contact details for the demo patrons (.example addresses and reserved test numbers reach no real person)
+DEMO_CONTACTS = {
+    "M0001": ("priya.nair@patron.example", "+15550100001"),
+    "M0002": ("tom.becker@patron.example", ""),
+    "M0005": ("", "+15550100005"),
+}
 DEMO_ALERTS = {
     "admin": [("email", "security@library.example")],
     "librarian": [("email", "head-librarian@library.example"), ("print", "front-desk")],
@@ -71,6 +77,10 @@ def seed_demo(settings: Settings) -> None:
             if not db.scalar(select(Card).where(Card.uid == uid)):
                 db.add(Card(uid=uid, kind="patron", member_ref=member_no))
         db.flush()
+        for member_no, (email, phone) in DEMO_CONTACTS.items():
+            owner = db.scalar(select(Member).where(Member.member_no == member_no))
+            if owner and not owner.email and not owner.phone:  # never overwrite what staff entered
+                owner.email, owner.phone = email, phone
         for username, channels in DEMO_ALERTS.items():
             user = db.scalar(select(User).where(User.username == username))
             for channel, address in channels:
@@ -159,6 +169,46 @@ def _backup_command(args, settings: Settings) -> int:
     return 0
 
 
+def _notify_command(args, settings: Settings) -> int:
+    """One pass (queue due patron reminders, deliver what is queued), or with --every keep doing it until stopped."""
+    import time
+
+    from aisys.notifications import runner
+    from aisys.notifications.providers import build_providers
+
+    factory = make_sessionmaker(make_engine(settings.database_url))
+    providers = build_providers(settings.notifications)
+
+    def one_pass() -> dict:
+        result = runner.run_once(factory, providers, settings.notifications, library_name=settings.app_name)
+        return result
+
+    if not args.every:
+        print("notifications:", one_pass())
+        return 0
+    if args.every < 1:
+        print("error: --every must be at least 1 second")
+        return 2
+    print(f"checking for reminders and delivering messages every {args.every:g} s (Ctrl+C to stop)")
+    loop = runner.Loop(one_pass, args.every)
+    loop.start()
+    last = None
+    try:
+        while True:
+            time.sleep(1)
+            if loop.last is not None and loop.last is not last:
+                last = loop.last
+                busy = last["reminders"]["queued"] or last["delivery"]["tried"]
+                if busy:
+                    print(time.strftime("%H:%M:%S"), last)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.stop()
+    print("stopped")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="aisys")
     parser.add_argument("--config", help="path to config TOML")
@@ -180,7 +230,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "restore":
             bp.add_argument("--yes", action="store_true", help="really do it")
     sub.add_parser("run", help="start the web application")
-    sub.add_parser("notify-dispatch", help="deliver queued notifications now")
+    nd = sub.add_parser("notify-dispatch", help="queue due patron reminders and deliver queued notifications")
+    nd.add_argument("--every", type=float, default=0, metavar="SECONDS", help="keep running, repeating every N seconds")
     sub.add_parser("version", help="print version")
     args = parser.parse_args(argv)
 
@@ -196,12 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         seed_demo(settings)
         print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
     elif args.cmd == "notify-dispatch":
-        from aisys.notifications import queue
-        from aisys.notifications.providers import build_providers
-
-        with make_sessionmaker(make_engine(settings.database_url))() as db:
-            result = queue.dispatch(db, build_providers(settings.notifications), settings.notifications)
-        print("notifications:", result)
+        return _notify_command(args, settings)
     elif args.cmd == "backup":
         return _backup_command(args, settings)
     elif args.cmd == "run":
