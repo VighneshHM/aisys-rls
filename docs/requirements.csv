@@ -10,13 +10,13 @@ FR08,Dashboard & reports,"Usage statistics and reports (tagged items, members, c
 FR09,Notifications,"Configurable email, SMS, print via provider-neutral adapters",partial,"Queue, retries, mock email/SMS/print providers, per-user preferences done; patron notices (overdue, holds) pending"
 FR10,Data migration,"~20k records from spreadsheet: validation, duplicates, error logs, reconciliation, rollback",done,"See docs/migration.md; 20k rows validated in 6.6 s, committed in 5.1 s"
 FR11,Administration,"Users/roles, configuration, audit logs, version reporting, system health",partial,"Users, roles, cards, audit, version, health done; config UI planned"
-FR12,Offline lifecycle,"Offline activation, updates, upgrades, patches, security updates; update package with rollback",planned,
+FR12,Offline lifecycle,"Offline activation, updates, upgrades, patches, security updates; update package with rollback",done,"Signed offline packages: install, update (verify, backup, rehearse, migrate, switch), patch and security kinds, rollback, recover; see docs/deployment.md"
 NFR01,Data integrity,Back up before integration; never modify/delete/corrupt existing records,done,"Verified backup before every import and restore, insert-only import, fingerprint proof, guided restore; see docs/backup-restore.md"
 NFR02,Security & privacy,"Least privilege, secure secrets, audit logging, input validation, encrypted transport",partial,TLS termination documented at deployment stage
 NFR03,Compatibility,"Windows 11 clients, Windows Server 2022+, Ethernet, isolated site",planned,
-NFR04,Licensing,"Identify dependencies/licences, pin versions, redistribution notes",partial,Versions pinned in pyproject; SBOM/licence inventory planned
+NFR04,Licensing,"Identify dependencies/licences, pin versions, redistribution notes",done,Versions pinned; CycloneDX SBOM and licence inventory generated from the shipped wheels (docs/third-party-licences.md); redistribution notes in docs/deployment.md
 NFR05,Testability,"Functional, integration, performance, migration, security, regression, UAT evidence",partial,Automated tests tagged to requirement IDs
-NFR06,Maintainability,"Modular adapters, config outside code, structured logs, versioned migrations, documented builds, rollback",partial,"Config-driven device adapters, versioned migrations, structured logs done"
+NFR06,Maintainability,"Modular adapters, config outside code, structured logs, versioned migrations, documented builds, rollback",done,"Config-driven adapters, versioned migrations, structured logs, documented builds, update package and rollback (docs/deployment.md)"
 NFR07,Supportability,"Diagnostics, health checks, structured logs, runbooks",partial,Health + logs done; runbook planned
 NFR08,Documentation,"Architecture, device config, IP/interface details, API docs, install, admin, user, troubleshooting",partial,OpenAPI auto-generated; guides planned
 NFR09,Delivery,Complete D0-D10 and list remaining production work,partial,
@@ -28,5 +28,5 @@ AC05,Acceptance,Handheld mock inventories a shelf; missing/misplaced report; vis
 AC06,Acceptance,"Gate mock unauthorised-removal event, accession number, mock CCTV image, queued email",done,See docs/gate.md
 AC07,Acceptance,Staff smart-card login via mock credential provider; role-based permissions enforced,done,Patron cards rejected for login (A-04)
 AC08,Acceptance,Dashboard statistics and filterable reports,done,See docs/reports.md
-AC09,Acceptance,"Install and run offline, apply offline update, documented rollback",planned,
+AC09,Acceptance,"Install and run offline, apply offline update, documented rollback",done,"Offline install, offline update with data migration, documented rollback; scripts/lifecycle_demo.py proves it with the network disabled"
 AC10,Acceptance,Restore from backup after simulated failed migration; original data intact,done,See docs/backup-restore.md

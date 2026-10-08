@@ -87,4 +87,4 @@ The Backups page has a **Disaster drill** so a reviewer can see the whole thing 
 - SQLite only (file databases). Other databases would need their own backup hook.
 - Backups sit on the same machine unless you copy them off; copy them regularly.
 - Restoring replaces everything, including the audit log and sessions up to the backup's moment (the restore itself is logged afterwards).
-- The checks cover data, not the application files; reinstall or roll back the application separately (AC09).
+- The checks cover data, not the application files; the application files are updated and rolled back by the package tools (`docs/deployment.md`), which take this same backup first.

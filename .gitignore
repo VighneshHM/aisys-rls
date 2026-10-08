@@ -15,3 +15,5 @@ dist/
 *.egg-info/
 build/
 samples/library_20000.csv
+release-keys/
+*.zip

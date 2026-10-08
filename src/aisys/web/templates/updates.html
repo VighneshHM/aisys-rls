@@ -1,0 +1,103 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Updates · {{ app_name }}{% endblock %}
+{% block heading %}Updates{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Version, updates and rollback</h2>
+  <p>Updates arrive as one signed package that works offline. Applying one (or going back) restarts the application, so it is done from the command line on the server. This page shows what is installed, checks a waiting package without changing anything, and keeps the history.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Installed</h3><span class="badge" id="licence-badge"></span></header>
+      <div class="body" id="installed"></div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Packages waiting</h3><button class="btn ghost small" id="refresh" type="button">Refresh</button></header>
+      <div class="body">
+        <p class="sub" style="margin:0 0 10px">Copy an update package (<span class="mono">.zip</span>) into the <b>incoming</b> folder on the server, then check it here. Checking verifies the signature and every file, and says what applying it would do. It changes nothing.</p>
+        <div id="incoming"></div>
+        <div id="check-notice" class="notice" role="alert"></div>
+        <div id="plan"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h3>How to update or go back</h3></header>
+      <div class="body" id="howto"></div>
+    </section>
+  </div>
+</div>
+
+<section class="panel" style="margin-top:18px">
+  <header><h3>History</h3></header>
+  <div class="table-wrap" id="history"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when} = UI;
+  const dl = (...pairs) => h("dl", {class: "kv"}, pairs.flatMap(([k, v]) => [h("dt", {}, k), h("dd", {}, v)]));
+  const cut = (t, n) => t.length > n ? t.slice(0, n) + "…" : t;
+  const code = text => h("pre", {class: "mono", style: "margin:4px 0 12px;white-space:pre-wrap;word-break:break-all;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);padding:8px 10px;border-radius:8px;font-size:12.5px"}, text);
+
+  function render(s) {
+    const lic = s.licence || {status: "missing"};
+    fill($("licence-badge"), s.managed ? h("span", {class: "badge " + (lic.status === "valid" ? "good" : "bad"), title: lic.problem || ""}, "Licence " + lic.status) : null);
+    if (!s.managed) {
+      fill($("installed"), dl(["Running version", s.running_version], ["Python", s.python]),
+        h("div", {class: "notice show warn", style: "margin-top:12px"}, "This copy was started from the source tree, not from an installed package, so there is nothing to update here. An installed copy shows its versions, licence and history on this page."));
+      fill($("incoming"), h("div", {class: "empty"}, "Not an installed copy."));
+      fill($("history"), h("div", {class: "empty"}, "No update history."));
+      fill($("howto"), h("p", {class: "sub"}, "See docs/deployment.md for how to build a package and install it."));
+      return;
+    }
+    fill($("installed"), dl(["Running version", h("b", {}, s.current)], ["Previous version", (s.previous || "none") + (s.previous ? " (kept for rollback)" : "")],
+      ["Database layout", s.schema_revision || "?"], ["Licence", lic.status === "valid" ? (lic.customer || "") + ", valid until " + (lic.expires || "no expiry") : (lic.problem || lic.status)],
+      ["Installed in", h("span", {class: "mono"}, s.root)]), s.interrupted ? h("div", {class: "notice show bad", style: "margin-top:12px"}, "An earlier update was interrupted. Run recover on the server (see below) before updating again.") : null);
+    fill($("incoming"), s.incoming.length ? h("table", {}, h("tbody", {}, s.incoming.map(n => h("tr", {}, h("td", {class: "mono"}, n),
+      h("td", {style: "text-align:right"}, h("button", {class: "btn ghost small", type: "button", onclick: ev => check(n, ev.target)}, "Check")))))) : h("div", {class: "empty"}, "Nothing waiting. The incoming folder is " + s.incoming_dir));
+    const m = s.manage;
+    fill($("howto"),
+      h("p", {class: "sub", style: "margin:0 0 4px"}, "1. Stop the application, then check the package:"), code("python " + m + " update <package.zip> --dry-run"),
+      h("p", {class: "sub", style: "margin:0 0 4px"}, "2. Apply it (backs up first, rehearses on a copy, switches last):"), code("python " + m + " update <package.zip>"),
+      h("p", {class: "sub", style: "margin:0 0 4px"}, "3. If you need to go back:"), code("python " + m + " rollback --yes"),
+      h("p", {class: "sub", style: "margin:0 0 4px"}, "If an update was interrupted:"), code("python " + m + " recover"),
+      h("p", {class: "sub", style: "margin:0"}, "Full runbook: docs/deployment.md"));
+    fill($("history"), s.history.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["When", "What", "Version", "Result"].map(t => h("th", {}, t)))),
+      h("tbody", {}, s.history.map(x => h("tr", {}, h("td", {class: "time"}, when(x.at)), h("td", {}, x.action + (x.kind && x.kind !== "release" ? " (" + x.kind + ")" : "")),
+        h("td", {class: "mono"}, (x.from ? x.from + " → " : "") + (x.to || "")),
+        h("td", {}, x.ok ? h("span", {class: "badge good"}, "ok") : h("span", {class: "badge bad", title: x.problem || ""}, "failed"), x.problem ? h("div", {class: "sub"}, cut(x.problem, 90)) : null)))))
+      : h("div", {class: "empty"}, "No history yet."));
+  }
+
+  async function load() {
+    try { render(await api("/api/updates/status")); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("installed"), h("div", {class: "empty"}, e.message)); }
+  }
+
+  async function check(name, button) {
+    clear("check-notice"); fill($("plan"), null);
+    button.disabled = true; const label = button.textContent; button.textContent = "Checking…";
+    try {
+      const p = await api("/api/updates/check", {json: {name}});
+      say("check-notice", "ok", name + " is valid: signed, and all " + p.files + " files intact.");
+      fill($("plan"), h("div", {class: "table-wrap"}, h("table", {}, h("tbody", {},
+        [["Would change", p.from + " → " + p.to + " (" + p.kind + ")"], ["Database layout", p.schema_from + " → " + p.schema_to + (p.schema_from === p.schema_to ? " (no data change, a rollback keeps all data)" : " (a rollback restores the pre-update backup)")], ["Notes", p.notes || "-"], ["Signed by key", p.signer]]
+          .map(([k, v]) => h("tr", {}, h("th", {}, k), h("td", {}, v)))))));
+    } catch (e) { say("check-notice", "bad", e.message); }
+    finally { button.disabled = false; button.textContent = label; }
+  }
+
+  $("refresh").onclick = load;
+  load();
+})();
+</script>
+{% endblock %}

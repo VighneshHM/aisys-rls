@@ -3,7 +3,7 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** and **AC10 backup and restore** complete. See `docs/traceability.md` for progress per
+**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** and **AC10 backup and restore** and **AC09 offline install, update and rollback** complete. See `docs/traceability.md` for progress per
 requirement and `docs/assumptions.md` for decisions.
 
 ## Quick start (Windows, PowerShell)
@@ -92,3 +92,11 @@ src/aisys/
 docs/                             requirements, traceability, assumptions, risks
 tests/                            pytest suite, tagged with requirement IDs
 ```
+
+## Try offline install, update and rollback (AC09)
+
+`python scripts/lifecycle_demo.py --keep` builds a 0.1.0 and a 0.2.0 package (the second changes the database), installs
+0.1.0 with the network deliberately broken, refuses a tampered, a foreign-signed and a downgrade package, applies 0.2.0
+(backup, rehearsal on a copy, migration, start-up check, switch) and rolls back with the data proven unchanged. The
+**Updates** page of an installed copy shows the versions, licence and history and can dry-run check a waiting package.
+How to build, install, update, roll back and recover: `docs/deployment.md`.

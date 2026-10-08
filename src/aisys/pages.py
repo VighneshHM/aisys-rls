@@ -36,6 +36,7 @@ NAV = [
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
     ("audit", "Audit log", "list", "#", "audit.read", False),
     ("backups", "Backups", "shield", "/backups", "admin.config", True),
+    ("updates", "Updates", "server", "/updates", "admin.config", True),
     ("admin", "Administration", "users", "#", "admin.users", False),
 ]
 
@@ -311,6 +312,15 @@ def backups_page(
         "backups",
         simulator=settings.environment != "production",
     )
+
+
+@router.get("/updates", response_class=HTMLResponse)
+def updates_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "admin.config", "updates.html", "updates")
 
 
 @router.get("/reports", response_class=HTMLResponse)

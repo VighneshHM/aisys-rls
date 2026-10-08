@@ -22,6 +22,7 @@ from aisys.gate_routes import notify_router
 from aisys.gate_routes import router as gate_router
 from aisys.integrations.credentials import CredentialProvider, MockCredentialProvider
 from aisys.inventory_routes import router as inventory_router
+from aisys.lifecycle_routes import router as updates_router
 from aisys.logging_setup import configure_logging
 from aisys.migration_routes import router as migration_router
 from aisys.notifications.providers import build_providers
@@ -77,6 +78,7 @@ def create_app(
     app.include_router(notify_router)
     app.include_router(reports_router)
     app.include_router(backup_router)
+    app.include_router(updates_router)
 
     @app.middleware("http")
     async def maintenance_gate(request: Request, call_next):
