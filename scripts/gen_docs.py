@@ -64,7 +64,7 @@ def data_dictionary() -> str:
         "erDiagram",
     ]
     for t in tables:
-        for fk in t.foreign_keys:
+        for fk in sorted(t.foreign_keys, key=lambda f: (f.parent.name, f.column.table.name, f.column.name)):
             out.append(f'  {fk.column.table.name} ||--o{{ {t.name} : "{fk.parent.name}"')
     for child, col, parent in SOFT_LINKS:
         out.append(f'  {parent} ||--o{{ {child} : "{col}"')

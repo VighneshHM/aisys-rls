@@ -41,7 +41,7 @@ jobs:
       - name: Lint and static analysis
         run: python -m ruff check .
       - name: Tests
-        run: python -m pytest -q
+        run: python -m pytest -q -n auto --durations=10
         env:
           AISYS_ENV: development
 
