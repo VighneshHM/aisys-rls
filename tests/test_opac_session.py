@@ -1,6 +1,7 @@
 """NFR02 / FR02: the public catalogue is for visitors, so opening it must end any staff session in that browser.
 
-A person opens the public catalogue from the staff workspace and leaves the screen for patrons. Nobody must be able to
+A person opens the public catalogue (by typing the address or an old bookmark: the staff menu has no link to it) and
+leaves the screen for patrons. Nobody must be able to
 step from there back into the workspace (by "Staff sign-in", the Back button or typing an address) without signing in
 again.
 """
@@ -89,10 +90,26 @@ def test_the_landing_page_offers_the_public_catalogue(client):
     assert 'href="/opac"' in page.text and "public catalogue" in page.text.lower()
 
 
-def test_the_staff_menu_says_the_public_catalogue_signs_you_out(client):
-    sign_in_browser(client)
-    page = client.get("/circulation").text
-    assert 'href="/opac"' in page and "Signs out" in page and "signs you out" in page
+def test_the_public_catalogue_is_not_in_the_staff_menu(client):
+    for uid in ("STAFFADMIN01", "STAFFLIB0001", "STAFFCLERK01", "STAFFAUDIT01"):
+        sign_in_browser(client, uid)
+        page = client.get("/dashboard" if uid != "STAFFCLERK01" else "/circulation")
+        assert page.status_code == 200, uid
+        assert 'href="/opac"' not in page.text and "Public catalogue" not in page.text, uid
+
+
+def test_the_public_page_has_only_one_way_out_the_home_page(client):
+    client.cookies.clear()
+    page = client.get("/opac").text
+    assert "Return to home page" in page and 'href="/"' in page
+    assert "Staff sign-in" not in page  # no staff-flavoured shortcut on the visitors' page
+
+
+def test_typing_the_address_still_signs_a_staff_member_out(client):
+    sign_in_browser(client, "STAFFADMIN01")
+    assert client.get("/api/auth/me").status_code == 200
+    client.get("/opac")  # no menu entry to click: someone typed the address or used an old bookmark
+    assert client.get("/api/auth/me").status_code == 401
 
 
 def test_pages_are_never_kept_for_the_back_button(client):
