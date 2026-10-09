@@ -13,9 +13,10 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from aisys import __version__, migrate
+from aisys.auth import service as auth_service
 from aisys.cli import DEMO_MEMBERS, DEMO_USERS
 from aisys.config import Settings
-from aisys.deps import Principal, get_db, get_principal_optional, get_settings
+from aisys.deps import COOKIE_NAME, Principal, client_ip, get_db, get_principal_optional, get_settings
 from aisys.migration.mapping import FIELDS, REQUIRED
 from aisys.models import AuditEvent, AuthSession, Card, Item, Loan, RfidTag, User
 from aisys.routes import STARTED_AT
@@ -360,13 +361,24 @@ def serials_page(
 
 
 @router.get("/opac", response_class=HTMLResponse)
-def opac_page(request: Request, settings: Settings = Depends(get_settings)):
-    """The public catalogue search: no sign-in."""
+def opac_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    db: Session = Depends(get_db),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    """The public catalogue search: no sign-in. It is often left open for visitors, so opening it ends any staff
+    session in this browser: nobody can step from the public page into a staff workspace that was left signed in."""
     if not settings.opac_enabled:
         return HTMLResponse("Not found", status_code=404)
-    return TEMPLATES.TemplateResponse(
+    response = TEMPLATES.TemplateResponse(
         request, "opac.html", {"app_name": settings.app_name, "version": __version__, "asset_v": asset_version()}
     )
+    if principal is not None:
+        auth_service.logout(db, db.merge(principal.session), client_ip(request), reason="public_catalogue")
+        response.delete_cookie(COOKIE_NAME)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/audit", response_class=HTMLResponse)

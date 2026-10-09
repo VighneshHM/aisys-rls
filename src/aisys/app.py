@@ -147,6 +147,9 @@ def create_app(
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        if response.headers.get("content-type", "").startswith("text/html"):
+            # a page must never be shown again from the browser's memory (Back button) after the person signed out
+            response.headers.setdefault("Cache-Control", "no-store")
         secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         if secure or settings.tls_certfile:
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
