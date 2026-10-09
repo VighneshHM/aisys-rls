@@ -62,7 +62,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
 | `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
-| `test_opac_session.py` | 19 | NFR02/FR02: the hand-over sign-out button (POST, audited, cross-site refused); opening the public catalogue signs nobody out; kiosk host names; no cached pages; scrollable menu that remembers its position |
+| `test_opac_session.py` | 20 | NFR02/FR02: not in the staff menu, reached from the sign-in page; the warning's sign-out (POST, audited, cross-site refused); opening the public catalogue signs nobody out; kiosk host names; no cached pages; scrollable menu that remembers its position |
 | `test_catalogue_edit.py` | 10 | FR01: corrections and copy status with the importer's rules, on-loan guard, shared-record count, audit trail, no deletes |
 | `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
 | `test_sip2_codec.py` | 70 | FR03: SIP2 message encoding and decoding, checksum, sequence, limits, hostile and fuzzed input |
@@ -70,7 +70,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_security_ops.py`, `test_config.py` | 11, 9 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 770 test cases (some are parametrised).
+Total: 771 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

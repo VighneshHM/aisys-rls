@@ -95,8 +95,6 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .nav a, .nav .nav-item { display: flex; gap: 12px; align-items: center; padding: 9px 10px; border-radius: 9px; color: var(--side-ink); text-decoration: none; font-weight: 500; }
 .nav a.active { background: var(--side-active); color: #fff; box-shadow: inset 3px 0 0 #818cf8; }
 .nav .nav-item { opacity: .6; cursor: default; }
-.nav-form { margin: 0; } .nav .nav-btn { display: flex; gap: 12px; align-items: center; width: 100%; padding: 9px 10px; border: 0; border-radius: 9px; background: none; color: var(--side-ink); font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
-.nav .nav-btn:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; }
 .nav .soon { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #ffffff12; color: #94a3b8; }
 .side .ver { flex: none; margin-top: auto; padding: 14px 10px 0; font-size: 12px; color: #6b7891; border-top: 1px solid #ffffff12; }
 .main { min-width: 0; display: flex; flex-direction: column; }

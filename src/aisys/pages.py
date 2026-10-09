@@ -28,7 +28,6 @@ router = APIRouter(include_in_schema=False)
 # (key, label, icon, href, permission needed to see it, implemented yet?)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
-    ("opac", "Public catalogue", "book", "/handover", None, True),  # a sign-out button, not a link (see handover)
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
@@ -368,9 +367,10 @@ def opac_page(
     principal: Principal | None = Depends(get_principal_optional),
 ):
     """The public catalogue search: no sign-in. Opening it changes nothing (a link from anywhere must not sign a member
-    of staff out). Staff hand a screen over with the menu's sign-out button (`handover`); a public terminal uses a
-    kiosk host name, where no staff session exists at all. If a staff session is still open in this browser, the
-    page says so and offers that sign-out."""
+    of staff out). It is reached from the sign-in page, which only shows once nobody is signed in, so the normal way
+    to it ends the staff session first; a public terminal uses a kiosk host name, where no staff session exists at all.
+    If a staff session is still open in this browser (the address was typed), the page says so and offers a sign-out
+    (`handover`)."""
     if not settings.opac_enabled:
         return HTMLResponse("Not found", status_code=404)
     response = TEMPLATES.TemplateResponse(
@@ -396,8 +396,8 @@ def handover(
 ):
     """Hand this screen over to visitors: end the staff session (server and cookie), record why, open the catalogue.
 
-    A POST from the staff menu, never a side effect of loading a page: the session cookie is SameSite=Lax, so another
-    site cannot send it with a POST, and a request whose Origin is another site is refused outright.
+    A POST from the public page's warning button, never a side effect of loading a page: the session cookie is
+    SameSite=Lax, so another site cannot send it with a POST, and a request whose Origin is another site is refused.
     """
     origin = request.headers.get("origin")
     if origin and urlsplit(origin).netloc.lower() != request.url.netloc.lower():

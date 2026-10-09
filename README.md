@@ -138,8 +138,8 @@ damaged, lost or withdrawn with a reason. The same rules as a new item apply, ev
 
 ## The public catalogue and public terminals
 
-On a shared staff screen, **Public catalogue** in the menu signs you out and opens the catalogue for visitors. Opening `/opac`
-any other way changes nothing (it warns if you are still signed in). A public terminal gets its own host name in
+The public catalogue is linked from the sign-in page, not the staff menu: on a shared screen, sign out first, then open it.
+Opening `/opac` by its address changes nothing (it warns if you are still signed in and offers a sign-out). A public terminal gets its own host name in
 `[opac] kiosk_hosts`, where only the catalogue exists (`docs/deployment.md`, *Public terminals*).
 
 ## Audit log and administration

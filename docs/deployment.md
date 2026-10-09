@@ -260,8 +260,8 @@ A screen in the reading room should never be able to reach a staff page. Give it
 
 On that name the server offers only the catalogue: `/` opens `/opac`, every other page and API answers "not found",
 sign-in is impossible, and any cookie or token the browser sends is ignored. Staff keep using the normal name, so a
-visitor's page can never sign them out. On a shared staff screen, use the menu's **Public catalogue** button, which signs
-you out before opening the catalogue (DR-17).
+visitor's page can never sign them out. On a shared staff screen, sign out and choose the public catalogue on the
+sign-in page (DR-17).
 
 ## Running in production: service, scheduled jobs, TLS
 

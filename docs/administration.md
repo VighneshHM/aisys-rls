@@ -225,8 +225,9 @@ server error, for every endpoint (one handler in `app.py`).
 
 - **Public terminals** in the reading room use a kiosk host name (`[opac] kiosk_hosts`, `docs/deployment.md`). On that name
   only the public catalogue exists: no staff page, no sign-in, no session. The Settings page lists the kiosk names.
-- **A staff screen** is handed to visitors with the menu's **Public catalogue** button, which signs the person out first
-  (audited as `auth.logout`, reason `public_catalogue`). Opening the catalogue in any other way does not sign anyone out;
-  the page then warns that a staff session is still open and offers the same sign-out (DR-17).
+- **A staff screen** is handed to visitors by signing out: the public catalogue is not in the staff menu, it is linked
+  from the sign-in page. Opening `/opac` by its address does not sign anyone out; the page then warns that a staff
+  session is still open and offers **Sign out and keep the catalogue open** (audited as `auth.logout`, reason
+  `public_catalogue`) (DR-17).
 - **Hand-run notification actions** (Send queued messages, Run reminders, Retry) are audited as `notification.dispatch`,
   `notification.reminders_run` and `notification.retry`.

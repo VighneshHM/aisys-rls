@@ -49,10 +49,11 @@ What was checked, how, and what is left. Each row can be re-run.
 * All data is synthetic.
 * The audit log and the application log never hold a whole card number (`STA…N01`), a password or a token; patron e-mail and phone
   are never written to the audit log (`test_security_ops`, `test_reminders`).
-* Handing a screen to visitors is a deliberate act (DR-17): the staff menu's **Public catalogue** entry is a sign-out button
-  (POST `/handover`) that ends the session on the server and in the browser, is audited as `public_catalogue`, and refuses a
-  request whose Origin is another site. Loading the public page itself changes nothing, so no link, second tab or API client
-  can sign anyone out (D-055); if a staff session is still open in that browser the page says so and offers the sign-out.
+* The public catalogue is not in the staff menu; it is linked from the sign-in page, which shows only once nobody is
+  signed in, so the way to it from the workspace goes through signing out (DR-17). Loading the public page itself changes
+  nothing, so no link, second tab or API client can sign anyone out (D-055); if a staff session is still open in that
+  browser the page says so and offers a sign-out (POST `/handover`: ends the session on the server and in the browser,
+  audited as `public_catalogue`, refused when the request's Origin is another site).
   Pages are never cached, so the Back button cannot show a workspace after signing out (`test_opac_session`).
 * Public terminals use a kiosk host name (`[opac] kiosk_hosts`): there only the catalogue, its search API, static files and
   the health checks exist, sign-in is impossible, and any cookie or token sent is removed before the request is handled.

@@ -333,15 +333,16 @@ record has (refused, naming it); a copy on loan (its status stays until it is ch
 - Every change is audited with the old and new values and the reason; a save that changes nothing writes nothing.
 
 ## UC-27 Hand a screen over to visitors; a public terminal
-**Actor:** any member of staff; a Visitor. **Flow:** on a shared screen, press **Public catalogue** in the menu: it signs the person
-out and opens the public catalogue. A public terminal opens the kiosk host name, where only the catalogue exists.
+**Actor:** any member of staff; a Visitor. **Flow:** on a shared screen, **Sign out**, then choose **Public catalogue** on the
+sign-in page. A public terminal opens the kiosk host name, where only the catalogue exists.
 **Alternatives:** someone opens `/opac` by its address while signed in (nothing happens to the session; the page warns and offers
 the sign-out); a link from another site to `/opac` (nobody is signed out).
 
 **Acceptance criteria:**
 
-- The menu button ends the session on the server and in the browser, is audited with reason `public_catalogue`, and opens the
-  catalogue; afterwards no staff page opens without signing in again (NFR02). UAT-27.
+- The staff menu has no public catalogue entry; the sign-in page links to it. The warning's sign-out ends the session on
+  the server and in the browser, is audited with reason `public_catalogue`, and opens the catalogue; afterwards no staff
+  page opens without signing in again (NFR02). UAT-27.
 - Loading `/opac` never signs anyone out: not a link from another site, not a second tab, not an API client.
 - A hand-over posted from another site is refused.
 - On a kiosk host name only the catalogue, its search, static files and health checks answer; sign-in is impossible and any

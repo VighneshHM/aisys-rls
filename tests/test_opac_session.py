@@ -1,10 +1,11 @@
 """NFR02 / FR02: the public catalogue and staff sessions (decision DR-17).
 
-A screen is handed over to visitors on purpose: the staff menu's "Public catalogue" entry is a sign-out button (a POST)
-that ends the session, records why and opens the catalogue (this keeps D-052 closed). Merely opening the catalogue
+The public catalogue is reached from the sign-in page, which shows only once nobody is signed in, so the normal way to
+it ends the staff session first (this keeps D-052 closed); it is not in the staff menu. Merely opening the catalogue
 changes nothing, so a link from another site, a second tab at the desk or an API client never signs anyone out
-(D-055). A public terminal uses a kiosk host name ([opac] kiosk_hosts), where only the catalogue exists and no staff
-session can be used or created.
+(D-055); if a staff session is still open there, the page warns and offers a sign-out (a POST to /handover). A public
+terminal uses a kiosk host name ([opac] kiosk_hosts), where only the catalogue exists and no staff session can be used
+or created.
 """
 
 from __future__ import annotations
@@ -119,13 +120,22 @@ def test_with_the_catalogue_switched_off_a_hand_over_goes_to_the_home_page(clien
     assert client.get("/opac").status_code == 404
 
 
-def test_every_role_has_the_hand_over_button_and_no_plain_link(client):
+def test_the_public_catalogue_is_not_in_the_staff_menu(client):
     for uid in ("STAFFADMIN01", "STAFFLIB0001", "STAFFCLERK01", "STAFFAUDIT01"):
         sign_in_browser(client, uid)
         page = client.get("/dashboard" if uid != "STAFFCLERK01" else "/circulation")
         assert page.status_code == 200, uid
-        assert '<form method="post" action="/handover"' in page.text and "Signs out" in page.text, uid
-        assert 'href="/opac"' not in page.text, uid  # a link would hand over without signing out
+        assert 'href="/opac"' not in page.text and "/handover" not in page.text, uid
+        assert "Public catalogue" not in page.text, uid
+
+
+def test_the_way_to_the_catalogue_from_the_workspace_goes_through_signing_out(client):
+    sign_in_browser(client)
+    assert client.get("/", follow_redirects=False).status_code in (302, 303, 307), "signed in: no landing page"
+    client.post("/api/auth/logout")
+    client.cookies.clear()
+    landing = client.get("/")
+    assert landing.status_code == 200 and 'href="/opac"' in landing.text  # only now is the catalogue offered
 
 
 def test_the_landing_page_offers_the_public_catalogue(client):

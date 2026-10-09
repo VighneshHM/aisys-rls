@@ -18,7 +18,7 @@ hands-on; nobody trains on real members.
 
 | Module | For | Length | Content | Practice (with demo data) |
 |---|---|---|---|---|
-| 1. First steps | everyone | 30 min | What the system does; signing in with a staff card; the menu for your role; what a patron card is not; leaving a screen for visitors with **Public catalogue** (it signs you out) | Sign in as each role; try the patron card and see why it is refused |
+| 1. First steps | everyone | 30 min | What the system does; signing in with a staff card; the menu for your role; what a patron card is not; leaving a screen for visitors: sign out, then **Public catalogue** on the sign-in page | Sign in as each role; try the patron card and see why it is refused |
 | 2. Circulation | clerks, librarians | 90 min | Find a member; check out, renew, check in; reading a refusal; fines; the reader's beeps and lights | Priya borrows two books; check out the blocked member (M0003) and the member over the limit (M0004); return a late book |
 | 3. Members and cards | clerks, librarians | 45 min | Add a member with contact details; issue and replace a card; print a card; reminders and opt-out | Add a member, issue a card, print it, switch reminders off |
 | 4. Catalogue and tagging | librarians | 90 min | Add an item (with ISBN lookup); search; correct a record; mark a copy damaged, lost or withdrawn; tag, remove, retire, re-tag; reading the tag-to-item link | Add five books, correct one author, withdraw one copy, tag three, retire one |

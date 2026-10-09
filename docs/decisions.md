@@ -225,14 +225,18 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 * **Decision (project owner, 2026-10-10): option 2.**
   - Loading `/opac` changes nothing. If a staff session is still open in that browser, the page says so and offers
     **Sign out and keep the catalogue open**.
-  - The staff menu's **Public catalogue** entry is a sign-out button: a POST to `/handover` that ends the session on the
-    server and in the browser, records `auth.logout` with reason `public_catalogue`, and opens the catalogue. Browsers do
-    not send the SameSite=Lax session cookie with another site's POST, and a request whose Origin is another site is
-    refused, so no other site can sign staff out.
+  - The public catalogue is **not in the staff menu**: it is linked from the sign-in page, which shows only once nobody
+    is signed in, so the normal way to it ends the staff session first. (A menu entry built as a sign-out button was
+    removed at the project owner's request the same day, C-12: a menu item that signs you out is easy to press by
+    mistake, and staff search with the richer Catalogue page.)
+  - The warning's sign-out is a POST to `/handover` that ends the session on the server and in the browser, records
+    `auth.logout` with reason `public_catalogue`, and opens the catalogue. Browsers do not send the SameSite=Lax session
+    cookie with another site's POST, and a request whose Origin is another site is refused, so no other site can sign
+    staff out.
   - `[opac] kiosk_hosts` lists host names for public terminals (for example `opac.library.local`). On those names only
     the catalogue, its search API, the static files and the health checks exist; every other path answers "not found",
     sign-in is impossible, and any cookie or token the browser sends is removed before the request is handled.
-* **Consequence:** D-052 stays closed for the hand-over it was about, and a public terminal on a kiosk name can never
+* **Consequence:** D-052 stays closed (the way to the catalogue goes through signing out), and a public terminal on a kiosk name can never
   hold a staff session. A staff member who opens the catalogue by typing its address and walks away is warned by the
   page but not signed out: the idle timeout (`session_ttl_minutes`) and the hand-over button are the protection there.
 
