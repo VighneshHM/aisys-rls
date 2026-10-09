@@ -16,10 +16,10 @@ from aisys import audit
 from aisys.circulation.service import CircError, find_member
 from aisys.models import Card, Member
 from aisys.notifications.providers import valid_address
+from aisys.rfid import tagging
 from aisys.rfid.devices import CardJob, CardPrinter, DeviceError, DeviceUnavailable
 from aisys.rfid.registry import DeviceRegistry
 
-CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
 MEMBER_NO_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,31}$")
 
 
@@ -29,16 +29,9 @@ def next_member_no(db: Session) -> str:
     return f"M{max(numbers, default=0) + 1:04d}"
 
 
-def _clean_card(uid: str) -> str:
-    uid = re.sub(r"[\s:-]", "", uid or "").upper()
-    if not CARD_RE.match(uid):
-        raise CircError(422, "bad_card", "A card number is 6 to 64 letters and digits")
-    return uid
-
-
-def _check_card_free(db: Session, uid: str) -> None:
-    if db.scalar(select(Card).where(Card.uid == uid)):
-        raise CircError(409, "card_in_use", "That card number is already registered to someone")
+def _refuse(status: int, problems: list[dict]) -> CircError:
+    first = problems[0]
+    return CircError(status, first["code"], "; ".join(p["message"] for p in problems))
 
 
 def clean_email(value: str) -> str:
@@ -104,9 +97,10 @@ def create_member(
         raise CircError(422, "bad_member_no", "A member number is letters, digits and dashes, like M0042")
     if db.scalar(select(Member).where(Member.member_no == number)):
         raise CircError(409, "member_exists", f"Member number {number} is already in use")
-    uid = _clean_card(card_uid) if card_uid.strip() else ""
-    if uid:
-        _check_card_free(db, uid)
+    uid = tagging.normalize_card_uid(card_uid)
+    problems = tagging.card_problems(db, uid) if uid else []
+    if problems:
+        raise _refuse(409 if problems[0]["code"] == "card_in_use" else 422, problems)
     member = Member(member_no=number, name=name, email=clean_email(email), phone=clean_phone(phone))
     db.add(member)
     db.flush()
@@ -126,10 +120,15 @@ def create_member(
 
 
 def issue_card(db: Session, member_no: str, card_uid: str, *, actor: str, ip: str = "") -> Member:
-    """Give a member a card. Any card they had before is switched off (lost or replaced)."""
-    member = find_member(db, member_no)
-    uid = _clean_card(card_uid)
-    _check_card_free(db, uid)
+    """Give a member a card. Any card they had before is switched off (lost or replaced).
+
+    The member record is validated first, by the check the tagging workflow uses (`tagging.validate_member_tagging`).
+    """
+    chk = tagging.validate_member_tagging(db, member_no, card_uid)
+    if not chk.ok:
+        raise _refuse(chk.status_code(), chk.problems)
+    member, uid = chk.member, chk.uid
+    assert member is not None  # the check passed
     old = list(db.scalars(select(Card).where(Card.kind == "patron", Card.member_ref == member.member_no, Card.active)))
     for card in old:
         card.active = False

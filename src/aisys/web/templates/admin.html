@@ -42,6 +42,29 @@
   </div>
 </div>
 
+<div class="grid two" style="margin-top:18px">
+  <section class="panel">
+    <header><h3>Roles</h3><span class="badge" id="role-count"></span></header>
+    <div class="table-wrap" id="roles" style="max-height:60vh;overflow:auto"></div>
+    <div id="roles-notice" class="notice" role="alert" style="margin:12px 18px"></div>
+  </section>
+
+  <section class="panel">
+    <header><h3 id="r-title">Add a custom role</h3></header>
+    <div class="body">
+      <p class="sub">The four built-in roles come with the software and are reset at every start. A custom role gives exactly the permissions ticked here; staff who hold it get the change on their next click.</p>
+      <div class="field"><label for="r-name">Role name</label><input id="r-name" autocomplete="off" maxlength="32" placeholder="lowercase letters, digits and _, e.g. stock_checker"></div>
+      <div class="field"><label for="r-desc">Description</label><input id="r-desc" autocomplete="off" maxlength="200"></div>
+      <fieldset style="border:0;padding:0;margin:0 0 14px;min-width:0"><legend style="font-weight:600;font-size:13px;color:var(--ink-2);margin-bottom:6px;padding:0">Permissions</legend><div id="r-perms" style="display:grid;gap:6px;max-height:40vh;overflow:auto"></div></fieldset>
+      <div class="actions">
+        <button class="btn" id="r-save" type="button">Add role</button>
+        <button class="btn ghost hidden" id="r-cancel" type="button">Cancel</button>
+      </div>
+      <div id="role-notice" class="notice" role="alert"></div>
+    </div>
+  </section>
+</div>
+
 <script src="/static/ui.js?v={{ asset_v }}"></script>
 <script>
 (() => {
@@ -58,7 +81,7 @@
 
   async function patch(url, body) {
     clear("people-notice");
-    try { await api(url, {method: "PATCH", json: body}); await load(); }
+    try { await api(url, {method: "PATCH", json: body}); await load(); await loadRoles(); }  // a role change moves the holder counts
     catch (e) { if (e.status === 401) { location.href = "/"; return; } say("people-notice", "bad", e.message); await load(); }
   }
 
@@ -105,7 +128,7 @@
         const u = await api("/api/admin/users", {json: body});
         say("user-notice", "ok", "Added " + u.display_name + ". Now issue them a staff card.");
         ["u-name", "u-display", "u-pass"].forEach(i => $(i).value = "");
-        await load();
+        await load(); await loadRoles();
       } catch (e) { say("user-notice", "bad", why(e)); }
     });
   };
@@ -123,7 +146,80 @@
       } catch (e) { say("card-notice", "bad", why(e)); }
     });
   };
+  // ---- roles
+  let editing = null;  // name of the custom role being edited, or null when adding
+  let catalogue = [];
+
+  function permBoxes(selected) {
+    fill($("r-perms"), catalogue.map(p => h("label", {style: "display:flex;gap:10px;align-items:flex-start;cursor:pointer"},
+      h("input", {type: "checkbox", value: p.code, checked: selected.includes(p.code) ? "" : false, style: "width:18px;height:18px;flex:none;margin-top:2px"}),
+      h("span", {}, h("span", {class: "mono"}, p.code), h("span", {class: "sub"}, " " + p.description)))));
+  }
+  function resetForm() {
+    editing = null;
+    $("r-title").textContent = "Add a custom role"; $("r-save").textContent = "Add role";
+    $("r-name").disabled = false; $("r-name").value = ""; $("r-desc").value = "";
+    $("r-cancel").classList.add("hidden");
+    permBoxes([]);
+  }
+  function edit(r) {
+    editing = r.name; clear("role-notice");
+    $("r-title").textContent = "Edit role " + r.name; $("r-save").textContent = "Save changes";
+    $("r-name").value = r.name; $("r-name").disabled = true; $("r-desc").value = r.description;
+    $("r-cancel").classList.remove("hidden");
+    permBoxes(r.permissions);
+    $("r-desc").focus();
+  }
+  async function removeRole(r) {
+    clear("roles-notice");
+    if (!confirm("Remove the role " + r.name + "?")) return;
+    try { await api("/api/admin/roles/" + encodeURIComponent(r.name), {method: "DELETE"}); if (editing === r.name) resetForm(); await loadRoles(); await load(); }
+    catch (e) { say("roles-notice", "bad", e.message); }
+  }
+  function roleRow(r) {
+    return h("tr", {},
+      h("td", {}, h("b", {class: "mono"}, r.name), r.built_in ? h("div", {}, pill("", "built-in")) : null, h("div", {class: "sub"}, r.description)),
+      h("td", {}, fmt(r.holders)),
+      h("td", {}, h("div", {class: "sub"}, r.permissions.length + " permission(s)"), h("div", {class: "mono sub", style: "white-space:normal"}, r.permissions.join(", "))),
+      h("td", {}, r.built_in ? null : h("div", {class: "actions", style: "margin:0;gap:6px"},
+        h("button", {class: "btn ghost small", type: "button", onclick: () => edit(r)}, "Edit"),
+        h("button", {class: "btn ghost small danger-text", type: "button", disabled: r.holders ? "" : false,
+          title: r.holders ? "Give its holders another role first" : "", onclick: () => removeRole(r)}, "Remove"))));
+  }
+  async function loadRoles() {
+    let d;
+    try { d = await api("/api/admin/roles"); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("roles"), h("div", {class: "empty"}, e.message)); return; }
+    const first = !catalogue.length;
+    catalogue = d.permissions;
+    $("role-count").textContent = fmt(d.roles.length) + " roles";
+    fill($("roles"), h("table", {},
+      h("thead", {}, h("tr", {}, ["Role", "Staff", "Permissions", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.roles.map(roleRow))));
+    if (first) resetForm();
+  }
+  $("r-cancel").onclick = () => { clear("role-notice"); resetForm(); };
+  $("r-save").onclick = async () => {
+    clear("role-notice");
+    const permissions = [...$("r-perms").querySelectorAll("input:checked")].map(i => i.value);
+    if (!permissions.length) { say("role-notice", "bad", "Tick at least one permission."); return; }
+    await busy($("r-save"), editing ? "Saving…" : "Adding…", async () => {
+      try {
+        const description = $("r-desc").value.trim();
+        if (editing) {
+          await api("/api/admin/roles/" + encodeURIComponent(editing), {method: "PATCH", json: {description, permissions}});
+          say("role-notice", "ok", "Saved " + editing + ".");
+        } else {
+          const r = await api("/api/admin/roles", {json: {name: $("r-name").value.trim(), description, permissions}});
+          say("role-notice", "ok", "Added " + r.name + ". Choose it as a person's role in the Staff list.");
+          resetForm();
+        }
+        await loadRoles(); await load();
+      } catch (e) { say("role-notice", "bad", why(e)); }
+    });
+  };
   load();
+  loadRoles();
 })();
 </script>
 {% endblock %}

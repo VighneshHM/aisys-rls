@@ -153,7 +153,15 @@ def resolve_session(db: Session, token: str) -> AuthSession | None:
     return sess
 
 
-def logout(db: Session, sess: AuthSession, ip: str = "") -> None:
+def logout(db: Session, sess: AuthSession, ip: str = "", reason: str = "") -> None:
     sess.revoked = True
-    audit.record(db, actor=sess.user.username, action="auth.logout", entity="user", entity_id=sess.user_id, ip=ip)
+    audit.record(
+        db,
+        actor=sess.user.username,
+        action="auth.logout",
+        entity="user",
+        entity_id=sess.user_id,
+        ip=ip,
+        detail={"reason": reason} if reason else None,
+    )
     db.commit()

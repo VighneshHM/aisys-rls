@@ -48,6 +48,9 @@ clarification log below the table. Design decisions with alternatives are in `do
 | A-38 | Loan rules belong to the ILMS when the `sip2` driver is used; the due date is the ILMS's (asked for with message `17` if the answer leaves it out), and the local loan period is a last resort only. The local checks (reference item, blocked member, fines over the limit, item already out) still run first. | own | docs/sip2.md. |
 | A-39 | The ILMS password is read only from the environment variable `AISYS_ILMS_PASSWORD`; a password in the configuration file is ignored. Patron passwords (PIN) are not sent. | own | Secrets stay out of the file (see DR-11). |
 | A-40 | Only SIP2 is built; NCIP 2.0 is not. The simulator is for tests and demonstration, never for production. | confirmed | C-09; DR-12. |
+| A-41 | The SOP's protocol requirement ("Support NCIP 2.0 and an SIP2 adapter boundary"; AC03 "a mocked NCIP or SIP2 flow") is met by SIP2. NCIP 2.0 is not built and not claimed; it would be one more connector class. | confirmed | C-10; DR-13. |
+| A-42 | The four built-in roles are defined by the software and restored at every start; administrators add their own roles beside them rather than editing those four. | own | DR-14. |
+| A-43 | "D0 to D10" in SOP NFR09 names the working days of the stage plan (SOP section 9 labels its stages D0 to D8), not the deliverables D1 to D9 of section 7. The mapping of stages to actual dates is in `docs/project-management.md`. | own | NFR09. |
 
 ## Clarification log
 
@@ -67,6 +70,7 @@ work: questions that only they can answer are marked **open - needs library staf
 | C-07 | Implement every remaining requirement (search, shelves, acquisitions, serials, labels, net cataloguing, deliverable documents) in one branch? | Project owner | 2026-10-08 | Yes, in one branch (`overall-fixes`) | Commit `ad8a3b6`; A-26 to A-32; FR01 and FR02 marked `done` as reference level |
 | C-08 | Should library rules (loan days, fines, reminders...) be editable in the browser? | Project owner | 2026-10-09 | Yes for rules; secrets and devices stay in the TOML file | Settings page, `app_settings` table, DR-11 |
 | C-09 | After the review, should the SIP2 wire protocol be added after all (it was left out in C-01)? | Project owner | 2026-10-09 | Yes: SIP2 only for now, on the same branch (`overall-fixes`); NCIP stays out | SIP2 driver, simulator and tests; FR03 `done`; A-33 to A-40; DR-12; R-16 reworded; `docs/sip2.md` |
+| C-10 | The final coverage review found NCIP 2.0 still unbuilt. Is an NCIP 2.0 adapter needed, given SIP2 is implemented? | Project owner | 2026-10-09 | No: the requirement says SIP2/NCIP 2.0 and SIP2 is implemented, so NCIP is not needed | NCIP not built and not claimed; FR03 `done` through SIP2; A-41; DR-13; `docs/remaining-work.md` keeps NCIP as an extension |
 
 ### Open questions from the first draft, resolved or still open
 

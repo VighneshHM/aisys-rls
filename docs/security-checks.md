@@ -7,7 +7,7 @@ What was checked, how, and what is left. Each row can be re-run.
 | Check | Tool / test | Result |
 |---|---|---|
 | Static analysis for security defects (Bandit rules) | `ruff check` with the `S` rule set, on every pull request | clean; the few intentional exceptions (subprocess with a fixed argument list, the demo password, constant SQL in migrations) carry a comment saying why |
-| Known vulnerabilities in dependencies | `pip-audit -r requirements.lock` on every pull request | found 7 in the signing library `cryptography` 48.0.0 during this work; fixed by pinning 50.0.2; clean now |
+| Known vulnerabilities in dependencies | `pip-audit` on `requirements.lock` and `requirements-dev.lock` on every pull request | found 7 in the signing library `cryptography` 48.0.0 during this work; fixed by pinning 50.0.2; clean now |
 | Secrets in the repository | review of `git ls-files`, `.gitignore` (keys, `.env`, `config/config.toml`, databases, `release-keys/` ignored) | none committed; the only credentials are the synthetic demo cards and the documented demo administrator password |
 | Permissions on every endpoint | `docs/api-reference.md` is generated from the routes and lists the permission each needs; tests call the sensitive ones with the wrong role | a role without the permission gets 403 and an audit line; no endpoint but sign-in, health and the public catalogue is public |
 | Passwords and sign-in | `test_foundation`: scrypt hashing, lockout after repeated failures, patron card cannot sign in, disabled person or card refused | passes |
@@ -48,6 +48,8 @@ What was checked, how, and what is left. Each row can be re-run.
 * All data is synthetic.
 * The audit log and the application log never hold a whole card number (`STA…N01`), a password or a token; patron e-mail and phone
   are never written to the audit log (`test_security_ops`, `test_reminders`).
+* Opening the public catalogue ends any staff session in that browser (server side, audited as `public_catalogue`), and pages are
+  never cached, so the public screen cannot be used to step back into a staff workspace left signed in (`test_opac_session`).
 * The public catalogue shows no accession number, barcode, tag, member, loan or due date (`test_search_shelves`).
 * The staff list shows staff card numbers masked.
 
@@ -58,9 +60,10 @@ What was checked, how, and what is left. Each row can be re-run.
 * Update packages are signed (Ed25519) with a checksum for every file, no unlisted file allowed; a tampered, unsigned,
   foreign-signed, older or wrongly-licensed package is refused before anything is changed (`test_lifecycle`).
 * Every package carries an SBOM and a licence inventory (`docs/third-party-licences.md`).
-* `requirements.lock` pins every package (runtime and development tools) with sha256 hashes; CI installs from it with
-  `--require-hashes`, so a changed or substituted package fails the install. `docs/sbom.cdx.json` lists all of them
-  (`scripts/sbom_lock.py`, checked by `test_docs`). `pip-audit` scans the same file.
+* `requirements.lock` (runtime) and `requirements-dev.lock` (development tools and the build backend) pin every package
+  with sha256 hashes; CI installs from them with `--require-hashes`, so a changed or substituted package fails the install.
+  `docs/sbom.cdx.json` lists all of them with licences (`scripts/sbom_lock.py`, checked by `test_docs`). `pip-audit`
+  scans both files.
 
 ## Concurrency and failure
 

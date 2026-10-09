@@ -97,7 +97,7 @@ src/aisys/
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              25 test files, 717 test cases
+tests/              26 test files, 743 test cases
 scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
@@ -285,7 +285,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **717 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
+- **743 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -295,8 +295,8 @@ Every endpoint other than login and health needs a session and a named permissio
   pages in a browser. Examples that found real bugs: restore without maintenance mode could lose concurrent work; a locked
   database hung a restore forever; one bad manifest broke the backup list; a deep Windows install folder crashed the
   installer; a `%` search matched everything; renewing an overdue item erased its fine.
-- **Offline proof for AC09:** `scripts/lifecycle_demo.py` installs, updates and rolls back with the network deliberately
-  disabled, and the data is shown unchanged.
+- **Offline proof for AC09:** `scripts/lifecycle_demo.py` installs, updates and rolls back with the network
+  blocked (every connection off the machine refused and logged; the log must stay empty), and the data is shown unchanged.
 - **Gaps (honest):**
   - Nothing is tested against real hardware, a real ILMS, a real mail server or a real camera: they are mocks. The SIP2 client is
     tested against a simulator written from the specification, not against any vendor system.
@@ -348,7 +348,7 @@ The authoritative list, with the requirement each item belongs to, is `docs/rema
 **Reasonable next steps**
 1. A real driver for one reader family; a run of the SIP2 driver against the site's real ILMS (and an NCIP adapter if the site needs one).
 2. A PostgreSQL option, with backup hooks for it.
-3. Password reset and custom roles; overdue and hold-ready notices to patrons through the same queue.
+3. Password reset (custom roles are built); overdue and hold-ready notices to patrons through the same queue.
 4. A service wrapper tested on Windows Server; verify the lifecycle on Linux.
 5. Automatic backup retention, an off-machine copy, monitoring of the health endpoints.
 6. A browser-driven end-to-end suite and a multi-user soak test in CI.

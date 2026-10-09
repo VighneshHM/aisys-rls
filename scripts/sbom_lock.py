@@ -1,12 +1,16 @@
-"""Write docs/sbom.cdx.json: the software bill of materials for everything pinned in requirements.lock.
+"""Write the software bill of materials and the licence inventory for everything pinned in the lock files.
 
-    python scripts/sbom_lock.py            # rewrite the file
-    python scripts/sbom_lock.py --check    # exit 1 if a pinned package is missing from it or has another version
+    python scripts/sbom_lock.py            # rewrite docs/sbom.cdx.json and docs/third-party-licences.md
+    python scripts/sbom_lock.py --check    # exit 1 if either file is out of date with the lock files
 
-The release script already writes an SBOM of the wheels that ship to a site (runtime packages only). This one covers
-the build and test tools too (pytest, ruff, mypy, cryptography for the signing tests), with the sha256 hashes from the
-lock file, so a reviewer can see every package the project depends on without building anything.
-`scope` is "required" for packages the application needs to run and "optional" for the development tools.
+Inputs: `requirements.lock` (what the application needs to run, and what ships to a site) and
+`requirements-dev.lock` (the test, lint, type-check and signing tools, and the build backend). Licences are read from
+the installed packages' metadata, so run it in the project's environment after installing both lock files
+(`pip install --require-hashes -r requirements.lock -r requirements-dev.lock`).
+The release script separately writes an SBOM and LICENSES.md of the wheels each package actually ships.
+
+Scope, in both outputs: **runtime** packages are shipped inside every offline package and redistributed to the site;
+**development** and **build** packages are used on the developer's and the build machine only and are never shipped.
 """
 
 from __future__ import annotations
@@ -15,12 +19,18 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from importlib import metadata
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-LOCK = REPO / "requirements.lock"
-OUT = REPO / "docs" / "sbom.cdx.json"
+sys.path.insert(0, str(REPO / "src"))
+from aisys_lifecycle.sbom import REVIEW, licence_of  # noqa: E402 - needs the path above
+
+LOCKS = {"requirements.lock": "runtime", "requirements-dev.lock": "development"}
+BUILD = {"setuptools"}  # the build backend named in pyproject.toml [build-system]
+SBOM = REPO / "docs" / "sbom.cdx.json"
+INVENTORY = REPO / "docs" / "third-party-licences.md"
 PIN = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s;\\]+)")
 HASH = re.compile(r"--hash=sha256:([0-9a-f]{64})")
 
@@ -29,23 +39,35 @@ def norm(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def read_lock() -> dict[str, dict]:
-    """name -> {name, version, hashes} from the lock file (one pin, then its hash lines)."""
+def read_lock(path: Path, scope: str) -> dict[str, dict]:
+    """name -> {name, version, hashes, scope} from one lock file (a pin, then its hash lines)."""
     pins: dict[str, dict] = {}
     current = None
-    for line in LOCK.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         m = PIN.match(line)
         if m:
-            current = pins.setdefault(norm(m.group(1)), {"name": m.group(1), "version": m.group(2), "hashes": []})
+            key = norm(m.group(1))
+            current = pins.setdefault(
+                key,
+                {"name": m.group(1), "version": m.group(2), "hashes": [], "scope": "build" if key in BUILD else scope},
+            )
         if current is not None:
             current["hashes"] += HASH.findall(line)
     return pins
 
 
+def read_locks() -> dict[str, dict]:
+    pins: dict[str, dict] = {}
+    for file, scope in LOCKS.items():
+        for key, pin in read_lock(REPO / file, scope).items():
+            if key in pins:
+                raise SystemExit(f"{pin['name']} is pinned in more than one lock file")
+            pins[key] = pin
+    return pins
+
+
 def runtime_names() -> set[str]:
     """The packages the application needs to run: its own requirements and theirs, found from the pyproject file."""
-    import tomllib
-
     declared = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
     seen: set[str] = set()
     todo = [norm(re.split(r"[<>=!~;\[ ]", d, maxsplit=1)[0]) for d in declared]
@@ -65,55 +87,126 @@ def runtime_names() -> set[str]:
     return seen
 
 
-def build() -> dict:
-    pins, runtime = read_lock(), runtime_names()
-    version = tomllib_version()
-    components = []
-    for key in sorted(pins):
-        p = pins[key]
-        components.append(
-            {
-                "type": "library",
-                "name": p["name"],
-                "version": p["version"],
-                "scope": "required" if key in runtime else "optional",
-                "purl": f"pkg:pypi/{key}@{p['version']}",
-                "hashes": [{"alg": "SHA-256", "content": h} for h in sorted(set(p["hashes"]))],
-            }
-        )
+def licence(name: str, version: str) -> str:
+    try:
+        meta = metadata.metadata(name)
+    except metadata.PackageNotFoundError:
+        raise SystemExit(f"{name} is not installed: install both lock files first") from None
+    if meta["Version"] != version:
+        raise SystemExit(f"{name} {meta['Version']} is installed but {version} is pinned: reinstall the lock files")
+    return licence_of(meta)
+
+
+def app_version() -> str:
+    return tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+
+
+def collect() -> list[dict]:
+    pins = read_locks()
+    for key, pin in pins.items():
+        pin["licence"] = licence(pin["name"], pin["version"])
+        pin["copyleft"] = bool(REVIEW.search(pin["licence"])) or pin["licence"] == "UNKNOWN"
+        pin["needs_review"] = pin["copyleft"] and pin["scope"] == "runtime"  # only shipped packages are redistributed
+        pin["key"] = key
+    return [pins[k] for k in sorted(pins)]
+
+
+def sbom(items: list[dict]) -> dict:
     return {
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
         "version": 1,
-        "metadata": {"component": {"type": "application", "name": "aisys", "version": version}},
-        "components": components,
+        "metadata": {"component": {"type": "application", "name": "aisys", "version": app_version()}},
+        "components": [
+            {
+                "type": "library",
+                "name": p["name"],
+                "version": p["version"],
+                "scope": "required" if p["scope"] == "runtime" else "optional",
+                "purl": f"pkg:pypi/{p['key']}@{p['version']}",
+                "licenses": [{"license": {"name": p["licence"]}}],
+                "properties": [{"name": "aisys:scope", "value": p["scope"]}],
+                "hashes": [{"alg": "SHA-256", "content": h} for h in sorted(set(p["hashes"]))],
+            }
+            for p in items
+        ],
     }
 
 
-def tomllib_version() -> str:
-    import tomllib
+def inventory(items: list[dict]) -> str:
+    counts = {s: sum(1 for p in items if p["scope"] == s) for s in ("runtime", "development", "build")}
+    flagged = [p["name"] for p in items if p["needs_review"]]
+    tools = [p["name"] for p in items if p["copyleft"] and not p["needs_review"]]
+    lines = [
+        f"# Third-party licences (NFR04, D4): aisys {app_version()}",
+        "",
+        "_Generated by `python scripts/sbom_lock.py` from `requirements.lock` and `requirements-dev.lock`;"
+        " `tests/test_docs.py` fails if it is out of date. The same list, with hashes, is `docs/sbom.cdx.json`"
+        " (CycloneDX)._",
+        "",
+        f"{len(items)} packages: {counts['runtime']} runtime, {counts['development']} development,"
+        f" {counts['build']} build. "
+        + (
+            f"**Needs legal review before redistribution: {', '.join(flagged)}.**"
+            if flagged
+            else "No shipped (runtime) package uses a copyleft or unknown licence."
+        )
+        + (
+            f" Not shipped, so no redistribution duty: {', '.join(tools)}"
+            " (weak copyleft, used only on the developer's machine)."
+            if tools
+            else ""
+        ),
+        "",
+        "* **runtime**: needed to run the application. These wheels are **redistributed**: every offline package"
+        " carries them, with their own licence files in each wheel's `.dist-info` folder, plus a generated"
+        " `LICENSES.md` and `SBOM.json`.",
+        "* **development**: tests, linting, type checking, dependency auditing and package signing. Used on the"
+        " developer's and the build machine only; **never shipped** to a site.",
+        "* **build**: the build backend that turns the source into a wheel on the build machine; **never shipped**.",
+        "",
+        "Redistribution and offline-use obligations: `docs/deployment.md`, section *Redistribution and offline use*.",
+        "",
+        "| Package | Version | Scope | Licence | Review |",
+        "|---|---|---|---|---|",
+    ]
+    order = {"runtime": 0, "development": 1, "build": 2}
+    for p in sorted(items, key=lambda p: (order[p["scope"]], p["key"])):
+        lines.append(
+            f"| {p['name']} | {p['version']} | {p['scope']} | {p['licence']} | "
+            + ("**needs review**" if p["needs_review"] else "ok, not shipped" if p["copyleft"] else "ok")
+            + " |"
+        )
+    return "\n".join(lines) + "\n"
 
-    return tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+
+def check_scopes(items: list[dict]) -> list[str]:
+    """Every package the application needs at run time must be in requirements.lock, and only those."""
+    runtime = runtime_names()
+    wrong = [p["name"] for p in items if (p["key"] in runtime) != (p["scope"] == "runtime")]
+    return [f"{n} is in the wrong lock file (runtime packages go in requirements.lock, others in -dev)" for n in wrong]
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
-    wanted = build()
+    items = collect()
+    problems = check_scopes(items)
+    sbom_text = json.dumps(sbom(items), indent=2) + "\n"
+    inv_text = inventory(items)
     if args.check:
-        have = (
-            {c["name"].lower(): c["version"] for c in json.loads(OUT.read_text(encoding="utf-8"))["components"]}
-            if OUT.exists()
-            else {}
-        )
-        stale = [c["name"] for c in wanted["components"] if have.get(c["name"].lower()) != c["version"]]
-        if stale:
-            print("sbom.cdx.json is out of date for:", ", ".join(stale), "- run python scripts/sbom_lock.py")
-            return 1
-        return 0
-    OUT.write_text(json.dumps(wanted, indent=2) + "\n", encoding="utf-8", newline="\n")
-    print(f"wrote {OUT.relative_to(REPO)} ({len(wanted['components'])} packages)")
+        for path, text in ((SBOM, sbom_text), (INVENTORY, inv_text)):
+            if not path.exists() or path.read_text(encoding="utf-8") != text:
+                problems.append(f"{path.relative_to(REPO)} is out of date: run python scripts/sbom_lock.py")
+        print("\n".join(problems))
+        return 1 if problems else 0
+    if problems:
+        print("\n".join(problems))
+        return 1
+    SBOM.write_text(sbom_text, encoding="utf-8", newline="\n")
+    INVENTORY.write_text(inv_text, encoding="utf-8", newline="\n")
+    print(f"wrote {SBOM.relative_to(REPO)} and {INVENTORY.relative_to(REPO)} ({len(items)} packages)")
     return 0
 
 

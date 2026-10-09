@@ -3,14 +3,20 @@
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
 every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
 
-**Status:** foundation (auth, RBAC, audit, health, migrations) **AC01 spreadsheet migration**, **AC02 tagging** and **AC03 circulation**, **AC04 circulation blocks** and **AC05 inventory** and **AC06 security gate** and **AC08 reports** and **AC10 backup and restore** and **AC09 offline install, update and rollback** complete. See `docs/traceability.md` for progress per
-requirement and `docs/assumptions.md` for decisions.
+**Status:** every SOP requirement (FR01 to FR12, NFR01 to NFR09) and all ten acceptance scenarios (AC01 to AC10) are
+implemented and tested: spreadsheet migration, tagging, circulation through a mock ILMS or the **SIP2** protocol, blocks and
+fines, inventory, the security gate, notifications and patron reminders, reports and dashboard, full-text search and the public
+catalogue, shelves, acquisitions, serials, labels and cards, staff, **roles** and **Settings** administration, backup and restore,
+and the signed offline install, update and rollback. NCIP 2.0 is not built (SIP2 meets the protocol requirement, decision DR-13).
+`docs/traceability.md` maps every requirement to its tests, `docs/assumptions.md` and `docs/decisions.md` record the decisions,
+and `docs/remaining-work.md` lists what is left for a live site.
 
 ## Quick start (Windows, PowerShell)
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python -m pip install -e ".[dev]"
+.\.venv\Scripts\python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
+.\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
 .\.venv\Scripts\aisys seed-demo     # migrates the DB and loads SYNTHETIC users/cards
 .\.venv\Scripts\aisys run           # http://127.0.0.1:8000  (API docs at /docs)
 ```
@@ -72,11 +78,20 @@ and the restore procedure: `docs/backup-restore.md`.
 
 ## Develop
 
+The same gates as CI (`.github/workflows/ci.yml`):
+
 ```powershell
-.\.venv\Scripts\python -m pytest          # tests (real migrations, temp DB)
-.\.venv\Scripts\python -m ruff check .    # lint
-.\.venv\Scripts\python scripts\trace.py   # regenerate docs/traceability.md
+.\.venv\Scripts\python -m ruff format --check .   # formatting
+.\.venv\Scripts\python -m ruff check .            # lint and static analysis (with the Bandit security rules)
+.\.venv\Scripts\python -m mypy                    # type check
+.\.venv\Scripts\python -m pytest -n auto          # tests, in parallel (real migrations, temporary databases)
+.\.venv\Scripts\python scripts\lifecycle_demo.py  # real offline install, update and rollback with the network blocked
 ```
+
+Generated documents (the tests fail when one is stale): `scripts\trace.py` (traceability matrix), `scripts\gen_docs.py` (data
+dictionary and API reference), `scripts\sbom_lock.py` (SBOM and licence inventory) and `scripts\sample_reports.py` (sample
+migration reports). Dependencies are pinned with hashes in `requirements.lock` (runtime, shipped) and `requirements-dev.lock`
+(development and build tools, never shipped).
 
 ## Configuration
 Copy `config/config.sample.toml` to `config/config.toml`. Secrets come from the environment only
@@ -85,19 +100,31 @@ Copy `config/config.sample.toml` to `config/config.toml`. Secrets come from the 
 ## Layout
 ```
 src/aisys/
-  app.py, routes.py, deps.py      web app factory, HTTP API, auth/RBAC dependencies
-  auth/                           password hashing, login service, permission catalogue
-  integrations/credentials.py     smart-card provider interface + mock
-  models.py, db.py, migrations/   ORM, engine, versioned Alembic migrations
+  app.py, routes.py, deps.py      web app factory, sign-in and system API, auth/RBAC dependencies
+  *_routes.py, pages.py           HTTP API per area, and the staff pages
+  auth/                           password hashing, login service, permission catalogue and built-in roles
+  catalogue/, labels/, shelves/   items, full-text search (FTS5), barcodes and spine labels, shelves and the virtual bookshelf
+  acquisitions/, serials/         purchase orders and receiving, subscriptions and issues
+  circulation/                    loans, fines, members; the ILMS connector (mock, and sip2/: client, codec, simulator)
+  rfid/                           device-neutral interfaces, mocks, registry, tagging (item and member validation)
+  inventory/, gate/               shelf sweeps; gate events, footfall and camera
+  notifications/, reports/        queue, providers, reminders; the seven reports and the dashboard
+  migration/, backup.py           spreadsheet import with staging and rollback; verified backup and restore
+  integrations/                   smart-card credential provider and net cataloguing (mocks)
+  settings_admin.py, doctor.py    the Settings page rules; the environment and configuration check
+  models.py, db.py, migrations/   ORM, engine, versioned Alembic migrations (0001 to 0011)
   audit.py, logging_setup.py      append-only audit trail, masked structured logs
-docs/                             requirements, traceability, assumptions, risks
+  web/                            templates and static files (no external requests)
+src/aisys_lifecycle/              offline packages: signing, licence, install, update, rollback, SBOM
+scripts/                          release, lifecycle demo, generators for the generated documents, performance report
+docs/                             every SOP deliverable; docs/index.md maps them
 tests/                            pytest suite, tagged with requirement IDs
 ```
 
 ## Try offline install, update and rollback (AC09)
 
 `python scripts/lifecycle_demo.py --keep` builds a 0.1.0 and a 0.2.0 package (the second changes the database), installs
-0.1.0 with the network deliberately broken, refuses a tampered, a foreign-signed and a downgrade package, applies 0.2.0
+0.1.0 with the network blocked (every connection off the machine is refused and logged), refuses a tampered, a foreign-signed and a downgrade package, applies 0.2.0
 (backup, rehearsal on a copy, migration, start-up check, switch) and rolls back with the data proven unchanged. The
 **Updates** page of an installed copy shows the versions, licence and history and can dry-run check a waiting package.
 How to build, install, update, roll back and recover: `docs/deployment.md`.
@@ -107,6 +134,8 @@ How to build, install, update, roll back and recover: `docs/deployment.md`.
 Sign in as the administrator (or the auditor for the audit log). **Audit log** filters by person, action, outcome and
 text, pages through the events, and exports CSV. **Administration** adds staff, issues staff or patron cards, activates or
 deactivates people and cards, unlocks locked accounts and changes roles; you cannot deactivate or demote yourself.
+**Roles** lists the four built-in roles and lets an administrator add custom ones with a chosen set of permissions,
+change them, and remove them when nobody holds them.
 Details: `docs/administration.md`.
 
 ## Search, shelves, orders, serials, labels, cards (FR01, FR02, FR04, FR06)
@@ -144,7 +173,8 @@ python -m aisys.cli run
 ```
 
 Honest limits: tested only against the simulator (written from the specification), not certified and not tried on any vendor
-system; a subset of SIP2; no encryption in SIP2 itself (use a VPN, stunnel or TLS proxy); NCIP 2.0 is not implemented.
+system; a subset of SIP2; no encryption in SIP2 itself (use a VPN, stunnel or TLS proxy). NCIP 2.0 is not implemented: SIP2
+meets the SOP's protocol requirement (decision DR-13), and an NCIP connector would be one more class behind the same boundary.
 Details: `docs/sip2.md`.
 
 ## Loan reminders (FR09)

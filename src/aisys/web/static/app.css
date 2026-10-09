@@ -88,12 +88,15 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .side .logo { padding: 4px 8px 20px; color: #fff; display: flex; gap: 12px; align-items: center; font-weight: 700; }
 .side .logo small { display: block; font-weight: 500; color: #7f8ba3; font-size: 12px; }
 .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: #6b7891; padding: 14px 10px 6px; }
-.nav { display: grid; gap: 2px; }
+.nav { display: grid; gap: 2px; align-content: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #ffffff30 transparent; overscroll-behavior: contain; }
+.nav::-webkit-scrollbar { width: 6px; }
+.nav::-webkit-scrollbar-thumb { background: #ffffff30; border-radius: 6px; }
+.opac-link { margin-top: 16px; }
 .nav a, .nav .nav-item { display: flex; gap: 12px; align-items: center; padding: 9px 10px; border-radius: 9px; color: var(--side-ink); text-decoration: none; font-weight: 500; }
 .nav a.active { background: var(--side-active); color: #fff; box-shadow: inset 3px 0 0 #818cf8; }
 .nav .nav-item { opacity: .6; cursor: default; }
 .nav .soon { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: #ffffff12; color: #94a3b8; }
-.side .ver { margin-top: auto; padding: 14px 10px 0; font-size: 12px; color: #6b7891; border-top: 1px solid #ffffff12; }
+.side .ver { flex: none; margin-top: auto; padding: 14px 10px 0; font-size: 12px; color: #6b7891; border-top: 1px solid #ffffff12; }
 .main { min-width: 0; display: flex; flex-direction: column; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .top h1 { font-size: 20px; }
@@ -131,7 +134,7 @@ td { padding: 11px 20px; border-bottom: 1px solid var(--line); vertical-align: t
 @media (max-width: 960px) {
   .auth { grid-template-columns: 1fr; } .auth-brand { display: none; }
   .shell { grid-template-columns: 1fr; } .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .nav { display: flex; flex-wrap: wrap; } .nav-label, .side .ver, .nav .soon { display: none; }
+  .nav { display: flex; flex-wrap: wrap; overflow: visible; flex: none; } .nav-label, .side .ver, .nav .soon { display: none; }
   .two { grid-template-columns: 1fr; } .content, .top { padding-left: 18px; padding-right: 18px; }
   .who .meta { display: none; }
 }

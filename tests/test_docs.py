@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -47,8 +48,16 @@ DELIVERABLES = {
         "traceability.md",
     ],
     "D2 architecture package": ["architecture.md"],
-    "D4 repository": ["engineering.md", "third-party-licences.md"],
-    "D6 test package": ["test-plan.md", "uat.md", "performance-results.md", "security-checks.md", "defect-log.md"],
+    "D4 repository": ["engineering.md", "third-party-licences.md", "project-management.md", "decisions.md"],
+    "D6 test package": [
+        "test-plan.md",
+        "uat.md",
+        "uat-signoff.md",
+        "uat-signoff-development.md",
+        "performance-results.md",
+        "security-checks.md",
+        "defect-log.md",
+    ],
     "D7 deployment package": ["deployment.md", "backup-restore.md"],
     "D8 operational documentation": [
         "administration.md",
@@ -76,15 +85,24 @@ def test_every_mandatory_deliverable_has_its_document():
             assert name in index, f"docs/index.md does not list {name}"
 
 
-def test_the_sbom_lists_every_pinned_package():
+@pytest.mark.req("NFR04")
+def test_the_sbom_and_the_licence_inventory_list_every_pinned_package():
     proc = subprocess.run(  # noqa: S603
         [sys.executable, str(ROOT / "scripts" / "sbom_lock.py"), "--check"], capture_output=True, text=True, check=False
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_every_package_in_the_lock_file_carries_hashes():
-    text = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+@pytest.mark.req("NFR04")
+def test_the_build_backend_is_pinned():
+    dev = (ROOT / "requirements-dev.lock").read_text(encoding="utf-8")
+    assert "\nsetuptools==" in dev, "pyproject.toml [build-system] needs setuptools: pin it in requirements-dev.lock"
+
+
+@pytest.mark.req("NFR04")
+@pytest.mark.parametrize("lock", ["requirements.lock", "requirements-dev.lock"])
+def test_every_package_in_the_lock_files_carries_hashes(lock):
+    text = (ROOT / lock).read_text(encoding="utf-8")
     blocks = [b for b in text.split("\n") if b and not b.startswith((" ", "#"))]
     assert blocks and all(" \\" in b for b in blocks), (
         "a pin has no --hash lines: regenerate with pip-compile --generate-hashes"
@@ -100,3 +118,19 @@ def test_the_sample_reports_are_current():
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+@pytest.mark.req("NFR09")
+def test_the_stage_timeline_covers_d0_to_d10():
+    text = (ROOT / "docs" / "project-management.md").read_text(encoding="utf-8")
+    days = re.findall(r"^\| (D\d+(?: to D\d+)?) \|", text, flags=re.M)
+    assert days[0] == "D0" and days[-1] == "D10", days
+
+
+@pytest.mark.req("NFR04")
+def test_redistribution_and_offline_use_notes_exist():
+    text = (ROOT / "docs" / "deployment.md").read_text(encoding="utf-8")
+    assert "## Redistribution and offline use" in text
+    section = text.split("## Redistribution and offline use", 1)[1].split("\n## ", 1)[0]
+    for must in ("redistributed", "Offline use", "Apache-2.0", "not redistributed"):
+        assert must in section, must

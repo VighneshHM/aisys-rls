@@ -16,7 +16,7 @@ was on 2026-10-09. Nothing was penetration tested or run against real hardware, 
 | R-06 | SQLite write contention under gate or inventory bursts | technical | Low | Medium | WAL and busy timeout; the event queue serialises writes; a PostgreSQL path is documented (see R-19) | VighneshHM | Mitigated |
 | R-07 | Card cloning or credential theft: the mock reader presents only a UID, so a copied staff card would log in | security | Medium | High | Provider boundary carries a challenge-response `proof` field; lockout after repeated failures; every sign-in audited; deactivating a person ends sessions at once. A real challenge-response driver is not built | VighneshHM; Library IT for real cards | Open |
 | R-08 | TLS misconfiguration: HTTP exposed on the LAN, weak or expired certificate, proxy mistakes | security | Medium | High | The app refuses half a TLS pair; its own HTTPS is tested with a real handshake; secure cookies and HSTS in production; binds to the LAN address only with TLS on. The reverse-proxy examples are documented, not run | Library IT | Open |
-| R-09 | Supply chain: a vulnerable or tampered dependency or GitHub Action | security | Medium | High | Exact pins in `pyproject.toml` and `requirements.lock`; `pip-audit` fails the build (it forced `cryptography` 50.0.2, D-021); Dependabot weekly; SBOM and licence inventory per package | VighneshHM | Mitigated |
+| R-09 | Supply chain: a vulnerable or tampered dependency or GitHub Action | security | Medium | High | Exact pins with hashes in `pyproject.toml`, `requirements.lock` and `requirements-dev.lock`; `pip-audit` fails the build (it forced `cryptography` 50.0.2, D-021); Dependabot weekly; SBOM and licence inventory per package | VighneshHM | Mitigated |
 | R-10 | The Ed25519 verifier in `aisys_lifecycle/ed25519.py` is my own code, so a flaw could accept a forged package | security | Low | High | Tested against the RFC 8032 vectors and against a real library; installer pins its key; checksum per file, no unlisted file allowed. No external code review | VighneshHM | Accepted |
 | R-11 | Backup theft: backups and the data file hold member names and contact details in clear text | security | Medium | High | Synthetic data only here. Backups stay on the server; access is by operating-system permissions. Encryption at rest and an off-machine copy are not built (`docs/remaining-work.md`) | Library IT | Open |
 | R-12 | Insider misuse: a staff user reads or changes more than their job needs | security | Medium | Medium | Four roles with least privilege; every route declares its permission; 403s audited; append-only audit log by database trigger; card numbers masked in logs | VighneshHM | Mitigated |
@@ -33,14 +33,16 @@ was on 2026-10-09. Nothing was penetration tested or run against real hardware, 
 | R-23 | Dependency: FastAPI (0.142.2) breaks or is vulnerable | dependency | Medium | Medium | Pinned exactly; `pip-audit` on every run; Dependabot; the test suite runs before any upgrade merges | VighneshHM | Mitigated |
 | R-24 | Dependency: SQLAlchemy (2.1.3) behaviour change or vulnerability | dependency | Low | High | Pinned; audit; tests include migrations and database invariants | VighneshHM | Mitigated |
 | R-25 | Dependency: Alembic (1.20.0) migration failure on upgrade | dependency | Low | High | Pinned; updates rehearsed on a copy of the data; backup before migrating; restore on failure | VighneshHM | Mitigated |
-| R-26 | Dependency: `cryptography` (50.0.2) vulnerability (seven were found in 48.0.0, D-021) | dependency | Medium | Medium | Pinned at the fixed version; only in the `dev` extra (tests and signing), not shipped to the site; `pip-audit` | VighneshHM | Mitigated |
+| R-26 | Dependency: `cryptography` (50.0.2) vulnerability (seven were found in 48.0.0, D-021) | dependency | Medium | Medium | Pinned at the fixed version; only in the `dev` extra and `requirements-dev.lock` (tests and signing), not shipped to the site; `pip-audit` | VighneshHM | Mitigated |
 | R-27 | Dependency: openpyxl (3.1.5) or the spreadsheet parser mishandles a hostile file | dependency | Low | Medium | Pinned; imported rows are validated and staged before any record is created; CSV formulas neutralised on export | VighneshHM | Mitigated |
-| R-28 | Dependency: uvicorn (0.54.0) or other runtime packages (Jinja2, python-multipart) vulnerable | dependency | Medium | Medium | Pinned; `pip-audit`; Dependabot; all 23 packages in the licence inventory | VighneshHM | Mitigated |
+| R-28 | Dependency: uvicorn (0.54.0) or other runtime packages (Jinja2, python-multipart) vulnerable | dependency | Medium | Medium | Pinned; `pip-audit`; Dependabot; all 43 pinned packages in the licence inventory | VighneshHM | Mitigated |
 
 ## Dependencies
 
 Python 3.12+, FastAPI, Uvicorn, SQLAlchemy, Alembic, Jinja2, python-multipart, openpyxl are pinned to exact versions in
-`pyproject.toml`; every package including transitive ones is pinned in `requirements.lock`. Licences: `docs/third-party-licences.md`.
+`pyproject.toml`; every package including transitive ones is pinned with hashes in `requirements.lock` (runtime) or
+`requirements-dev.lock` (development and build tools). Licences: `docs/third-party-licences.md`; redistribution and
+offline-use notes: `docs/deployment.md`.
 
 ## Excluded work
 

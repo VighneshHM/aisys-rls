@@ -102,6 +102,7 @@ def scan(
                     member_id=member.id,
                     loan_id=loan.id,
                     due_on=str(day),
+                    next_attempt_at=now,  # due from the scan's own clock, not the wall clock (D-051)
                 )
             )
         try:
