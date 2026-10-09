@@ -22,17 +22,21 @@ How the work is controlled, so a reviewer can see the practice and not only the 
 | Gate | Tool | Fails the build when |
 |---|---|---|
 | Formatting | `ruff format --check` | any file is not formatted |
+| Type checking | `mypy` (configured in `pyproject.toml`, covers `src/`) | any type error |
 | Lint and static analysis | `ruff check` with `E F I B UP S` (the `S` rules are the Bandit security checks) | any finding (tests may use `assert`) |
-| Automated tests | `pytest -q` on Windows (`windows-latest` with Python 3.12 and 3.13, and `windows-2022` with 3.12, the Server 2022 image) | any test fails |
+| Automated tests | `pytest -q -n auto` (parallel workers; each test copies a database that was migrated once, which cut a 25-30 minute CI run) on Windows (`windows-latest` with Python 3.12 and 3.13, and `windows-2022` with 3.12, the Server 2022 image) | any test fails |
+| Real offline lifecycle | `scripts/lifecycle_demo.py` on `windows-latest`: a real install from signed package, refusals, signed update, rollback with the data proven | any step fails |
 | Dependency scan | `pip-audit -r requirements.lock` | any known vulnerability in a pinned dependency (it caught and forced the upgrade of `cryptography`) |
 | Dependency updates | Dependabot, weekly, for pip and for the actions | opens pull requests; they go through the same gates |
+
+Every job installs from `requirements.lock` with `--require-hashes`, so CI runs the exact versions that were audited.
 
 Concurrency is set so a newer push cancels the older run of the same branch; the test job has a 30-minute limit.
 
 ## Dependencies and licences
 
 * Runtime dependencies are pinned in `pyproject.toml` (exact versions) and `requirements.lock` (every package, including the
-  transitive ones). Development tools (`pytest`, `httpx`, `ruff`, `cryptography`) are only in the `dev` extra.
+  transitive ones). Development tools (`pytest`, `pytest-xdist`, `httpx`, `ruff`, `mypy`, `cryptography`) are only in the `dev` extra.
 * `docs/third-party-licences.md` is the licence inventory (23 packages, none copyleft); every update package also carries a
   CycloneDX `SBOM.json` and `LICENSES.md` generated from the wheels it actually ships, with copyleft or unknown licences flagged.
 * Offline installation needs nothing from the internet: the package contains every wheel (`docs/deployment.md`).

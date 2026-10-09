@@ -59,7 +59,7 @@ def _interval(value) -> float:
 
 def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     """Load settings. Precedence: env vars > config file > built-in defaults."""
-    cfg_path = Path(path or os.environ.get("AISYS_CONFIG", DEFAULT_CONFIG_PATH))
+    cfg_path = Path(path) if path else Path(os.environ.get("AISYS_CONFIG", str(DEFAULT_CONFIG_PATH)))
     raw: dict = {}
     if cfg_path.is_file():
         with cfg_path.open("rb") as fh:

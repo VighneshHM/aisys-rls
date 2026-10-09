@@ -105,14 +105,14 @@ def dashboard_charts(db: Session, config: CirculationConfig, days: int = 14) -> 
     now = datetime.now(UTC)
     lo = datetime(now.year, now.month, now.day, tzinfo=UTC) - timedelta(days=days - 1)
     hi = datetime(now.year, now.month, now.day, tzinfo=UTC) + timedelta(days=1)
-    tx = dict(
+    tx: dict[str, int] = dict(
         db.execute(
             select(func.date(CircEvent.ts), func.count())
             .where(CircEvent.ts >= lo, CircEvent.ts < hi, CircEvent.outcome == "ok")
             .group_by(func.date(CircEvent.ts))
         ).all()
     )
-    alarms = dict(
+    alarms: dict[str, int] = dict(
         db.execute(
             select(func.date(GateEvent.ts), func.count())
             .where(GateEvent.ts >= lo, GateEvent.ts < hi, GateEvent.alarm, GateEvent.duplicate_of.is_(None))

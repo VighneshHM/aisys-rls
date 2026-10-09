@@ -54,6 +54,7 @@ def seed_demo(settings: Settings) -> None:
             if db.scalar(select(User).where(User.username == username)):
                 continue
             role = db.scalar(select(Role).where(Role.name == role_name))
+            assert role is not None  # sync_rbac has just created every role
             user = User(
                 username=username,
                 display_name=name,
@@ -82,15 +83,17 @@ def seed_demo(settings: Settings) -> None:
             if owner and not owner.email and not owner.phone:  # never overwrite what staff entered
                 owner.email, owner.phone = email, phone
         for username, channels in DEMO_ALERTS.items():
-            user = db.scalar(select(User).where(User.username == username))
+            alert_user = db.scalar(select(User).where(User.username == username))
+            if alert_user is None:
+                continue
             for channel, address in channels:
                 have = db.scalar(
                     select(NotificationPref).where(
-                        NotificationPref.user_id == user.id, NotificationPref.channel == channel
+                        NotificationPref.user_id == alert_user.id, NotificationPref.channel == channel
                     )
                 )
-                if user and not have:
-                    db.add(NotificationPref(user_id=user.id, channel=channel, address=address))
+                if not have:
+                    db.add(NotificationPref(user_id=alert_user.id, channel=channel, address=address))
         audit.record(db, actor="system", action="seed.demo", detail={"users": len(DEMO_USERS)})
         db.commit()
 

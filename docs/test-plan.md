@@ -12,7 +12,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 
 | Type (NFR05) | What is tested | How | Evidence |
 |---|---|---|---|
-| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 22 test files; list below |
+| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 23 test files; list below |
 | Integration | routes + services + database + mock devices together; the connector with retries and timeouts; delivery through provider adapters; a real HTTPS server; a real background loop; real subprocess installs and updates | pytest (some tests start a real server, a real `uvicorn`, or a real virtual environment) | `test_gate`, `test_circulation`, `test_security_ops`, `test_lifecycle`, `test_reminders` |
 | Migration | 200- and 20,000-row files, duplicates, invalid rows, reconciliation, rollback, restore after a failed import | pytest with generated synthetic files | `test_migration`, `test_backup` |
 | Performance | search, reports, import, backup, restore, reminders and concurrent desks with 20,000 items | `scripts/perf_report.py` | `docs/performance-results.md` |
@@ -62,10 +62,11 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
 | `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
+| `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
 | `test_security_ops.py`, `test_config.py` | 11, 8 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
-| `test_ui_assets.py`, `test_docs.py` | 31, 4 | page assets and scripts, generated documents, deliverables present |
+| `test_ui_assets.py`, `test_docs.py` | 31, 7 | page assets and scripts, generated documents, SBOM, hashed lock file, sample reports, deliverables present |
 
-Total: 543 test cases (some are parametrised).
+Total: 584 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

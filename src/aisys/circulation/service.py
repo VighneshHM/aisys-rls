@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
+from typing import Any, NoReturn, cast
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -28,7 +29,7 @@ from aisys.circulation.connector import (
     MemberView,
 )
 from aisys.models import Card, CircEvent, Item, Loan, Member, Notification, RfidTag, utcnow
-from aisys.rfid.devices import DeviceError, DeviceUnavailable
+from aisys.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
 from aisys.rfid.events import normalize_tag_uid
 from aisys.rfid.registry import DeviceRegistry
 from aisys.timeutil import aware, iso
@@ -87,8 +88,9 @@ def open_loan(db: Session, item_id: int) -> Loan | None:
 
 
 def open_count(db: Session, member_id: int) -> int:
-    return db.scalar(
-        select(func.count()).select_from(Loan).where(Loan.member_id == member_id, Loan.returned_at.is_(None))
+    return (
+        db.scalar(select(func.count()).select_from(Loan).where(Loan.member_id == member_id, Loan.returned_at.is_(None)))
+        or 0
     )
 
 
@@ -211,7 +213,7 @@ def _refuse(
     loan: Loan | None,
     actor: str,
     outcome: str = "refused",
-) -> None:
+) -> NoReturn:
     """Record the attempt that did not go ahead, then raise. Nothing else in the database changes."""
     db.rollback()
     db.add(
@@ -264,7 +266,7 @@ def _security(db: Session, devices: DeviceRegistry, item: Item, *, armed: bool, 
     tag = db.scalar(select(RfidTag).where(RfidTag.item_id == item.id, RfidTag.status == "active"))
     if tag is None:
         return {"status": "no_tag", "ok": True, "message": "This item has no active tag, so there was no security bit."}
-    reader = devices.get(reader_id)
+    reader = cast("StaffReader | None", devices.get(reader_id))
     todo = f"Have the tag {verb} before the item passes the gate."
     if reader is None:
         return {"status": "no_reader", "ok": False, "message": f"Reader '{reader_id}' is not configured. {todo}"}
@@ -285,7 +287,7 @@ def _security(db: Session, devices: DeviceRegistry, item: Item, *, armed: bool, 
 
 
 def _beep(devices: DeviceRegistry, reader_id: str, pattern: str) -> None:
-    reader = devices.get(reader_id)
+    reader = cast("StaffReader | None", devices.get(reader_id))
     if reader is not None:
         try:
             reader.indicate(pattern)
@@ -373,7 +375,7 @@ def checkout(
 ) -> dict:
     member, item = find_member(db, member_no), resolve_item(db, item_ref)
     loan, txn_id, now = open_loan(db, item.id), _txn_id(), utcnow()
-    common = dict(
+    common: dict[str, Any] = dict(
         action="checkout", txn_id=txn_id, protocol=connector.protocol, member=member, item=item, loan=loan, actor=actor
     )
     code, message = _local_refusal(member, item, loan, config)
@@ -419,7 +421,7 @@ def renew(
     item = resolve_item(db, item_ref)
     loan, txn_id, now = open_loan(db, item.id), _txn_id(), utcnow()
     member = loan.member if loan else None
-    common = dict(
+    common: dict[str, Any] = dict(
         action="renew", txn_id=txn_id, protocol=connector.protocol, member=member, item=item, loan=loan, actor=actor
     )
     if loan is None:
@@ -431,6 +433,7 @@ def renew(
             source="local",
             **common,
         )
+    member = loan.member
     code, message = _local_refusal(
         member, item, None, config
     )  # blocked member / fines; the item IS on loan, which is fine
@@ -443,6 +446,7 @@ def renew(
     old_due = loan.due_at
     # renewing restarts the clock, so any fine earned so far is charged now (otherwise renewing would erase it)
     fine = fines.charge_overdue(db, loan, now, config, actor)
+    assert result.due_at is not None  # an accepted renewal always carries the new due date
     loan.due_at, loan.renewals = result.due_at, loan.renewals + 1
     out = _finish(
         db,
@@ -475,7 +479,7 @@ def checkin(
     item = resolve_item(db, item_ref)
     loan, txn_id, now = open_loan(db, item.id), _txn_id(), utcnow()
     member = loan.member if loan else None
-    common = dict(
+    common: dict[str, Any] = dict(
         action="checkin", txn_id=txn_id, protocol=connector.protocol, member=member, item=item, loan=loan, actor=actor
     )
     if loan is None:
@@ -487,6 +491,7 @@ def checkin(
             source="local",
             **common,
         )
+    member = loan.member
     result = connector.checkin(txn_id, _item_view(item, loan), now=now)
     if not result.ok:
         outcome = "failed" if result.code == "ilms_unavailable" else "refused"

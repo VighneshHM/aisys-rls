@@ -6,7 +6,7 @@ http://127.0.0.1:8000. Demo identities (all synthetic): staff cards `STAFFADMIN0
 `STAFFCLERK01` (desk clerk), `STAFFAUDIT01` (auditor); demo patron `PATRON000001` (Priya Nair, M0001).
 
 **Who ran them:** the development team (the developer, with the AI assistant driving the in-app browser and reading what the
-page showed), not library staff. That is the stated limit of this evidence: a site acceptance test with real users and devices is
+page showed), not library staff. That is the stated limit of this evidence: a site acceptance test with real users and devices (blank form: `docs/uat-signoff.md`) is
 the first production task (`docs/remaining-work.md`). Each scenario was run in the browser when its feature was built, and the
 whole set of automated checks that mirror them (`docs/traceability.md`) passes on the final build.
 

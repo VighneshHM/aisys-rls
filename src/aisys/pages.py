@@ -42,6 +42,7 @@ NAV = [
     ("audit", "Audit log", "list", "/audit", "audit.read", True),
     ("backups", "Backups", "shield", "/backups", "admin.config", True),
     ("updates", "Updates", "server", "/updates", "admin.config", True),
+    ("settings", "Settings", "dash", "/settings", "admin.config", True),
     ("admin", "Administration", "users", "/admin", "admin.users", True),
 ]
 
@@ -385,6 +386,15 @@ def admin_page(
 ):
     me = principal.user.username if principal else ""
     return _gated_page(request, settings, principal, "admin.users", "admin.html", "admin", me=me)
+
+
+@router.get("/settings", response_class=HTMLResponse)
+def settings_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "admin.config", "settings.html", "settings")
 
 
 @router.get("/updates", response_class=HTMLResponse)

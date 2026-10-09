@@ -19,13 +19,14 @@ import csv
 import io
 import logging
 from collections import Counter
+from typing import cast
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from aisys import audit
 from aisys.models import InventoryScan, InventorySession, Item, RfidTag, utcnow
-from aisys.rfid.devices import DeviceError, DeviceUnavailable
+from aisys.rfid.devices import DeviceError, DeviceUnavailable, Handheld
 from aisys.rfid.registry import DeviceRegistry
 from aisys.rfid.tagging import state_of, tag_links
 from aisys.shelves import service as shelves
@@ -135,11 +136,11 @@ def scan(db: Session, registry: DeviceRegistry, session_id: int, *, actor: str) 
     session = get_session(db, session_id)
     if session.status != "open":
         raise InventoryError(409, "This inventory session is closed")
-    handheld = registry.get(session.handheld_id, "handheld")
+    handheld = cast("Handheld | None", registry.get(session.handheld_id, "handheld"))
     if handheld is None:
         raise InventoryError(404, f"Handheld reader '{session.handheld_id}' is not configured")
     try:
-        observed = handheld.scan()  # type: ignore[union-attr]
+        observed = handheld.scan()
     except DeviceUnavailable as exc:
         raise InventoryError(503, f"The handheld '{session.handheld_id}' is offline") from exc
     except DeviceError as exc:
@@ -172,7 +173,7 @@ def scan(db: Session, registry: DeviceRegistry, session_id: int, *, actor: str) 
                 }
             )
             try:  # the confirmation a person would hear and see; a dead buzzer must never lose the scan
-                handheld.indicate(SIGNAL[result])  # type: ignore[union-attr]
+                handheld.indicate(SIGNAL[result])
             except DeviceError:
                 log.warning("could not signal '%s' on %s", SIGNAL[result], session.handheld_id)
     session.sweeps += 1
@@ -212,6 +213,7 @@ def _shelf_order(db: Session, session: InventorySession) -> dict:
     books = []
     for item_id in ids:
         item = db.get(Item, item_id)
+        assert item is not None  # scans only ever reference existing items
         books.append({"accession_no": item.accession_no, "title": item.bib.title, "call_number": item.call_number})
     return {"checked": checked or 0, "out_of_order": books, "in_order": not books}
 
@@ -228,7 +230,7 @@ def report(db: Session, session_id: int) -> dict:
         .where(Item.location == session.location, Item.status == "available")
         .order_by(Item.accession_no)
     ).all()
-    items = {s.item_id: db.get(Item, s.item_id) for s in scans if s.item_id is not None}
+    items: dict[int | None, Item | None] = {s.item_id: db.get(Item, s.item_id) for s in scans if s.item_id is not None}
     by_result: dict[str, list[dict]] = {r: [] for r in RESULTS}
     for s in scans:
         item = items.get(s.item_id)

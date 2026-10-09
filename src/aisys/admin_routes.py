@@ -153,7 +153,8 @@ def people(_: Principal = CanAdmin, db: Session = Depends(get_db)):
     now = datetime.now(UTC)
     cards: dict[int, list[Card]] = {}
     for c in db.scalars(select(Card).where(Card.kind == "staff").order_by(Card.id)):
-        cards.setdefault(c.user_id, []).append(c)
+        if c.user_id is not None:
+            cards.setdefault(c.user_id, []).append(c)
     users = db.scalars(select(User).order_by(User.username))
     roles = db.scalars(select(Role).order_by(Role.name))
     return {
@@ -173,11 +174,14 @@ class CardPatch(BaseModel):
 
 
 def _active_admins(db: Session, excluding: int) -> int:
-    return db.scalar(
-        select(func.count())
-        .select_from(User)
-        .join(Role, User.role_id == Role.id)
-        .where(Role.name == "admin", User.active.is_(True), User.id != excluding)
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(User)
+            .join(Role, User.role_id == Role.id)
+            .where(Role.name == "admin", User.active.is_(True), User.id != excluding)
+        )
+        or 0
     )
 
 

@@ -54,6 +54,9 @@ What was checked, how, and what is left. Each row can be re-run.
 * Update packages are signed (Ed25519) with a checksum for every file, no unlisted file allowed; a tampered, unsigned,
   foreign-signed, older or wrongly-licensed package is refused before anything is changed (`test_lifecycle`).
 * Every package carries an SBOM and a licence inventory (`docs/third-party-licences.md`).
+* `requirements.lock` pins every package (runtime and development tools) with sha256 hashes; CI installs from it with
+  `--require-hashes`, so a changed or substituted package fails the install. `docs/sbom.cdx.json` lists all of them
+  (`scripts/sbom_lock.py`, checked by `test_docs`). `pip-audit` scans the same file.
 
 ## Concurrency and failure
 

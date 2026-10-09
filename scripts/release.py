@@ -127,7 +127,11 @@ def build(
         work = _prepare_source(source, version, tmp)
         wheels = tmp / "wheels"
         wheels.mkdir()
-        constraint = work / "requirements.lock"
+        # pip does not accept hashes in a constraints file, so pass the same pins without them
+        pins = [ln.rstrip(" \\") for ln in (work / "requirements.lock").read_text(encoding="utf-8").splitlines()]
+        constraint = tmp / "constraints.txt"
+        pinned = [ln for ln in pins if ln and not ln.startswith((" ", "#"))]
+        constraint.write_text("\n".join(pinned) + "\n", encoding="utf-8")
         cmd = [
             sys.executable,
             "-m",

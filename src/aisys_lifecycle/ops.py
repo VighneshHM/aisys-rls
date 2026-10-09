@@ -33,6 +33,7 @@ import urllib.request
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import IO
 
 from aisys_lifecycle import bundle as bundles
 from aisys_lifecycle import licence
@@ -175,13 +176,13 @@ class RunLock:
 
     def __init__(self, path: Path):
         self.path = path
-        self._fh = None
+        self._fh: IO[bytes] | None = None
 
     def acquire(self) -> bool:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         fh = self.path.open("a+b")
         try:
-            if os.name == "nt":
+            if sys.platform == "win32":
                 import msvcrt
 
                 fh.seek(0)
@@ -200,7 +201,7 @@ class RunLock:
         if self._fh is None:
             return
         try:
-            if os.name == "nt":
+            if sys.platform == "win32":
                 import msvcrt
 
                 self._fh.seek(0)

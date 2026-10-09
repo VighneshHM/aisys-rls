@@ -117,6 +117,12 @@ Details: `docs/administration.md`.
 * **Acquisitions**, **Serials** and **Labels** are in the menu for librarians; **Print the card** is under a member on Circulation.
 * `python -m aisys.cli doctor` checks the computer and configuration. `python scripts/perf_report.py` measures performance at 20,000 items.
 
+## Settings (FR11)
+
+Administrators open **Settings** to change the library's rules in the browser: loan period, fines, reminders, sign-in limits and the
+public catalogue switch. Changes apply at once, are audited, and **Use file value** goes back to the configuration file. Devices,
+drivers and certificates stay in `config/config.toml` (see `docs/administration.md`).
+
 ## More documentation
 
 `docs/index.md` (every document against the SOP deliverable it satisfies), `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),

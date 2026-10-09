@@ -97,7 +97,7 @@ src/aisys/
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              22 test files, 543 test cases
+tests/              23 test files, 584 test cases
 scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
@@ -124,7 +124,7 @@ flowchart LR
 `migration/service.py` stages (`MigrationBatch`, `MigrationRow`), `validation.py` produces per-row errors
 (`{field, code, message}`), duplicates use `BibRecord.dedupe_key` and `Item.accession_no` uniqueness. Commit only inserts,
 never updates existing items, and records `batch_id` on every row it creates so a batch can be rolled back exactly.
-A 20,000-row file validates in about 6.6 s and commits in about 5.1 s on the development machine.
+A 20,000-row file validates in about 13.1 s and commits in about 7.4 s on the development machine.
 
 ### 4.3 Tagging (AC02)
 `POST /api/rfid/tagging`: the device write happens first (the reader encodes the tag), then the database insert; if the
@@ -282,7 +282,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **543 automated test cases, all passing** (about 7 minutes), `ruff` format and lint clean (including security rules), CI on
+- **584 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag

@@ -7,6 +7,7 @@ A patron card only identifies a member; it never gives a login. Issuing a new ca
 from __future__ import annotations
 
 import re
+from typing import cast
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -15,7 +16,7 @@ from aisys import audit
 from aisys.circulation.service import CircError, find_member
 from aisys.models import Card, Member
 from aisys.notifications.providers import valid_address
-from aisys.rfid.devices import CardJob, DeviceError, DeviceUnavailable
+from aisys.rfid.devices import CardJob, CardPrinter, DeviceError, DeviceUnavailable
 from aisys.rfid.registry import DeviceRegistry
 
 CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
@@ -152,13 +153,14 @@ def search(db: Session, q: str, limit: int = 10) -> list[dict]:
     if not q:
         return []
     like = f"%{q}%"
-    rows = db.scalars(
-        select(Member)
-        .where(or_(func.lower(Member.name).like(like), func.lower(Member.member_no).like(like)))
-        .order_by(Member.name)
-        .limit(limit)
+    rows = list(
+        db.scalars(
+            select(Member)
+            .where(or_(func.lower(Member.name).like(like), func.lower(Member.member_no).like(like)))
+            .order_by(Member.name)
+            .limit(limit)
+        )
     )
-    rows = list(rows)
     cards = dict(
         db.execute(
             select(Card.member_ref, Card.uid).where(
@@ -206,7 +208,7 @@ def personalise_card(
     """Print and encode the member's current card on the card printer. Nothing changes in the catalogue or the loans."""
     member = find_member(db, member_no)
     card = _active_card(db, member)
-    printer = next((d for d in devices.all() if d.kind == "card_printer"), None)
+    printer = cast("CardPrinter | None", next((d for d in devices.all() if d.kind == "card_printer"), None))
     if printer is None:
         raise CircError(503, "no_printer", "No card printer is configured")
     try:

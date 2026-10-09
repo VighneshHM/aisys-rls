@@ -17,7 +17,7 @@ a live site, and what the prototype deliberately does not do. Nothing here block
 
 | Area | Requirement | What is missing |
 |---|---|---|
-| Acceptance by real users | NFR05 | A site acceptance test with library staff and real devices (the UAT in `docs/uat.md` was run by the development team) |
+| Acceptance by real users | NFR05 | A site acceptance test with library staff and real devices (the UAT in `docs/uat.md` was run by the development team; the blank sign-off form for library staff is `docs/uat-signoff.md`) |
 | Load and endurance | NFR05 | A soak test of hours or days on a server-class machine; the measured figures are one process on one machine (`docs/performance-results.md`) |
 | TLS in front | NFR02 | The application's own HTTPS is tested; the proxy and service-wrapper examples in `docs/deployment.md` are documented, not run |
 | Platforms | NFR03 | A real Windows Server 2022 installation (CI runs on the Server 2022 image); Linux unverified |

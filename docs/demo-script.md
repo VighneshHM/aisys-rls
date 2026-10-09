@@ -33,7 +33,7 @@ desk clerk `STAFFCLERK01`, auditor `STAFFAUDIT01`).
 
 Extras if there is time (each 2 minutes): the public catalogue `/opac` (signed out, search, **Show the shelf**); **Labels** (spine and
 barcode); **Acquisitions** (order, place, book in); **Serials** (late issue, claim); **Print the card**; patron reminders
-(**Due tomorrow** beside a loan, watch the message appear); **Administration** (deactivate someone, try to deactivate yourself).
+(**Due tomorrow** beside a loan, watch the message appear); **Administration** (deactivate someone, try to deactivate yourself); **Settings** (as administrator, change the loan period or fine per day, see it apply at once, find the `admin.settings.update` line in the **Audit log**, then **Use file value**).
 
 ## If something goes wrong on the day
 
@@ -46,6 +46,8 @@ barcode); **Acquisitions** (order, place, book in); **Serials** (late issue, cla
 
 ## Presentation outline (12 slides, 15 minutes)
 
+The deck is `docs/presentation.html`: one self-contained file (no network), open it in a browser; arrow keys or a click move between slides, and each slide has speaker notes. It follows this outline.
+
 1. **The problem and the scope**: add RFID to an existing library system without touching its records; what is mocked and why.
 2. **Architecture**: the layered diagram (`docs/architecture.md` section 2) and the interface/mocks rule.
 3. **What was built**: the ten scenarios as a checklist, with the requirement coverage (30 of 31 requirements done; FR03 is partial because no wire protocol is built).
@@ -54,7 +56,7 @@ barcode); **Acquisitions** (order, place, book in); **Serials** (late issue, cla
 6. **Security**: roles and permissions, signed packages, TLS, masked logs, hostile-input tests, dependency audit.
 7. **Offline lifecycle**: install, update with a rehearsal, rollback; the SBOM and licences.
 8. **Search and shelves**: full-text index kept current by triggers; the public catalogue; the virtual bookshelf.
-9. **Testing**: 540 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
+9. **Testing**: 584 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
 10. **What the testing found**: examples (the search that took 1.3 s, duplicate delivery, the restore race) and how they were fixed.
 11. **Known limits and production backlog**: `docs/remaining-work.md` (no real hardware or wire protocol, SQLite only, no pen test).
 12. **Questions and the live demonstration.**
