@@ -72,7 +72,8 @@ retries = 2                 # attempts after the first, made by the resilience w
 backoff_s = 0.1             # pause between attempts
 ```
 
-`protocol` (the wording the mock uses) has no effect with `driver = "sip2"`.
+There is no `protocol` setting: SIP2 is the only protocol (DR-13). An older file that still has `protocol = "ncip"` stops the
+application at start with a plain message; delete the line (D-059).
 
 The login **password is never read from the file** (a password written there is ignored). Set it in the environment of the
 application:
