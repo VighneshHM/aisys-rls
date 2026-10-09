@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, exists, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased, contains_eager
 
@@ -211,7 +211,7 @@ def search(
         stmt = stmt.where(
             or_(
                 ranked.c.id.is_not(None),
-                exists().where(any_link.item_id == Item.id, any_link.tag_uid == uid) if uid else False,
+                exists().where(any_link.item_id == Item.id, any_link.tag_uid == uid) if uid else false(),
             )
         )
     elif q:
@@ -223,7 +223,7 @@ def search(
                 func.lower(Item.accession_no).like(like, escape="\\"),
                 func.lower(func.coalesce(Item.barcode, "")).like(like, escape="\\"),
                 func.coalesce(BibRecord.isbn, "").like(_like(q.replace("-", "")), escape="\\"),
-                exists().where(any_link.item_id == Item.id, any_link.tag_uid == uid) if uid else False,
+                exists().where(any_link.item_id == Item.id, any_link.tag_uid == uid) if uid else false(),
             )
         )
     if tagged is True:
@@ -239,7 +239,7 @@ def search(
         else [BibRecord.title, Item.accession_no]
     )
     rows = db.execute(stmt.order_by(*order).limit(min(max(limit, 1), 200)).offset(max(offset, 0)))
-    found = [(item, tag) for item, tag in rows.unique()]
+    found: list[tuple[Item, RfidTag | None]] = [(item, tag) for item, tag in rows.unique()]
     matched: dict[int, str] = {}
     if uid and found:
         links = db.execute(

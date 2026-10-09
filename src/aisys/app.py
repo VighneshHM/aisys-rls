@@ -10,9 +10,10 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
 from sqlalchemy.exc import StatementError
 
-from aisys import __version__, migrate, pages
+from aisys import __version__, migrate, pages, settings_admin
 from aisys.acquisitions_routes import router as acquisitions_router
 from aisys.acquisitions_routes import serials as serials_router
 from aisys.admin_routes import router as admin_router
@@ -32,6 +33,7 @@ from aisys.labels_routes import router as labels_router
 from aisys.lifecycle_routes import router as updates_router
 from aisys.logging_setup import configure_logging
 from aisys.migration_routes import router as migration_router
+from aisys.models import AppSetting
 from aisys.notifications import runner
 from aisys.notifications.providers import build_providers
 from aisys.opac_routes import router as opac_router
@@ -39,6 +41,7 @@ from aisys.reports_routes import router as reports_router
 from aisys.rfid.registry import DeviceRegistry
 from aisys.rfid_routes import router as rfid_router
 from aisys.routes import router
+from aisys.settings_routes import router as settings_router
 from aisys.shelves_routes import router as shelves_router
 
 log = logging.getLogger("aisys")
@@ -68,6 +71,9 @@ def create_app(
     factory = make_sessionmaker(engine)
     with factory() as db:
         sync_rbac(db)
+        saved = settings_admin.overrides(db.scalars(select(AppSetting)))
+    base_settings = settings  # what the TOML file and environment say
+    settings = settings_admin.apply(settings, saved)  # then the rules changed on the Settings page
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -78,8 +84,8 @@ def create_app(
                 lambda: runner.run_once(
                     app.state.session_factory,
                     app.state.providers,
-                    settings.notifications,
-                    library_name=settings.app_name,
+                    app.state.settings.notifications,
+                    library_name=app.state.settings.app_name,
                 ),
                 settings.notifications.auto_dispatch_s,
                 paused=app.state.maintenance.is_set,
@@ -93,6 +99,7 @@ def create_app(
 
     app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
     app.state.settings = settings
+    app.state.base_settings = base_settings
     app.state.maintenance = threading.Event()  # set while a restore runs: everything else waits (see below)
     app.state.engine = engine
     app.state.session_factory = factory
@@ -112,6 +119,7 @@ def create_app(
     app.include_router(reports_router)
     app.include_router(backup_router)
     app.include_router(admin_router)
+    app.include_router(settings_router)
     app.include_router(opac_router)
     app.include_router(acquisitions_router)
     app.include_router(serials_router)

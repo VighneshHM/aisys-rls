@@ -7,7 +7,7 @@ protocol-neutral codes plus a human message, the way both SIP2 ("screen message"
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol, runtime_checkable
 
@@ -37,6 +37,12 @@ class CirculationConfig:
         ""  # host name or IP address of the ILMS server (a real connector uses it; the mock ignores it)
     )
     ilms_port: int = 0  # the SIP2 / NCIP port of the ILMS server (0 = not set)
+    ilms_login: str = ""  # SIP2 login user (CN); empty means the server needs no login
+    ilms_password: str = field(default="", repr=False)  # SIP2 login password (CO): from AISYS_ILMS_PASSWORD only
+    ilms_institution: str = ""  # SIP2 institution id (AO)
+    ilms_location: str = ""  # SIP2 location code (CP/AP) of this system
+    ilms_timeout_s: float = 5.0  # seconds to wait for an answer
+    ilms_checksum: bool = True  # SIP2 error detection (sequence number and checksum)
     ilms_retries: int = 2  # extra attempts after the first
     ilms_backoff_s: float = 0.1
 

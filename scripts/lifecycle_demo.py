@@ -47,7 +47,8 @@ def downgrade() -> None:
 
 
 def run(cmd: list[str], offline: bool = False, expect_fail: bool = False) -> str:
-    env = {**os.environ, **(OFFLINE if offline else {})}
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}  # run as a fresh machine would
+    env.update(OFFLINE if offline else {})
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env, check=False)  # noqa: S603
     out = (proc.stdout + proc.stderr).strip()
     if expect_fail and proc.returncode == 0:

@@ -22,6 +22,10 @@ class ResilientConnector:
         self.backoff_s = backoff_s
         self.protocol = inner.protocol
 
+    def reconfigure(self, config) -> None:
+        if hasattr(self.inner, "reconfigure"):
+            self.inner.reconfigure(config)
+
     def _call(self, op: str, txn_id: str, *args, **kwargs) -> ConnectorResult:
         last = ""
         for attempt in range(self.retries + 1):

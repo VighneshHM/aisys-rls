@@ -32,6 +32,7 @@ INSTALL_PY = '''"""Install AISYS: python install.py --root <dir> --licence <file
 import os
 import sys
 
+sys.dont_write_bytecode = True  # importing the tools must not add files to the signed package folder
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "tools"))
 
@@ -127,7 +128,11 @@ def build(
         work = _prepare_source(source, version, tmp)
         wheels = tmp / "wheels"
         wheels.mkdir()
-        constraint = work / "requirements.lock"
+        # pip does not accept hashes in a constraints file, so pass the same pins without them
+        pins = [ln.rstrip(" \\") for ln in (work / "requirements.lock").read_text(encoding="utf-8").splitlines()]
+        constraint = tmp / "constraints.txt"
+        pinned = [ln for ln in pins if ln and not ln.startswith((" ", "#"))]
+        constraint.write_text("\n".join(pinned) + "\n", encoding="utf-8")
         cmd = [
             sys.executable,
             "-m",

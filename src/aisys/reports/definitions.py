@@ -7,6 +7,7 @@ what you see at the top always adds up to what is listed below.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import Select, case, func, or_, select
 
@@ -339,7 +340,7 @@ def operators(ctx: Context, p: dict, limit: int, offset: int) -> Result:
         if only and u.username.lower() != only:
             continue
         c, m = circ.get(u.username, {}), money.get(u.username, {})
-        row = {
+        row: dict[str, Any] = {
             "username": u.username,
             "name": u.display_name,
             "role": u.role.name.replace("_", " "),
@@ -437,17 +438,23 @@ def rfid_clients(ctx: Context, p: dict, limit: int, offset: int) -> Result:
             activity, unit, detail = ps[0], "passages", f"{ps[1]} people, {alarms} alarms"
             seen = last(GatePassage.ts, GatePassage.gate_id == did)
         elif d["kind"] == "camera":
-            activity = db.scalar(
-                select(func.count(GateImage.id)).where(GateImage.camera_id == did, *_between(GateImage.ts, lo, hi))
+            activity = (
+                db.scalar(
+                    select(func.count(GateImage.id)).where(GateImage.camera_id == did, *_between(GateImage.ts, lo, hi))
+                )
+                or 0
             )
             unit, detail = "snapshots", "taken for gate alarms"
             seen = last(GateImage.ts, GateImage.camera_id == did)
         elif d["kind"] == "card_printer":
             mine = (AuditEvent.action == "member.card_personalise", AuditEvent.detail["printer"].as_string() == did)
-            activity = db.scalar(
-                select(func.count(AuditEvent.id)).where(
-                    *mine, AuditEvent.outcome == "success", *_between(AuditEvent.ts, lo, hi)
+            activity = (
+                db.scalar(
+                    select(func.count(AuditEvent.id)).where(
+                        *mine, AuditEvent.outcome == "success", *_between(AuditEvent.ts, lo, hi)
+                    )
                 )
+                or 0
             )
             jams = db.scalar(
                 select(func.count(AuditEvent.id)).where(
@@ -569,7 +576,8 @@ def gate_events(ctx: Context, p: dict, limit: int, offset: int) -> Result:
             .where(Notification.event_id.in_([e.id for e in page]))
             .group_by(Notification.event_id, Notification.status)
         ):
-            msgs.setdefault(eid, {})[st] = n
+            if eid is not None:
+                msgs.setdefault(eid, {})[st] = n
     rows = [
         {
             "ts": iso(e.ts),
@@ -600,7 +608,7 @@ def gate_events(ctx: Context, p: dict, limit: int, offset: int) -> Result:
             .group_by(Notification.status)
         ).all()
     )
-    days = dict(
+    days: dict[str, int] = dict(
         ctx.db.execute(
             select(func.date(GateEvent.ts), func.count()).where(*first_alarms).group_by(func.date(GateEvent.ts))
         ).all()

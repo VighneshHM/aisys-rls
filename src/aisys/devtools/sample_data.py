@@ -15,6 +15,7 @@ import json
 import random
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from openpyxl import Workbook
 
@@ -46,7 +47,7 @@ def build_rows(n: int = 20000, seed: int = 42) -> tuple[list[str], list[list[str
     rng = random.Random(seed)
     clean_head = min(1000, n // 5)  # first rows are guaranteed clean so duplicates can point at them
     pool_size = max(10, int(n * 0.7))
-    bibs = []
+    bibs: list[dict[str, Any]] = []
     for i in range(pool_size):
         bibs.append({
             "title": f"{rng.choice(ADJ)} {rng.choice(NOUN)}, Volume {i + 1}",

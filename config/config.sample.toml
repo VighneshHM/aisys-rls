@@ -81,10 +81,18 @@ remind_days_before = 1           # days before the due date for the first remind
 auto_dispatch_seconds = 60
 
 [ilms]
+# driver = "mock" is the built-in stand-in. driver = "sip2" speaks the SIP2 protocol to a real ILMS (docs/sip2.md);
+# to try it without one, run `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`.
 driver = "mock"
-protocol = "sip2"                # sip2 | ncip (the dialect the mock imitates; a real adapter speaks its own)
-#endpoint = "192.168.1.50"       # host name or IP address of the ILMS server (used by a real connector)
-#port = 6001                     # the SIP2 / NCIP port of the ILMS server
+protocol = "sip2"                # sip2 | ncip (the dialect the mock imitates; the sip2 driver always speaks SIP2)
+#endpoint = "192.168.1.50"       # host name or IP address of the ILMS server (needed by driver = "sip2")
+#port = 6001                     # the SIP2 port of the ILMS server (needed by driver = "sip2")
+#login = "aisys"                 # SIP2 login user; leave out if the ILMS needs no login
+#institution = "LIBRARY"         # SIP2 institution id (field AO)
+#location = "MAIN"               # SIP2 location code of this system (fields CP and AP)
+#timeout_s = 5                   # seconds to wait for an answer (0.1 to 120)
+#checksum = true                 # SIP2 error detection (sequence number and checksum); turn off only if the ILMS rejects it
+# The login PASSWORD is never written here: set the environment variable AISYS_ILMS_PASSWORD instead.
 retries = 2
 backoff_s = 0.1
 

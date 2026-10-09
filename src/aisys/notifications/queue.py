@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from typing import Any, cast
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import CursorResult, case, func, select, update
 from sqlalchemy.orm import Session
 
 from aisys.models import Notification, utcnow
@@ -68,10 +69,13 @@ def dispatch(
             continue
         # Claim it: only one dispatcher (this app's loop, the command line, a button) wins the row, so a message is
         # never sent twice however many run at once. A crash after the claim means one more try later, not a loss.
-        claimed = db.execute(
-            update(Notification)
-            .where(Notification.id == n.id, Notification.status == "queued", Notification.attempts == n.attempts)
-            .values(attempts=n.attempts + 1)
+        claimed = cast(
+            "CursorResult[Any]",
+            db.execute(
+                update(Notification)
+                .where(Notification.id == n.id, Notification.status == "queued", Notification.attempts == n.attempts)
+                .values(attempts=n.attempts + 1)
+            ),
         ).rowcount
         db.commit()
         if claimed != 1:

@@ -230,7 +230,7 @@ def receive(db: Session, order_id: int, receipts: list[dict], *, actor: str, ip:
         )
     if not receipts:
         raise AcquisitionError(422, "Say which lines arrived")
-    by_id = {line.id: line for line in order.lines}
+    by_id: dict[int | None, PoLine] = {line.id: line for line in order.lines}
     plan: list[tuple[PoLine, int]] = []
     seen: set[int] = set()
     for r in receipts:

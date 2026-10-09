@@ -74,3 +74,29 @@ def test_every_mandatory_deliverable_has_its_document():
     for files in DELIVERABLES.values():
         for name in files:
             assert name in index, f"docs/index.md does not list {name}"
+
+
+def test_the_sbom_lists_every_pinned_package():
+    proc = subprocess.run(  # noqa: S603
+        [sys.executable, str(ROOT / "scripts" / "sbom_lock.py"), "--check"], capture_output=True, text=True, check=False
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_every_package_in_the_lock_file_carries_hashes():
+    text = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+    blocks = [b for b in text.split("\n") if b and not b.startswith((" ", "#"))]
+    assert blocks and all(" \\" in b for b in blocks), (
+        "a pin has no --hash lines: regenerate with pip-compile --generate-hashes"
+    )
+    assert text.count("--hash=sha256:") >= len(blocks)
+
+
+def test_the_sample_reports_are_current():
+    proc = subprocess.run(  # noqa: S603
+        [sys.executable, str(ROOT / "scripts" / "sample_reports.py"), "--check"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr

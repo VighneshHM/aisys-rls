@@ -43,6 +43,10 @@ WORDING = {
 
 
 class MockIlms:
+    def reconfigure(self, config: CirculationConfig) -> None:
+        """Take new loan and fine rules without losing what the mock already holds (a real ILMS owns its own rules)."""
+        self.config = config
+
     def __init__(self, config: CirculationConfig | None = None, **_options: object) -> None:
         self.config = config or CirculationConfig()
         self.protocol = self.config.ilms_protocol if self.config.ilms_protocol in WORDING else "sip2"

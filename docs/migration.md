@@ -23,7 +23,7 @@ upload -> STAGE (every row kept verbatim) -> MAP columns -> VALIDATE (dry run, l
 | **Staging table** holds raw + normalised rows | Satisfies "import into staging, reject invalid rows"; lets users review before anything is written; keeps evidence for reports | Extra storage (~20k JSON rows) |
 | **Insert-only commit**, never update/delete existing rows | NFR01: cannot corrupt existing records; duplicates are *skipped and reported*, not merged | Re-importing a corrected row needs a new accession no. or a manual fix |
 | **Backup before commit** (SQLite online backup, integrity-checked) | NFR01/AC10: a restorable snapshot exists for every import | SQLite only; other DBs need their own backup hook |
-| **Single transaction** for all inserts | A failure leaves the library exactly as it was (tested by injecting a failure after the inserts) | One long write lock (about 5 s for 20k rows) |
+| **Single transaction** for all inserts | A failure leaves the library exactly as it was (tested by injecting a failure after the inserts) | One long write lock (about 7 s for 20k rows) |
 | **Fingerprint of pre-existing records** hashed before and after | Turns "existing data unchanged" from a claim into a check | Hashes key fields, not every column |
 | **Rollback by `batch_id`** on items and bib records | Removes exactly what the batch created; refuses (409) if items are already referenced elsewhere (FK) | Bib records still used by later batches are kept and reported |
 | **Mapping-driven columns** with alias + fuzzy matching, user-overridable | The reviewers' file layout is unknown (assumption A-01) | Fuzzy cutoff is deliberately strict; borderline headers need a manual choice |
@@ -83,10 +83,15 @@ barcodes and bibliographic keys it compared against and **re-checks automaticall
 ## Evidence
 * Synthetic data generator: `python -m aisys.devtools.sample_data --rows 20000 --out samples` (deterministic; the manifest lists the
   exact number of deliberate defects, and tests assert the importer finds exactly those).
-* 20,000-row `.xlsx` on the development laptop: **upload + validate 6.6 s, commit 5.1 s**, reconciliation balanced,
+* 20,000-row `.xlsx` on the development laptop: **upload + validate 13.1 s, commit 7.4 s** (`docs/performance-results.md`), reconciliation balanced,
   rollback returns to the pre-migration count (`tests/test_migration.py::test_full_20000_row_xlsx_import_reconcile_and_rollback`).
 * Atomicity proven by failure injection; existing records proven unchanged by fingerprint; backup verified readable and holding
   the pre-migration state.
+
+## Sample reports
+Committed examples of the two reports, made from `samples/library_200.xlsx` by `python scripts/sample_reports.py`:
+`docs/samples/validation-report.csv` (the problem list), `docs/samples/reconciliation-report.json` (the proof after commit) and
+`docs/samples/README.md` (every column and field explained). `python scripts/sample_reports.py --check` says whether they are current.
 
 ## Known limitations
 * Only the first worksheet of an `.xlsx` is read. Dates stored as text are parsed day-first (dd/mm vs mm/dd is ambiguous).

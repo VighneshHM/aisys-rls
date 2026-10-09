@@ -87,7 +87,7 @@ def event_out(e: GateEvent, *, has_image: bool = False) -> dict:
 
 
 def _has_image(db: Session, event_id: int) -> bool:
-    return db.scalar(select(func.count()).select_from(GateImage).where(GateImage.event_id == event_id)) > 0
+    return (db.scalar(select(func.count()).select_from(GateImage).where(GateImage.event_id == event_id)) or 0) > 0
 
 
 def process(db: Session, registry: DeviceRegistry, gate_id: str, config: GateConfig) -> list[dict]:

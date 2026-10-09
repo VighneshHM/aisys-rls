@@ -16,7 +16,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from sqlalchemy import case, exists, func, or_, select
+from sqlalchemy import case, exists, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased, contains_eager
 
@@ -507,7 +507,7 @@ def tag_detail(db: Session, tag_uid: str, history_limit: int = 50) -> dict:
         "item": item_out(current.item, active_tag(db, current.item_id)),
         "associations": [
             {
-                **tag_out(link),
+                **(tag_out(link) or {}),
                 "item": {"id": link.item_id, "accession_no": link.item.accession_no, "title": link.item.bib.title},
             }
             for link in links
@@ -563,7 +563,7 @@ def list_tags(db: Session, *, state: str | None = None, q: str = "", limit: int 
                 func.lower(past_bib.title).like(like, escape="\\"),
             ),
         )
-        uid_match = func.lower(agg.c.uid).like(uid_like, escape="\\") if normalize_tag_uid(q) else False
+        uid_match = func.lower(agg.c.uid).like(uid_like, escape="\\") if normalize_tag_uid(q) else false()
         stmt = stmt.where(or_(uid_match, on_matching_item))
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
     rows = db.execute(stmt.order_by(RfidTag.id.desc()).limit(min(max(limit, 1), 200)).offset(max(offset, 0))).unique()

@@ -1,0 +1,31 @@
+{
+  "balanced": true,
+  "batch_summary": {
+    "bibs_reused": 0,
+    "bibs_to_create": 136,
+    "duplicate": 2,
+    "invalid": 7,
+    "library_bibs_before": 0,
+    "library_items_before": 0,
+    "source_rows": 200,
+    "valid": 191,
+    "valid_with_warnings": 5
+  },
+  "bibs_after": 136,
+  "bibs_before": 0,
+  "bibs_created": 136,
+  "existing_records_unchanged": true,
+  "items_added": 191,
+  "items_after": 191,
+  "items_before": 0,
+  "migrated": 191,
+  "rejected_invalid": 7,
+  "skipped_duplicate": 2,
+  "source_file": "library_200.xlsx",
+  "source_rows": 200,
+  "warnings_by_code": {
+    "item_type_unknown": 2,
+    "loan_not_migrated": 2,
+    "year_invalid": 1
+  }
+}

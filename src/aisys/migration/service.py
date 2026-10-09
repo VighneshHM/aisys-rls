@@ -17,8 +17,9 @@ from collections import Counter
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 
-from sqlalchemy import delete, exists, func, insert, or_, select, update
+from sqlalchemy import CursorResult, delete, exists, func, insert, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -135,7 +136,9 @@ def set_mapping(db: Session, batch: MigrationBatch, new_mapping: dict[str, str],
 def _library_state(db: Session) -> tuple[set[str], set[str], set[str]]:
     """Everything a row can clash with: accession numbers, barcodes (casefolded) and bibliographic keys."""
     taken_acc = {a.casefold() for a in db.scalars(select(Item.accession_no))}
-    taken_bc = {b.casefold() for b in db.scalars(select(Item.barcode).where(Item.barcode.is_not(None)))}
+    taken_bc = {
+        b.casefold() for b in db.scalars(select(Item.barcode).where(Item.barcode.is_not(None))) if b is not None
+    }
     return taken_acc, taken_bc, set(db.scalars(select(BibRecord.dedupe_key)))
 
 
@@ -298,7 +301,7 @@ def _fingerprint(db: Session, exclude_batch_id: int) -> str:
     ):
         h.update(repr(tuple(r)).encode())
     not_mine_bib = or_(BibRecord.batch_id.is_(None), BibRecord.batch_id != exclude_batch_id)
-    for r in db.execute(
+    for br in db.execute(
         select(
             BibRecord.id,
             BibRecord.dedupe_key,
@@ -311,7 +314,7 @@ def _fingerprint(db: Session, exclude_batch_id: int) -> str:
         .where(not_mine_bib)
         .order_by(BibRecord.id)
     ):
-        h.update(repr(tuple(r)).encode())
+        h.update(repr(tuple(br)).encode())
     return h.hexdigest()
 
 
@@ -438,6 +441,7 @@ def commit_batch(db: Session, settings: Settings, batch: MigrationBatch, *, acto
     except Exception as exc:
         db.rollback()  # nothing from this batch reaches the library
         failed = db.get(MigrationBatch, batch_id)
+        assert failed is not None  # committed earlier in this call
         failed.status = "failed"
         failed.summary = {
             **failed.summary,
@@ -496,9 +500,11 @@ def rollback_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = 
     batch_id = batch.id
     rec = batch.summary["reconciliation"]
     try:
-        removed_items = db.execute(delete(Item).where(Item.batch_id == batch_id)).rowcount
+        removed_items = cast("CursorResult[Any]", db.execute(delete(Item).where(Item.batch_id == batch_id))).rowcount
         still_used = exists().where(Item.bib_id == BibRecord.id)
-        removed_bibs = db.execute(delete(BibRecord).where(BibRecord.batch_id == batch_id, ~still_used)).rowcount
+        removed_bibs = cast(
+            "CursorResult[Any]", db.execute(delete(BibRecord).where(BibRecord.batch_id == batch_id, ~still_used))
+        ).rowcount
         retained = _count(db, BibRecord, BibRecord.batch_id == batch_id)
         db.execute(
             update(MigrationRow)

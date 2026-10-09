@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from bisect import bisect_right
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -137,7 +138,7 @@ def update_shelf(db: Session, shelf_id: int, fields: dict, *, actor: str, ip: st
     shelf = db.get(Shelf, shelf_id)
     if shelf is None:
         raise ShelfError(404, "No such shelf")
-    changed = {}
+    changed: dict[str, Any] = {}
     if "description" in fields and fields["description"] is not None:
         shelf.description = fields["description"].strip()[:200]
         changed["description"] = "changed"
@@ -196,7 +197,7 @@ def out_of_order_items(db: Session, session_id: int, code: str) -> list[int]:
 def view(db: Session, code: str, limit: int = DEFAULT_VIEW, offset: int = 0) -> dict:
     """The shelf as a row of books in call-number order, with what the last inventory sweep found out of place."""
     code = _clean_code(code)
-    items = db.scalars(select(Item).where(Item.location == code, Item.status.not_in(HIDDEN_STATUSES))).all()
+    items = list(db.scalars(select(Item).where(Item.location == code, Item.status.not_in(HIDDEN_STATUSES))))
     tagged = set(
         db.scalars(
             select(RfidTag.item_id).where(RfidTag.status == "active", RfidTag.item_id.in_([i.id for i in items] or [0]))

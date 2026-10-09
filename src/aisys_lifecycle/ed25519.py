@@ -63,6 +63,7 @@ def _recover_x(y: int, sign: int) -> int | None:
 
 _GY = 4 * _inv(5) % _P
 _GX = _recover_x(_GY, 0)
+assert _GX is not None  # the base point's x always exists
 _G = (_GX, _GY, 1, _GX * _GY % _P)
 
 

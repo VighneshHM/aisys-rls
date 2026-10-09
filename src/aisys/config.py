@@ -51,6 +51,17 @@ def _port(value) -> int:
     return port
 
 
+def _seconds(value) -> float:
+    """How long to wait for the ILMS: between 0.1 and 120 seconds, or the application does not start."""
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        raise RuntimeError(f"[ilms] timeout_s must be a number of seconds, not {value!r}") from None
+    if not 0.1 <= seconds <= 120:
+        raise RuntimeError(f"[ilms] timeout_s must be between 0.1 and 120 seconds, not {seconds:g}")
+    return seconds
+
+
 def _interval(value) -> float:
     """0 turns the loop off; anything else is at least one second (a smaller number would spin the CPU)."""
     seconds = float(value)
@@ -59,7 +70,7 @@ def _interval(value) -> float:
 
 def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
     """Load settings. Precedence: env vars > config file > built-in defaults."""
-    cfg_path = Path(path or os.environ.get("AISYS_CONFIG", DEFAULT_CONFIG_PATH))
+    cfg_path = Path(path) if path else Path(os.environ.get("AISYS_CONFIG", str(DEFAULT_CONFIG_PATH)))
     raw: dict = {}
     if cfg_path.is_file():
         with cfg_path.open("rb") as fh:
@@ -92,6 +103,12 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         ilms_protocol=str(ilms.get("protocol", dc.ilms_protocol)),
         ilms_endpoint=str(ilms.get("endpoint", dc.ilms_endpoint)).strip(),
         ilms_port=_port(ilms.get("port", dc.ilms_port)),
+        ilms_login=str(ilms.get("login", dc.ilms_login)),
+        ilms_password=os.environ.get("AISYS_ILMS_PASSWORD", ""),  # never in the file
+        ilms_institution=str(ilms.get("institution", dc.ilms_institution)),
+        ilms_location=str(ilms.get("location", dc.ilms_location)),
+        ilms_timeout_s=_seconds(ilms.get("timeout_s", dc.ilms_timeout_s)),
+        ilms_checksum=bool(ilms.get("checksum", dc.ilms_checksum)),
         ilms_retries=int(ilms.get("retries", dc.ilms_retries)),
         ilms_backoff_s=float(ilms.get("backoff_s", dc.ilms_backoff_s)),
     )

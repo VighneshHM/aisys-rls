@@ -510,3 +510,14 @@ class SerialIssue(Base):
     status: Mapped[str] = mapped_column(String(10), default="expected", index=True)  # expected|received|claimed|missing
     item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
     note: Mapped[str] = mapped_column(String(200), default="")
+
+
+# ---------------------------------------------------------------- settings changed in the browser
+class AppSetting(Base):
+    """A library rule an administrator changed on the Settings page. It overrides the same value in the TOML file."""
+
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(String(40))
+    updated_by: Mapped[str] = mapped_column(String(64), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

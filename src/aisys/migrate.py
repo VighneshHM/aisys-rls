@@ -37,4 +37,6 @@ def current_revision(engine: Engine) -> str | None:
 
 
 def head_revision() -> str:
-    return ScriptDirectory(str(MIGRATIONS_DIR)).get_current_head()
+    head = ScriptDirectory(str(MIGRATIONS_DIR)).get_current_head()
+    assert head is not None  # the packaged migrations always have a head
+    return head

@@ -12,6 +12,7 @@ What was checked, how, and what is left. Each row can be re-run.
 | Permissions on every endpoint | `docs/api-reference.md` is generated from the routes and lists the permission each needs; tests call the sensitive ones with the wrong role | a role without the permission gets 403 and an audit line; no endpoint but sign-in, health and the public catalogue is public |
 | Passwords and sign-in | `test_foundation`: scrypt hashing, lockout after repeated failures, patron card cannot sign in, disabled person or card refused | passes |
 | Session handling | `test_admin`: deactivating a person ends their open sessions at once; tokens are stored hashed | passes |
+| ILMS password | `test_sip2`: `AISYS_ILMS_PASSWORD` is the only source (a password in the file is ignored) and it does not appear in a printout of the settings | passes; also not shown by `aisys doctor` |
 
 ## Input handling (hostile input tests)
 
@@ -28,6 +29,8 @@ What was checked, how, and what is left. Each row can be re-run.
 | Enormous numbers (`offset=99999999999999999999`, ids that large) | every endpoint | a clean 422, never a server error |
 | Oversized and malformed bodies, wrong types | all endpoints | 422 with the field and the reason |
 | Too many public searches | `/api/opac/search` | 429 after 60 a minute per address |
+| Hostile, garbled, truncated, oversized (over 64 KB), wrong-checksum or wrong-sequence SIP2 answers; control and non-ASCII characters | SIP2 decoder (`test_sip2_codec`, fuzz-tested) and client (`test_sip2`) | only `Sip2Error` comes out of decoding; the client asks for a repeat or reports "sent without an answer"; nothing crashes |
+| `\|` or control characters in a member or item number (field injection) | SIP2 encoder (`test_sip2_codec`, `test_sip2`) | refused before anything is sent |
 
 ## Transport and headers
 
@@ -38,6 +41,7 @@ What was checked, how, and what is left. Each row can be re-run.
 | Every response has `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`; HSTS on HTTPS or behind a proxy that says so | `test_security_ops` |
 | Camera images are never cached | `Cache-Control: private, no-store` (`test_gate`) |
 | Production refuses to start with a short secret key; the installer generates one | `test_config`, `test_lifecycle` |
+| SIP2 to the ILMS is **not encrypted** (user, password and patron data in clear text) | Not fixable inside SIP2: use a VPN, stunnel or a TLS-terminating proxy, or an isolated segment (`docs/sip2.md`, `docs/site-addressing.md`). Documented, not tested here |
 
 ## Privacy
 
@@ -54,6 +58,9 @@ What was checked, how, and what is left. Each row can be re-run.
 * Update packages are signed (Ed25519) with a checksum for every file, no unlisted file allowed; a tampered, unsigned,
   foreign-signed, older or wrongly-licensed package is refused before anything is changed (`test_lifecycle`).
 * Every package carries an SBOM and a licence inventory (`docs/third-party-licences.md`).
+* `requirements.lock` pins every package (runtime and development tools) with sha256 hashes; CI installs from it with
+  `--require-hashes`, so a changed or substituted package fails the install. `docs/sbom.cdx.json` lists all of them
+  (`scripts/sbom_lock.py`, checked by `test_docs`). `pip-audit` scans the same file.
 
 ## Concurrency and failure
 
@@ -69,5 +76,6 @@ twice; two scanners never queue a reminder twice; a restore under four clients' 
 * **The credential provider is a mock**; real smart-card challenge-response is a future driver (the interface already carries the
   `proof` field). Assumption A-09.
 * **TLS in front of the application is documented, not tested here** (the built-in TLS is tested).
+* **The SIP2 link has no encryption and was tested only against the simulator**; the checksum guards against damage, not an attacker.
 * **No rate limit on sign-in beyond the account lockout**, and no multi-factor option.
 * The SQLite file and the backups are protected by operating-system permissions, not encrypted at rest.

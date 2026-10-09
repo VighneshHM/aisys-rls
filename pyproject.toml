@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.16.10"]
+dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.16.10", "mypy==2.4.0"]
 
 [project.scripts]
 aisys = "aisys.cli:main"
@@ -35,6 +35,12 @@ testpaths = ["tests"]
 markers = [
   "req(*ids): requirement IDs (FR/NFR/AC) this test provides evidence for",
 ]
+
+[tool.mypy]
+files = ["src"]
+ignore_missing_imports = true  # alembic and a few others ship no type information
+warn_unused_ignores = true
+exclude = ["src/aisys/migrations/"]  # generated-style migration scripts
 
 [tool.ruff]
 line-length = 120

@@ -15,7 +15,7 @@ flowchart LR
     db[(SQLite data file<br/>+ backups)]
     app --- db
   end
-  app -- "SIP2 / NCIP shaped<br/>CirculationConnector" --> ilms[(Existing ILMS)]
+  app -- "SIP2 over TCP (or mock)<br/>CirculationConnector" --> ilms[(Existing ILMS)]
   app -- "device commands and events" --> dev[Staff reader · handheld · gate<br/>camera · card printer]
   app -- "NotificationProvider" --> svc[E-mail · SMS · print services]
   app -- "BibliographicSource" --> net[Outside catalogue by ISBN]
@@ -32,7 +32,7 @@ writes the ILMS's records: all ILMS access goes through the connector.
 | User layer | Staff web interface, public catalogue (OPAC), dashboard, reports, administration | `web/templates`, `web/static`, `pages.py`, `opac_routes.py` |
 | Application layer | Cataloguing, circulation, members, fines, inventory, shelves, acquisitions, serials, labels, notification, reporting, access control | `catalogue/`, `circulation/`, `inventory/`, `shelves/`, `acquisitions/`, `serials/`, `labels/`, `notifications/`, `reports/`, `auth/` |
 | RFID middleware | Device-neutral commands and events for staff reader, handheld, gate, smart card, printer and camera | `rfid/devices.py` (Protocols), `rfid/registry.py`, `rfid/mock.py`, `rfid/events.py` |
-| Interoperability | SIP2 / NCIP adapter boundary and mocks | `circulation/connector.py`, `mock_ilms.py`, `resilience.py`, `registry.py` |
+| Interoperability | ILMS adapter boundary, a mock, and a SIP2 client (`docs/sip2.md`); no NCIP | `circulation/connector.py`, `mock_ilms.py`, `resilience.py`, `registry.py`, `sip2/` |
 | Data layer | Transactional database, search index, audit log, migration staging, backup and restore | `models.py`, `migrations/`, `catalogue/fts.py`, `audit.py`, `migration/`, `backup.py` |
 | Integration layer | E-mail, SMS, print, CCTV photo, ILMS, net-cataloguing connectors | `notifications/providers.py`, `integrations/`, `rfid/mock.py` (camera) |
 | Operations layer | Configuration, secrets, offline installer, logs, health checks, updates, backups, rollback | `config.py`, `logging_setup.py`, `doctor.py`, `aisys_lifecycle/`, `backup.py` |
@@ -98,7 +98,7 @@ flowchart LR
   end
   b1 & b2 -- "Ethernet, HTTPS" --> proxy
   app -- "Ethernet" --> readers[RFID readers, gate, camera, card printer]
-  app -- "Ethernet" --> ilms[(ILMS :SIP2/NCIP port)]
+  app -- "Ethernet (SIP2: use a tunnel)" --> ilms[(ILMS :SIP2 port)]
 ```
 
 **Installation layout** (folder created by `install.py`; see `docs/deployment.md`): `releases/<version>/venv` (one environment per
@@ -110,7 +110,7 @@ version), `state.json` (current and previous), `config/` (config, secret, licenc
 | Interface | Direction | Protocol / transport | Default / config key | Notes |
 |---|---|---|---|---|
 | Staff and public browsers | in | HTTPS (or HTTP behind a proxy) | `[app] host`, `port` = 127.0.0.1:8000; `[server] tls_certfile`, `tls_keyfile` | Bind to the LAN address only when TLS is on |
-| ILMS | out | SIP2 or NCIP over TCP | `[ilms] endpoint` (*site*), `port` (*site*), `protocol`, `retries`, `backoff_s` | Mock here; a real connector is one class (`register_driver`) |
+| ILMS | out | SIP2 over TCP (no encryption: VPN, stunnel or TLS proxy) | `[ilms] driver`, `endpoint` (*site*), `port` (*site*), `login`, `institution`, `location`, `timeout_s`, `checksum`, `retries`, `backoff_s`; password from `AISYS_ILMS_PASSWORD` only | `mock` by default; `sip2` tested against a simulator only; NCIP would be one more class (`register_driver`) |
 | Staff reader, handheld, gate, camera, card printer | out | Vendor SDK or TCP/serial, per driver | `[[devices]] id, kind, driver` + driver options (*site*) | Mock here |
 | Mail, SMS, print | out | SMTP / gateway API / print queue, per driver | `[notifications] email, sms, print` drivers | Mock here |
 | Outside catalogue | out | Per driver (Z39.50, SRU, HTTP API) | `[netcat] driver` | Mock here |
@@ -164,7 +164,7 @@ All are `typing.Protocol`s with a mock and a registry; a real implementation is 
 
 | Interface | Methods (summary) | Mock | Failure behaviour |
 |---|---|---|---|
-| `CirculationConnector` | `patron_status`, `checkout`, `renew`, `checkin`, `due_date` | `MockIlms` (words replies as SIP2 or NCIP) | `ResilientConnector`: bounded retries with the same transaction id; timeouts surface as "try again", never a half-recorded loan |
+| `CirculationConnector` | `patron_status`, `checkout`, `renew`, `checkin`, `due_date` | `MockIlms` (words replies as SIP2 or NCIP); `Sip2Connector` (SIP2 over TCP, simulator in `sip2/server.py`) | `ResilientConnector`: bounded retries with the same transaction id; timeouts surface as "try again", never a half-recorded loan; the SIP2 connector also verifies with the ILMS before repeating a request whose answer was lost |
 | `StaffReader` | `read_field`, `encode`, `set_security`, `clear`, `indicate` | `MockStaffReader` (simulated pad) | write device first, database second, undo the device if the save fails |
 | `Handheld` | `scan`, `indicate` | `MockHandheld` (loads a shelf from the catalogue) | each tag earns a beep and a light |
 | `Gate` | `poll` (passages: tags seen, people count), `indicate` | `MockGate` | alarm decided from the security bit only |

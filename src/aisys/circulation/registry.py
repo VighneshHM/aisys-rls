@@ -11,12 +11,22 @@ from collections.abc import Callable
 from aisys.circulation.connector import CirculationConfig, CirculationConnector
 from aisys.circulation.mock_ilms import MockIlms
 from aisys.circulation.resilience import ResilientConnector
+from aisys.circulation.sip2.adapter import Sip2Connector
 
 _DRIVERS: dict[str, Callable[..., CirculationConnector]] = {"mock": MockIlms}
 
 
 class ConnectorConfigError(ValueError):
     """The [ilms] configuration is invalid (fails fast at startup)."""
+
+
+def _sip2(config: CirculationConfig, **_options: object) -> CirculationConnector:
+    if not config.ilms_endpoint or not config.ilms_port:
+        raise ConnectorConfigError("the sip2 driver needs [ilms] endpoint and port")
+    return Sip2Connector(config)
+
+
+_DRIVERS["sip2"] = _sip2
 
 
 def register_driver(name: str, factory: Callable[..., CirculationConnector]) -> None:
