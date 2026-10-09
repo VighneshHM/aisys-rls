@@ -8,7 +8,7 @@
       <div class="nav-label">Workspace</div>
       {% for item in nav %}
         {% if item.live %}
-          <a href="{{ item.href }}" class="{{ 'active' if item.key == active else '' }}" {{ 'aria-current=page' if item.key == active else '' }}{% if item.key == 'opac' %} title="Opens the public catalogue and signs you out, so a visitor cannot use your session"{% endif %}>{{ icon(item.icon) }} {{ item.label }}{% if item.key == 'opac' %}<span class="soon">Signs out</span>{% endif %}</a>
+          <a href="{{ item.href }}" class="{{ 'active' if item.key == active else '' }}" {{ 'aria-current=page' if item.key == active else '' }}>{{ icon(item.icon) }} {{ item.label }}</a>
         {% else %}
           <div class="nav-item" title="Planned for a later stage">{{ icon(item.icon) }} {{ item.label }}<span class="soon">Soon</span></div>
         {% endif %}

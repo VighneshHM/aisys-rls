@@ -62,14 +62,14 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
 | `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
-| `test_opac_session.py` | 11 | NFR02/FR02: opening the public catalogue ends the staff session; sign-in link; no cached pages; scrollable menu that remembers its position |
+| `test_opac_session.py` | 13 | NFR02/FR02: opening the public catalogue ends the staff session; not in the staff menu; Return to home page; no cached pages; scrollable menu that remembers its position |
 | `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
 | `test_sip2_codec.py` | 70 | FR03: SIP2 message encoding and decoding, checksum, sequence, limits, hostile and fuzzed input |
 | `test_sip2.py` | 61 | FR03/AC03: SIP2 client and connector against the simulator over a real socket, including the web API end to end; lost, dropped and damaged answers; verify-before-resend; error mapping; configuration and password handling |
 | `test_security_ops.py`, `test_config.py` | 11, 8 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 743 test cases (some are parametrised).
+Total: 745 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

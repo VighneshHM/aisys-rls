@@ -28,7 +28,6 @@ router = APIRouter(include_in_schema=False)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
-    ("opac", "Public catalogue", "scan", "/opac", None, True),
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
