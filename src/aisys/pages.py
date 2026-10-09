@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -27,6 +28,7 @@ router = APIRouter(include_in_schema=False)
 # (key, label, icon, href, permission needed to see it, implemented yet?)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
+    ("opac", "Public catalogue", "book", "/handover", None, True),  # a sign-out button, not a link (see handover)
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
@@ -299,7 +301,7 @@ def circulation_page(
         can_checkin="circulation.checkin" in perms,
         can_renew="circulation.renew" in perms,
         can_block="member.write" in perms,
-        protocol=settings.circulation.ilms_protocol.upper(),
+        protocol=request.app.state.ilms.protocol.upper(),  # what the connector really speaks
     )
 
 
@@ -363,20 +365,48 @@ def serials_page(
 def opac_page(
     request: Request,
     settings: Settings = Depends(get_settings),
-    db: Session = Depends(get_db),
     principal: Principal | None = Depends(get_principal_optional),
 ):
-    """The public catalogue search: no sign-in. It is often left open for visitors, so opening it ends any staff
-    session in this browser: nobody can step from the public page into a staff workspace that was left signed in."""
+    """The public catalogue search: no sign-in. Opening it changes nothing (a link from anywhere must not sign a member
+    of staff out). Staff hand a screen over with the menu's sign-out button (`handover`); a public terminal uses a
+    kiosk host name, where no staff session exists at all. If a staff session is still open in this browser, the
+    page says so and offers that sign-out."""
     if not settings.opac_enabled:
         return HTMLResponse("Not found", status_code=404)
     response = TEMPLATES.TemplateResponse(
-        request, "opac.html", {"app_name": settings.app_name, "version": __version__, "asset_v": asset_version()}
+        request,
+        "opac.html",
+        {
+            "app_name": settings.app_name,
+            "version": __version__,
+            "asset_v": asset_version(),
+            "staff_signed_in": principal is not None,
+        },
     )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@router.post("/handover")
+def handover(
+    request: Request,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    """Hand this screen over to visitors: end the staff session (server and cookie), record why, open the catalogue.
+
+    A POST from the staff menu, never a side effect of loading a page: the session cookie is SameSite=Lax, so another
+    site cannot send it with a POST, and a request whose Origin is another site is refused outright.
+    """
+    origin = request.headers.get("origin")
+    if origin and urlsplit(origin).netloc.lower() != request.url.netloc.lower():
+        return JSONResponse({"detail": "Cross-site request refused"}, status_code=403)
+    target = "/opac" if settings.opac_enabled else "/"
+    response = RedirectResponse(target, status_code=303)
     if principal is not None:
         auth_service.logout(db, db.merge(principal.session), client_ip(request), reason="public_catalogue")
         response.delete_cookie(COOKIE_NAME)
-    response.headers["Cache-Control"] = "no-store"
     return response
 
 

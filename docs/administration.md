@@ -178,6 +178,8 @@ An update with an expired licence is refused unless it is a security update. Win
 - The structured JSON log (console, `[logging]`) records requests and errors without secrets; the **Audit log** records who did
   what; `manage.py status` shows versions, history and interrupted updates; the **Updates** page shows the same plus the licence.
 - There is no built-in alerting. Point a monitoring tool at `/health/ready` (`remaining-work.md`, Operations).
+- The gate loop is reported on the Settings page (read-only, "Gate reading"); **Read the gates now** on Gate events shows
+  at once whether each gate answers. An offline gate is named there and in the log; the other gates are still read.
 - The reminder and message loop is reported on the Settings page (read-only, "Message loop"); queued messages that are not
   being delivered usually mean the loop is off (`auto_dispatch_seconds = 0`).
 
@@ -218,3 +220,13 @@ An update with an expired licence is refused unless it is a security update. Win
 
 Any request with a number SQLite cannot hold (for example `offset=99999999999999999999` or such an id) gets a clean 422 instead of a
 server error, for every endpoint (one handler in `app.py`).
+
+## 12. Public terminals and handing over a screen
+
+- **Public terminals** in the reading room use a kiosk host name (`[opac] kiosk_hosts`, `docs/deployment.md`). On that name
+  only the public catalogue exists: no staff page, no sign-in, no session. The Settings page lists the kiosk names.
+- **A staff screen** is handed to visitors with the menu's **Public catalogue** button, which signs the person out first
+  (audited as `auth.logout`, reason `public_catalogue`). Opening the catalogue in any other way does not sign anyone out;
+  the page then warns that a staff session is still open and offers the same sign-out (DR-17).
+- **Hand-run notification actions** (Send queued messages, Run reminders, Retry) are audited as `notification.dispatch`,
+  `notification.reminders_run` and `notification.retry`.

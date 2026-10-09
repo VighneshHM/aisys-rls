@@ -189,6 +189,41 @@ def serve_options(settings: Settings) -> dict:
     return options
 
 
+def _gate_command(args, settings: Settings) -> int:
+    """Read the real gates once, or with --every keep reading them until stopped. Use this OR the application's own
+    gate loop (`[gate] poll_seconds`), not both: each passage is handed over only once, to whoever reads it first."""
+    import time
+
+    from aisys.gate import service as gate_service
+    from aisys.notifications import runner
+    from aisys.rfid.registry import DeviceRegistry
+
+    factory = make_sessionmaker(make_engine(settings.database_url))
+    devices = DeviceRegistry(settings.devices)
+
+    def one_pass() -> dict:
+        with factory() as db:
+            return gate_service.poll_all(db, devices, settings.gate)
+
+    if not args.every:
+        result = one_pass()
+        print("gates:", result)
+        return 1 if any(not g["ok"] for g in result["gates"].values()) else 0
+    if args.every < 0.5:
+        print("error: --every must be at least 0.5 seconds")
+        return 2
+    print(f"reading the gates every {args.every:g} s (Ctrl+C to stop)")
+    loop = runner.Loop(one_pass, args.every, name="aisys-gate").start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("stopping")
+    finally:
+        loop.stop()
+    return 0
+
+
 def _notify_command(args, settings: Settings) -> int:
     """One pass (queue due patron reminders, deliver what is queued), or with --every keep doing it until stopped."""
     import time
@@ -267,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
         if name == "restore":
             bp.add_argument("--yes", action="store_true", help="really do it")
     sub.add_parser("run", help="start the web application")
+    gp = sub.add_parser("gate-poll", help="read every real gate and record its passages, alarms and alerts")
+    gp.add_argument("--every", type=float, default=0, metavar="SECONDS", help="keep running, repeating every N seconds")
     nd = sub.add_parser("notify-dispatch", help="queue due patron reminders and deliver queued notifications")
     nd.add_argument("--every", type=float, default=0, metavar="SECONDS", help="keep running, repeating every N seconds")
     sim = sub.add_parser("sip2-sim", help="run a SIP2 test server that stands in for an ILMS (simulator)")
@@ -291,6 +328,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
     elif args.cmd == "notify-dispatch":
         return _notify_command(args, settings)
+    elif args.cmd == "gate-poll":
+        return _gate_command(args, settings)
     elif args.cmd == "sip2-sim":
         return _sip2_sim(args, settings)
     elif args.cmd == "doctor":

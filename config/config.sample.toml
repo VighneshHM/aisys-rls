@@ -60,10 +60,13 @@ fine_per_day_cents = 25          # 0.25 for each billable day late
 grace_days = 1                   # whole days late that cost nothing
 max_fine_per_loan_cents = 1000   # one loan never costs more than 10.00
 
-# The ILMS connector. "mock" is a built-in simulator that words its replies as SIP2 or NCIP.
+# The ILMS connector. "mock" is a built-in simulator that answers in SIP2 wording.
 # A real system is a class implementing CirculationConnector, registered in code and selected here.
 [gate]
 duplicate_window_s = 60          # the same tag alarming again within this many seconds is a duplicate
+# Read every real gate this often while the application runs (0 = off). Simulator gates hand their passages over by
+# themselves. Alternatively run `python -m aisys.cli gate-poll --every 2` as a separate process: one or the other.
+poll_seconds = 2
 
 # Notification channels. "mock" providers record what they would send. A real email, SMS or print service is a class
 # implementing NotificationProvider, registered in code and selected here.
@@ -84,7 +87,6 @@ auto_dispatch_seconds = 60
 # driver = "mock" is the built-in stand-in. driver = "sip2" speaks the SIP2 protocol to a real ILMS (docs/sip2.md);
 # to try it without one, run `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`.
 driver = "mock"
-protocol = "sip2"                # sip2 | ncip (the dialect the mock imitates; the sip2 driver always speaks SIP2)
 #endpoint = "192.168.1.50"       # host name or IP address of the ILMS server (needed by driver = "sip2")
 #port = 6001                     # the SIP2 port of the ILMS server (needed by driver = "sip2")
 #login = "aisys"                 # SIP2 login user; leave out if the ILMS needs no login
@@ -99,6 +101,9 @@ backoff_s = 0.1
 # The public catalogue search at /opac (no sign-in; shows titles, shelves and availability only).
 [opac]
 enabled = true
+# Host names that serve ONLY the public catalogue, for public terminals (e.g. a DNS or hosts-file name pointing at this
+# server). On these names there is no staff page, no sign-in and no session; staff use the normal name. Empty = none.
+kiosk_hosts = []
 
 # Net cataloguing: look a book up by ISBN in an outside catalogue. "mock" is a built-in synthetic set.
 [netcat]

@@ -51,6 +51,8 @@ clarification log below the table. Design decisions with alternatives are in `do
 | A-41 | The SOP's protocol requirement ("Support NCIP 2.0 and an SIP2 adapter boundary"; AC03 "a mocked NCIP or SIP2 flow") is met by SIP2. NCIP 2.0 is not built and not claimed; it would be one more connector class. | confirmed | C-10; DR-13. |
 | A-42 | The four built-in roles are defined by the software and restored at every start; administrators add their own roles beside them rather than editing those four. | own | DR-14. |
 | A-43 | "D0 to D10" in SOP NFR09 names the working days of the stage plan (SOP section 9 labels its stages D0 to D8), not the deliverables D1 to D9 of section 7. The mapping of stages to actual dates is in `docs/project-management.md`. | own | NFR09. |
+| A-44 | A public terminal can be given its own host name (DNS or hosts file) for the library server; on it only the public catalogue is served (DR-17). Staff screens hand over with the menu's sign-out button. | confirmed | Project owner chose this on 2026-10-10 (C-11). |
+| A-45 | Gates are read by polling their driver; the loop inside the application and the `gate-poll` command are alternatives, never run together. | own | DR-18. |
 
 ## Clarification log
 
@@ -71,6 +73,7 @@ work: questions that only they can answer are marked **open - needs library staf
 | C-08 | Should library rules (loan days, fines, reminders...) be editable in the browser? | Project owner | 2026-10-09 | Yes for rules; secrets and devices stay in the TOML file | Settings page, `app_settings` table, DR-11 |
 | C-09 | After the review, should the SIP2 wire protocol be added after all (it was left out in C-01)? | Project owner | 2026-10-09 | Yes: SIP2 only for now, on the same branch (`overall-fixes`); NCIP stays out | SIP2 driver, simulator and tests; FR03 `done`; A-33 to A-40; DR-12; R-16 reworded; `docs/sip2.md` |
 | C-10 | The final coverage review found NCIP 2.0 still unbuilt. Is an NCIP 2.0 adapter needed, given SIP2 is implemented? | Project owner | 2026-10-09 | No: the requirement says SIP2/NCIP 2.0 and SIP2 is implemented, so NCIP is not needed | NCIP not built and not claimed; FR03 `done` through SIP2; A-41; DR-13; `docs/remaining-work.md` keeps NCIP as an extension |
+| C-11 | The first fix for D-052 signs staff out whenever `/opac` is loaded, with side effects (cross-site logout, lost desk tabs, revoked API tokens). Which approach? (1) explicit hand-over; (2) hand-over plus kiosk host names; (3) keep and document | Project owner | 2026-10-10 | (2) hand-over plus kiosk host names | DR-17, A-44, D-055 |
 
 ### Open questions from the first draft, resolved or still open
 

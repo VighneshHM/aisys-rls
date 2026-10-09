@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.exc import StatementError
@@ -24,6 +24,7 @@ from aisys.circulation.registry import build_connector
 from aisys.circulation_routes import router as circulation_router
 from aisys.config import Settings, load_settings
 from aisys.db import make_engine, make_sessionmaker
+from aisys.gate import service as gate_service
 from aisys.gate_routes import notify_router
 from aisys.gate_routes import router as gate_router
 from aisys.integrations.credentials import CredentialProvider, MockCredentialProvider
@@ -77,8 +78,9 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        """Run the notification loop (if `auto_dispatch_seconds` is set) for as long as the application runs."""
-        loop = None
+        """Run the notification loop (if `auto_dispatch_seconds` is set) and the gate loop (if `[gate] poll_seconds`
+        is set) for as long as the application runs."""
+        loop = gate_loop = None
         if settings.notifications.auto_dispatch_s > 0:
             loop = runner.Loop(
                 lambda: runner.run_once(
@@ -90,12 +92,22 @@ def create_app(
                 settings.notifications.auto_dispatch_s,
                 paused=app.state.maintenance.is_set,
             ).start()
-        app.state.notify_loop = loop
+        if settings.gate.poll_seconds > 0:
+
+            def gate_pass() -> dict:
+                with app.state.session_factory() as db:
+                    return gate_service.poll_all(db, app.state.devices, app.state.settings.gate)
+
+            gate_loop = runner.Loop(
+                gate_pass, settings.gate.poll_seconds, paused=app.state.maintenance.is_set, name="aisys-gate"
+            ).start()
+        app.state.notify_loop, app.state.gate_loop = loop, gate_loop
         try:
             yield
         finally:
-            if loop is not None:
-                loop.stop()
+            for running in (loop, gate_loop):
+                if running is not None:
+                    running.stop()
 
     app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
     app.state.settings = settings
@@ -171,6 +183,29 @@ def create_app(
                 headers={"Retry-After": "5"},
             )
         return await call_next(request)
+
+    kiosk_hosts = frozenset(settings.opac_kiosk_hosts)
+
+    @app.middleware("http")
+    async def kiosk_host(request: Request, call_next):
+        """A public terminal reaches the system by a kiosk host name ([opac] kiosk_hosts). There, only the public
+        catalogue exists: every staff page and API answers "not found", no sign-in is possible, and any session cookie
+        or token the browser sends is dropped before the request is handled, so a staff session can never be used
+        or shown there. Staff use the normal host name, so their sessions are never touched by a visitor's page."""
+        if not kiosk_hosts or (request.url.hostname or "").lower() not in kiosk_hosts:
+            return await call_next(request)
+        path = request.url.path
+        if path == "/":
+            return RedirectResponse("/opac", status_code=303)
+        if not (path == "/opac" or path.startswith(("/api/opac/", "/static/")) or path in ("/health", "/health/ready")):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        request.scope["headers"] = [
+            (k, v) for k, v in request.scope["headers"] if k not in (b"cookie", b"authorization")
+        ]
+        response = await call_next(request)
+        if "set-cookie" in response.headers:
+            del response.headers["set-cookie"]
+        return response
 
     app.mount(
         "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"

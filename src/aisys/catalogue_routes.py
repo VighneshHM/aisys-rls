@@ -1,4 +1,4 @@
-"""HTTP API for the catalogue: locate and create items."""
+"""HTTP API for the catalogue: locate, create and correct items, and change a copy's status."""
 
 from __future__ import annotations
 
@@ -114,3 +114,44 @@ def create_item(
     except service.CatalogueError as exc:
         raise _raise(exc) from exc
     return service.item_out(item)
+
+
+class ItemPatch(BaseModel):
+    """Corrections to a record, or a new status for the copy. Fields left out stay as they are; the accession number
+    is fixed (it is written on the tag)."""
+
+    model_config = ConfigDict(extra="forbid")
+    title: str | None = None
+    author: str | None = None
+    isbn: str | None = None
+    publisher: str | None = None
+    pub_year: int | str | None = None
+    edition: str | None = None
+    language: str | None = None
+    barcode: str | None = None
+    call_number: str | None = None
+    location: str | None = None
+    item_type: str | None = None
+    status: str | None = None
+    price: float | str | None = None
+    acquired_on: str | None = None
+    reason: str = ""  # why the status changed (e.g. "water damage"), kept in the audit log
+
+
+@router.patch("/items/{item_id}")
+def update_item(
+    item_id: int,
+    body: ItemPatch,
+    request: Request,
+    principal: Principal = Depends(require("catalogue.write")),
+    db: Session = Depends(get_db),
+):
+    """Correct a record, or mark a copy damaged, lost, withdrawn or available again. Audited; nothing is deleted."""
+    changes = {k: str(v) for k, v in body.model_dump(exclude={"reason"}).items() if v is not None}
+    try:
+        item = service.update_item(
+            db, item_id, changes, reason=body.reason, actor=principal.user.username, ip=client_ip(request)
+        )
+    except service.CatalogueError as exc:
+        raise _raise(exc) from exc
+    return service.item_out(item, service.active_tag(db, item.id))

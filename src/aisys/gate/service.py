@@ -111,6 +111,31 @@ def process(db: Session, registry: DeviceRegistry, gate_id: str, config: GateCon
     return [event_out(e, has_image=_has_image(db, e.id)) for e in created]
 
 
+def poll_all(db: Session, registry: DeviceRegistry, config: GateConfig, *, include_mock: bool = False) -> dict:
+    """Read every configured gate once: the production path from a real gate to events, alarms, snapshots and alerts.
+
+    Run by the application's gate loop (`[gate] poll_seconds`), by `aisys gate-poll` and by the Gate events page.
+    Simulator gates are skipped unless asked for: in development the simulator hands its passages over itself. One gate
+    that is offline or fails is reported and does not stop the others.
+    """
+    out: dict = {"gates": {}, "events": 0, "alarms": 0}
+    for device in registry.all():
+        if device.kind != "gate" or (getattr(device, "is_mock", False) and not include_mock):
+            continue
+        try:
+            events = process(db, registry, device.device_id, config)
+        except GateError as exc:
+            db.rollback()
+            out["gates"][device.device_id] = {"ok": False, "error": exc.message}
+            log.warning("gate %s could not be read: %s", device.device_id, exc.message)
+            continue
+        alarms = sum(1 for e in events if e["alarm"])
+        out["gates"][device.device_id] = {"ok": True, "events": len(events), "alarms": alarms}
+        out["events"] += len(events)
+        out["alarms"] += alarms
+    return out
+
+
 def _record(db, gate, camera, config: GateConfig, passage: GatePassage, obs) -> GateEvent:
     armed = True if obs.security_armed is None else bool(obs.security_armed)  # unreadable: fail safe
     links = tag_links(db, obs.uid)

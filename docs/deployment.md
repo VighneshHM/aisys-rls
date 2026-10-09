@@ -62,7 +62,6 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 | `[circulation] loan_days`, `max_renewals`, `max_loans` | 14, 2, 5 | loan policy (the ILMS owns it; the mock applies it) |
 | `[circulation] fine_per_day_cents`, `grace_days`, `max_fine_per_loan_cents` | 25, 1, 1000 | the fine rule |
 | `[ilms] driver` | mock | the ILMS connector: `mock`, or `sip2` to speak SIP2 over TCP (`docs/sip2.md`) |
-| `[ilms] protocol` | sip2 | `sip2` or `ncip` (the wording the mock imitates; the `sip2` driver ignores it) |
 | `[ilms] endpoint`, `port` | empty, 0 | the ILMS host and its SIP2 port; both are required by `driver = "sip2"` (the application will not start without them) |
 | `[ilms] login` | empty | SIP2 login user; empty means no login is sent |
 | `[ilms] institution`, `location` | empty, empty | SIP2 institution id (AO) and location code (CP, AP) |
@@ -70,11 +69,13 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 | `[ilms] checksum` | true | SIP2 error detection (sequence digit and checksum); turn off only if the ILMS rejects it |
 | `[ilms] retries`, `backoff_s` | 2, 0.1 | extra attempts and the wait between them |
 | `[gate] duplicate_window_s` | 60 | a repeat alarm for the same tag within this many seconds is recorded, not re-sent |
+| `[gate] poll_seconds` | 0 (2 in the sample file) | read every real gate this often while the application runs; 0 = off (then run `aisys gate-poll --every 2`, not both) |
 | `[notifications] email, sms, print` | mock | the provider driver per channel |
 | `[notifications] max_attempts`, `backoff_s` | 3, 60 | delivery attempts before a message is marked failed; the wait grows with each failure |
 | `[notifications] reminders`, `remind_days_before` | true, 1 | patron loan reminders and how many days ahead (1 to 30) |
 | `[notifications] auto_dispatch_seconds` | 0 (sample file: 60) | how often the running app queues reminders and delivers messages; 0 = off |
 | `[opac] enabled` | true | the public catalogue at `/opac` |
+| `[opac] kiosk_hosts` | [] | host names that serve only the public catalogue, for public terminals (see *Public terminals*) |
 | `[netcat] driver` | mock | where net cataloguing looks books up |
 | `[server] tls_certfile`, `tls_keyfile` | empty | serve HTTPS directly (both or neither) |
 
@@ -249,7 +250,24 @@ nothing in a site installation depends on an internet trust store.
 `python scripts/sbom_lock.py` regenerates the inventory; the test suite fails until it is current, and a copyleft or unknown
 licence in a runtime package is marked **needs review** and must be cleared before release.
 
+## Public terminals (kiosk host names)
+
+A screen in the reading room should never be able to reach a staff page. Give it its own host name for the same server:
+
+1. Add a DNS name (or a hosts-file line on the terminal), for example `opac.library.local`, pointing at the server.
+2. List it in the configuration: `[opac] kiosk_hosts = ["opac.library.local"]`, and restart the application.
+3. Set the terminal's browser home page to `https://opac.library.local/`.
+
+On that name the server offers only the catalogue: `/` opens `/opac`, every other page and API answers "not found",
+sign-in is impossible, and any cookie or token the browser sends is ignored. Staff keep using the normal name, so a
+visitor's page can never sign them out. On a shared staff screen, use the menu's **Public catalogue** button, which signs
+you out before opening the catalogue (DR-17).
+
 ## Running in production: service, scheduled jobs, TLS
+
+Background work inside the application: the message loop (`[notifications] auto_dispatch_seconds`) and the gate loop
+(`[gate] poll_seconds`). Either can instead run as its own scheduled process: `python -m aisys.cli notify-dispatch --every 60`
+and `python -m aisys.cli gate-poll --every 2`. Run each job in one place only.
 
 These are **documented examples, not tested here**: the exercise has no production server. Adapt them to the site.
 

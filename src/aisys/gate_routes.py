@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from aisys import audit
 from aisys.circulation.service import CircError, resolve_item
 from aisys.config import Settings
 from aisys.deps import Principal, client_ip, get_db, get_settings, require
@@ -92,6 +93,18 @@ def event_image(event_id: int, _: Principal = CanView, db: Session = Depends(get
     )
 
 
+@router.post("/poll")
+def poll_gates(
+    _: Principal = CanView,
+    db: Session = Depends(get_db),
+    devices: DeviceRegistry = Depends(get_devices),
+    settings: Settings = Depends(get_settings),
+):
+    """Read every real gate now (the gate loop does this by itself when `[gate] poll_seconds` is set). Simulator
+    gates are not read here: in development they hand their passages over when someone walks through."""
+    return service.poll_all(db, devices, settings.gate)
+
+
 # ------------------------------------------------------------------ development simulator (404 in production)
 class WalkIn(BaseModel):
     item_refs: list[str] = Field(default_factory=list, max_length=20)  # accession no., barcode or tag UID
@@ -172,32 +185,48 @@ def list_notifications(
     )
 
 
+def _audit(db: Session, principal: Principal, request: Request, action: str, detail: dict, entity_id=None) -> None:
+    """Every administrative action is recorded (SOP section 10), including the hand-run notification ones."""
+    audit.record(
+        db, actor=principal.user.username, action=action, entity="notification", entity_id=entity_id, detail=detail,
+        ip=client_ip(request),
+    )  # fmt: skip
+    db.commit()
+
+
 @notify_router.post("/dispatch")
 def dispatch(
-    _: Principal = CanAdmin,
+    request: Request,
+    principal: Principal = CanAdmin,
     db: Session = Depends(get_db),
     providers: dict[str, NotificationProvider] = Depends(get_providers),
     settings: Settings = Depends(get_settings),
 ):
     """Deliver every queued message that is due (failures are retried later, up to the configured limit)."""
-    return queue.dispatch(db, providers, settings.notifications)
+    result = queue.dispatch(db, providers, settings.notifications)
+    _audit(db, principal, request, "notification.dispatch", {k: result[k] for k in ("tried", "sent", "failed")})
+    return result
 
 
 @notify_router.post("/reminders/run")
 def run_reminders(
-    _: Principal = CanAdmin,
+    request: Request,
+    principal: Principal = CanAdmin,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ):
     """Queue the patron reminders that are due today (the background loop does this by itself)."""
-    return reminders.scan(db, settings.notifications, library_name=settings.app_name)
+    result = reminders.scan(db, settings.notifications, library_name=settings.app_name)
+    _audit(db, principal, request, "notification.reminders_run", {"queued": result.get("queued", 0)})
+    return result
 
 
 @notify_router.post("/{notification_id}/retry")
-def retry(notification_id: int, _: Principal = CanAdmin, db: Session = Depends(get_db)):
+def retry(notification_id: int, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)):
     row = queue.retry(db, notification_id)
     if row is None:
         raise HTTPException(409, detail={"message": "Only a failed notification can be retried", "problems": []})
+    _audit(db, principal, request, "notification.retry", {"channel": row.channel}, entity_id=row.id)
     return queue.notification_out(row)
 
 

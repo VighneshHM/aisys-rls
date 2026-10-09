@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +31,8 @@ class Settings:
     log_format: str = "json"
     backup_dir: str = "data/backups"
     opac_enabled: bool = True  # the public catalogue search
+    # host names that serve ONLY the public catalogue (public terminals): no staff page, no sign-in, no session
+    opac_kiosk_hosts: tuple[str, ...] = ()
     tls_certfile: str = ""  # serve HTTPS directly (otherwise put a TLS proxy in front)
     tls_keyfile: str = ""
     netcat_driver: str = "mock"  # where net cataloguing looks books up
@@ -38,6 +41,22 @@ class Settings:
     notifications: NotificationConfig = NotificationConfig()
     gate: GateConfig = GateConfig()
     secret_key: str = field(default="", repr=False)
+
+
+HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def _kiosk_hosts(value) -> tuple[str, ...]:
+    """[opac] kiosk_hosts: a list of host names (no port, no scheme), e.g. ["opac.library.local"]."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        raise ValueError('[opac] kiosk_hosts must be a list of host names, e.g. ["opac.library.local"]')
+    hosts = tuple(str(h).strip().lower() for h in value if str(h).strip())
+    bad = [h for h in hosts if not HOST_RE.match(h)]
+    if bad:
+        raise ValueError(f"[opac] kiosk_hosts: not a host name: {', '.join(bad)} (no port, scheme or path)")
+    return hosts
 
 
 def _port(value) -> int:
@@ -90,6 +109,11 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         or DEFAULT_DEVICES
     )
     circ, ilms = raw.get("circulation", {}), raw.get("ilms", {})
+    if str(ilms.get("protocol", "sip2")).strip().lower() != "sip2":  # older files had a mock "dialect" switch
+        raise ValueError(
+            "[ilms] protocol: only SIP2 is supported (NCIP 2.0 is not built, see docs/decisions.md DR-13); "
+            'remove the line or set protocol = "sip2"'
+        )
     dc = CirculationConfig()
     circulation = CirculationConfig(
         fine_limit_cents=int(circ.get("fine_limit_cents", dc.fine_limit_cents)),
@@ -100,7 +124,6 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         grace_days=int(circ.get("grace_days", dc.grace_days)),
         max_fine_per_loan_cents=int(circ.get("max_fine_per_loan_cents", dc.max_fine_per_loan_cents)),
         ilms_driver=str(ilms.get("driver", dc.ilms_driver)),
-        ilms_protocol=str(ilms.get("protocol", dc.ilms_protocol)),
         ilms_endpoint=str(ilms.get("endpoint", dc.ilms_endpoint)).strip(),
         ilms_port=_port(ilms.get("port", dc.ilms_port)),
         ilms_login=str(ilms.get("login", dc.ilms_login)),
@@ -124,7 +147,12 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         remind_days_before=min(max(int(notif.get("remind_days_before", dn.remind_days_before)), 1), 30),
         auto_dispatch_s=_interval(notif.get("auto_dispatch_seconds", dn.auto_dispatch_s)),
     )
-    gate = GateConfig(duplicate_window_s=int(gate_raw.get("duplicate_window_s", dg.duplicate_window_s)))
+    poll_s = float(gate_raw.get("poll_seconds", dg.poll_seconds))
+    if poll_s != 0 and not 0.5 <= poll_s <= 3600:
+        raise ValueError("[gate] poll_seconds must be 0 (off) or between 0.5 and 3600")
+    gate = GateConfig(
+        duplicate_window_s=int(gate_raw.get("duplicate_window_s", dg.duplicate_window_s)), poll_seconds=poll_s
+    )
     d = Settings()
 
     settings = Settings(
@@ -140,6 +168,7 @@ def load_settings(path: str | os.PathLike[str] | None = None) -> Settings:
         log_format=log.get("format", d.log_format),
         backup_dir=os.environ.get("AISYS_BACKUP_DIR", backup.get("dir", d.backup_dir)),
         opac_enabled=bool(opac.get("enabled", d.opac_enabled)),
+        opac_kiosk_hosts=_kiosk_hosts(opac.get("kiosk_hosts", [])),
         tls_certfile=os.environ.get("AISYS_TLS_CERTFILE", str(server.get("tls_certfile", d.tls_certfile))),
         tls_keyfile=os.environ.get("AISYS_TLS_KEYFILE", str(server.get("tls_keyfile", d.tls_keyfile))),
         netcat_driver=str(netcat.get("driver", d.netcat_driver)),

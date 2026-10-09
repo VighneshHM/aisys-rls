@@ -97,7 +97,7 @@ src/aisys/
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              26 test files, 745 test cases
+tests/              27 test files, 770 test cases
 scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
@@ -202,7 +202,7 @@ the pre-update backup only when the update changed the database layout; otherwis
 
 - **Sources:** a spreadsheet (`.csv` or `.xlsx`; samples of 200 and 20,000 rows in `samples/`, all synthetic), the mock
   readers/gate/handheld, the mock ILMS, and the user interface.
-- **Storage:** one SQLite file (`data/aisys.db`, WAL mode). 29 tables plus the full-text index. Migrations `0001` to `0010` ship inside the package.
+- **Storage:** one SQLite file (`data/aisys.db`, WAL mode). 30 tables plus the full-text index. Migrations `0001` to `0011` ship inside the package.
 - **Lifecycle of important data:** import rows are staged then `migrated`; items are inserted only; tags have intervals
   (a re-tag creates a new row, history kept); loans stay forever (open while `returned_at` is null); the audit log,
   circulation events, fine ledger and gate events are append-only (database triggers reject UPDATE and DELETE).
@@ -237,7 +237,7 @@ Every endpoint other than login and health needs a session and a named permissio
 - **Mock-only endpoints** (`/mock/...`: place a tag on the reader, power a device, fail the ILMS, walk through the gate,
   disaster drill, fail the next import) exist only outside production and return 404 in production.
 - **ILMS integration:** `CirculationConnector` (checkout, checkin, renew, patron status) with `ResilientConnector` on top.
-  The default mock speaks "SIP2" or "NCIP" in naming only. With `[ilms] driver = "sip2"` the **SIP2 protocol (3M 2.00) is spoken
+  The default mock answers in SIP2 wording (it speaks no protocol). With `[ilms] driver = "sip2"` the **SIP2 protocol (3M 2.00) is spoken
   over TCP** (`circulation/sip2/`, `docs/sip2.md`), verified before any repeat so a lost answer never lends or renews twice.
   It was tested only against the simulator in the repository (`python -m aisys.cli sip2-sim`): **no certification is claimed and no
   vendor ILMS was used. NCIP 2.0 is not implemented.** SIP2 is unencrypted, so use a tunnel to the ILMS.
@@ -285,7 +285,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **745 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
+- **770 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -303,12 +303,13 @@ Every endpoint other than login and health needs a session and a named permissio
   - Automated UI tests only check assets and pages render; interactive behaviour was verified by hand in the browser.
   - Load tests are limited to the sizes above on one machine; there is no multi-user soak test.
   - The lifecycle was exercised on Windows only. Linux is expected to work but is unverified.
-  - The AC09 CI runs use a fake release (no real virtual environment) for most tests; the real path is covered by the demo
-    script and my manual probes, not by CI.
+  - Most AC09 unit tests use a fake release (no real virtual environment) for speed; the real path (real install, signed
+    update, rollback, with the network blocked) runs in CI as the `lifecycle-demo` job (`scripts/lifecycle_demo.py`).
 
 ## 11. Deployment
 
-- **Run from source (development):** `python -m pip install -e ".[dev]"`, `python -m aisys.cli seed-demo`,
+- **Run from source (development):** `python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock`,
+  `python -m pip install -e . --no-deps --no-build-isolation`, `python -m aisys.cli seed-demo`,
   `python -m aisys.cli run`, open http://127.0.0.1:8000. Demo staff cards and the admin password are in the README.
 - **Offline installation (the delivered way):** build a signed package on a machine with internet once
   (`scripts/release.py`), copy the `.zip` and the vendor public key to the target, `python install.py --root <short folder>

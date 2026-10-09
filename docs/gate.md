@@ -3,6 +3,21 @@
 A gate mock reads every tag that passes. A tag whose security bit is still on and that is not on loan raises an alarm:
 the accession number is recorded, a CCTV snapshot is taken, and a message is queued for each person who asked to be told.
 
+## How passages reach the system (DR-18)
+
+A gate driver implements `Gate.poll()`, which returns the passages since the last call. In production something must
+call it, and there are three ways, all using `gate.service.poll_all` (every configured gate that is not a simulator):
+
+| Way | How | When to use |
+|---|---|---|
+| The gate loop inside the application | `[gate] poll_seconds = 2` (0 = off); pauses during a restore | the normal set-up |
+| A separate process | `python -m aisys.cli gate-poll --every 2` (once without `--every`; exit code 1 if a gate could not be read) | if the web application is restarted often, or runs on another machine |
+| On demand | **Read the gates now** on Gate events, or `POST /api/gate/poll` (`gate.view`) | checking a gate after maintenance |
+
+Use the loop **or** the separate process, not both: each passage is handed over once, to whoever reads it first. An offline
+gate is reported (`ok: false` with the reason) and the other gates are still read. Simulator gates are never read here: in
+development the simulator hands its passages over itself when someone walks through.
+
 ## How an alarm is decided
 
 The alarm comes **only from the security bit read from the tag at the gate**. The gate never calls the library system
@@ -57,9 +72,10 @@ If the camera fails, the alarm is still recorded and announced, and the message 
 | POST | `/api/notifications/dispatch`, `/{id}/retry` | `admin.config` |
 | GET | `/api/notifications/outbox`, `/prefs` | `admin.config` |
 | PUT | `/api/notifications/prefs/{user_id}` `{channels: {email|sms|print: {active, address}}}` | `admin.config` |
+| read the gates | `POST /api/gate/poll` (needs `gate.view`): reads every real gate once and returns events and alarms per gate | |
 | simulator | `POST /api/gate/mock/gates/{id}/walk`, `/mock/camera/fail` (need `rfid.tag`); `POST/DELETE /api/notifications/mock/fail` (needs `admin.config`); 404 in production | |
 
-Configuration: `[gate] duplicate_window_s`, `[notifications] email|sms|print`, `max_attempts`, `backoff_s`, and
+Configuration: `[gate] duplicate_window_s`, `[gate] poll_seconds`, `[notifications] email|sms|print`, `max_attempts`, `backoff_s`, and
 `[[devices]]` entries with `kind = "gate"` and `kind = "camera"`.
 
 ## Demo data
@@ -70,7 +86,7 @@ Configuration: `[gate] duplicate_window_s`, `[notifications] email|sms|print`, `
 ## Known limits
 
 - Mock gate and camera only. Gate hardware that pushes events would need a small driver that feeds `process`.
-- The gate is polled on demand (the simulator walks a person through and processes at once); there is no background poller.
+- Gates are read by polling (`Gate.poll()`); a gate that pushes events needs a driver that queues them for `poll()` to return.
 - SMS and print are mock providers. Patron notices (overdue, holds) are not built yet; they would use the same queue.
 - Recipients are staff users only.
 - Acknowledging or closing an alarm (who handled it, and when) is not built.

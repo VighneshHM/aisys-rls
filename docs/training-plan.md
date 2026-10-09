@@ -18,17 +18,17 @@ hands-on; nobody trains on real members.
 
 | Module | For | Length | Content | Practice (with demo data) |
 |---|---|---|---|---|
-| 1. First steps | everyone | 30 min | What the system does; signing in with a staff card; the menu for your role; what a patron card is not | Sign in as each role; try the patron card and see why it is refused |
+| 1. First steps | everyone | 30 min | What the system does; signing in with a staff card; the menu for your role; what a patron card is not; leaving a screen for visitors with **Public catalogue** (it signs you out) | Sign in as each role; try the patron card and see why it is refused |
 | 2. Circulation | clerks, librarians | 90 min | Find a member; check out, renew, check in; reading a refusal; fines; the reader's beeps and lights | Priya borrows two books; check out the blocked member (M0003) and the member over the limit (M0004); return a late book |
 | 3. Members and cards | clerks, librarians | 45 min | Add a member with contact details; issue and replace a card; print a card; reminders and opt-out | Add a member, issue a card, print it, switch reminders off |
-| 4. Catalogue and tagging | librarians | 90 min | Add an item (with ISBN lookup); search; tag, remove, retire, re-tag; reading the tag-to-item link | Add five books, tag three, retire one |
+| 4. Catalogue and tagging | librarians | 90 min | Add an item (with ISBN lookup); search; correct a record; mark a copy damaged, lost or withdrawn; tag, remove, retire, re-tag; reading the tag-to-item link | Add five books, correct one author, withdraw one copy, tag three, retire one |
 | 5. Inventory and shelves | librarians | 90 min | A shelf sweep; missing, misplaced, unknown, out of order; the virtual bookshelf; capacity | Sweep a shelf with stray and missing books; fix what the report lists |
 | 6. Labels | librarians | 30 min | Spine and barcode labels; browser printing and the label printer | Print the labels for a shelf |
 | 7. Orders and serials | librarians | 60 min | Make, place and receive an order; subscriptions, receiving issues, claiming late ones | Order and receive two titles; add a monthly journal and claim a late issue |
 | 8. Importing | librarians | 60 min | The staged import: mapping, problems, duplicates, reconciliation, rollback | Import the 200-row sample, read the problem list, roll it back |
-| 9. The gate | security staff, librarians | 45 min | Reading an alarm; the camera picture; alert preferences; what happens when mail is down | Walk a book through the gate; send and retry the queued message |
+| 9. The gate | security staff, librarians | 45 min | Reading an alarm; the camera picture; alert preferences; what happens when mail is down; the gate loop and **Read the gates now**; an offline gate | Walk a book through the gate; send and retry the queued message |
 | 10. Reports | librarians, auditors | 45 min | Dashboard, the seven reports, filters, CSV | Answer three questions from the reports |
-| 11. Administration | administrators | 90 min | People and roles, cards, locking out and unlocking, the audit log | Add a staff member, issue a card, deactivate, read your own actions in the audit log |
+| 11. Administration | administrators | 120 min | People and roles, custom roles, cards, locking out and unlocking, the Settings page (library rules, Use file value), public terminals on a kiosk host name, the audit log | Add a staff member, issue a card, make a custom role and give it to them, change the loan period and undo it, read your own actions in the audit log |
 | 12. Keeping it safe | administrators | 90 min | Backups, comparing, restoring; the disaster drill; updating and rolling back offline; health checks and the doctor | Run the drill; install, update and roll back with `scripts/lifecycle_demo.py` |
 | 13. When something goes wrong | administrators, librarians | 45 min | The troubleshooting table; where to look (health, audit log, status); who to call | Work through three faults from the table |
 

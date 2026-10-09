@@ -121,8 +121,8 @@ Offline: the whole system installs and updates from a signed package with no int
 
 ## 5. Database
 
-SQLite in WAL mode through SQLAlchemy 2; versioned migrations `0001` to `0010` (Alembic, shipped inside the package) create it.
-29 tables (see `docs/data-dictionary.md` for every column and the full diagram). Core relationships:
+SQLite in WAL mode through SQLAlchemy 2; versioned migrations `0001` to `0011` (Alembic, shipped inside the package) create it.
+30 tables (see `docs/data-dictionary.md` for every column and the full diagram). Core relationships:
 
 ```mermaid
 erDiagram
@@ -164,7 +164,7 @@ All are `typing.Protocol`s with a mock and a registry; a real implementation is 
 
 | Interface | Methods (summary) | Mock | Failure behaviour |
 |---|---|---|---|
-| `CirculationConnector` | `patron_status`, `checkout`, `renew`, `checkin`, `due_date` | `MockIlms` (words replies as SIP2 or NCIP); `Sip2Connector` (SIP2 over TCP, simulator in `sip2/server.py`) | `ResilientConnector`: bounded retries with the same transaction id; timeouts surface as "try again", never a half-recorded loan; the SIP2 connector also verifies with the ILMS before repeating a request whose answer was lost |
+| `CirculationConnector` | `patron_status`, `checkout`, `renew`, `checkin`, `due_date` | `MockIlms` (answers in SIP2 wording); `Sip2Connector` (SIP2 over TCP, simulator in `sip2/server.py`) | `ResilientConnector`: bounded retries with the same transaction id; timeouts surface as "try again", never a half-recorded loan; the SIP2 connector also verifies with the ILMS before repeating a request whose answer was lost |
 | `StaffReader` | `read_field`, `encode`, `set_security`, `clear`, `indicate` | `MockStaffReader` (simulated pad) | write device first, database second, undo the device if the save fails |
 | `Handheld` | `scan`, `indicate` | `MockHandheld` (loads a shelf from the catalogue) | each tag earns a beep and a light |
 | `Gate` | `poll` (passages: tags seen, people count), `indicate` | `MockGate` | alarm decided from the security bit only |

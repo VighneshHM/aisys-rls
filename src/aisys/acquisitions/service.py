@@ -9,7 +9,7 @@ free accession number ("ACQ000001"). The new copies have no RFID tag yet: taggin
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -19,7 +19,7 @@ from aisys import audit
 from aisys.catalogue import service as catalogue
 from aisys.migration import validation
 from aisys.models import Item, PoLine, PurchaseOrder, utcnow
-from aisys.timeutil import iso
+from aisys.timeutil import iso, library_today
 
 MAX_QUANTITY = 1000
 MAX_LINES = 200
@@ -87,7 +87,7 @@ def _clean_line(raw: dict) -> dict:
     if isbn and not validation.isbn_valid(isbn):
         problems.append({"field": "isbn", "message": "That ISBN is not valid"})
     year = raw.get("pub_year")
-    if year is not None and (not isinstance(year, int) or not 1400 <= year <= date.today().year + 1):
+    if year is not None and (not isinstance(year, int) or not 1400 <= year <= library_today().year + 1):
         problems.append({"field": "pub_year", "message": "Year of publication looks wrong"})
     location = " ".join(str(raw.get("location") or "").split())
     if len(location) > 100:
@@ -256,7 +256,7 @@ def receive(db: Session, order_id: int, receipts: list[dict], *, actor: str, ip:
                         "accession_no": next_accession(db),
                         "location": line.location,
                         "price": f"{line.unit_price_cents / 100:.2f}",
-                        "acquired_on": date.today().isoformat(),
+                        "acquired_on": library_today().isoformat(),
                     },
                     actor=actor,
                     ip=ip,

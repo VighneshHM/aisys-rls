@@ -43,11 +43,14 @@ listed and nothing is claimed about them.
 | #19 | `feature/patron-reminders` | Patron loan reminders and notification loop | 2026-10-08 | FR09 (reminders, A-25) |
 | #21 | `overall-fixes` | Remaining requirements, search, shelves, acquisitions, serials, labels, deliverable documents, doc-generator ordering, parallel CI tests | 2026-10-09 | FR01, FR02, NFR03 to NFR09 (documents), NFR05 (CI speed-up) |
 | #22 | `overall-fixes` | Settings page, type check, hashed lock file, SBOM, remaining deliverable documents, SIP2 wire protocol, bytecode fix for the signed package | 2026-10-09 | FR11 (Settings page), FR03 (SIP2), NFR04, NFR06, AC09 |
-| (next) | `fix/sop-gaps` | Final SOP gap closure: custom roles, one member-card check, real network block in the offline rehearsal, split lock files, full licence inventory, stage timeline, UAT additions, release tag | open at the time of writing | FR03 (NCIP decision, DR-13), FR05, FR11, NFR04, NFR05, NFR09, AC09 |
+| #23 | `fix/sop-gaps` | First SOP coverage review: custom roles, one member-card check, network-blocked offline rehearsal, split lock files, full licence inventory, stage timeline, UAT additions; UI patches (public catalogue session, scrolling menu) | 2026-10-09 | FR03 (NCIP decision, DR-13), FR05, FR11, NFR02, NFR04, NFR05, NFR09, AC09 |
+| #24 | `fix/sop-gaps` | Public catalogue fix (D-052 amended) | 2026-10-09 | NFR02, FR02 |
+| (next) | `fix/review-gaps` | Second SOP coverage review: public-catalogue hand-over and kiosk hosts, production gate reading, catalogue corrections and status, audited notification actions, NCIP option removed, documents brought up to date | open at the time of writing | NFR02, FR02 (DR-17), FR07 (DR-18), FR01 (DR-19), FR03 (DR-13), SOP section 10 |
 
 Note on #21 and #22: both merged the same branch, `overall-fixes`. #21 (`3b11886`) carried `ad8a3b6`, `51c4a1b` and `f38be77`;
-#22 (`2a1681c`) carried `39d38fe`, `d777380` and `6ef3588`. The last row is the branch that closes the gaps found by the final
-coverage review; its pull-request number is given by GitHub when it is opened, so none is claimed here.
+#22 (`2a1681c`) carried `39d38fe`, `d777380` and `6ef3588`. #23 (`841e3f4`) and #24 (`ded36b9`) both merged
+`fix/sop-gaps`: #23 carried `791ce55` and `dd96b88`, #24 carried `52f26a8`. The last row closes the gaps found by the
+second coverage review; its pull-request number is given by GitHub when it is opened, so none is claimed here.
 The requirement mapping above is by feature area and the notes column of `docs/requirements.csv`; the full test-level mapping
 is the generated `docs/traceability.md`.
 
@@ -70,7 +73,7 @@ and the dates below come from `git log`.
 | D7 | 6 Migration and resilience | Profiling, validation, dry run, reconciliation, migration into the test database, rollback and restore | PR #1, #6, #14; `docs/samples/` | 2026-10-05 to 2026-10-08 |
 | D8 | 7 Verification | Functional, integration, regression, performance, security, migration, backup, restore, offline-update and rollback tests; every result mapped to a requirement; defects triaged and retested | PR #16, #21, #22; `docs/traceability.md`, `docs/test-plan.md`, `docs/defect-log.md`, `docs/uat.md` | 2026-10-08 to 2026-10-09 |
 | D9 | Demonstration (deliverable D9) | Demo script, presentation, known limitations, production backlog | `docs/demo-script.md`, `docs/presentation.html`, `docs/remaining-work.md` | 2026-10-09 |
-| D10 | Hand-over | Final coverage review against the SOP, gap closure, evaluation release tag `v0.1.0` (the package version) | branch `fix/sop-gaps`; tag `v0.1.0` on `main` | 2026-10-09 to 2026-10-10 |
+| D10 | Hand-over | Two coverage reviews against the SOP and their gap closures; evaluation release tag `v0.1.0` (the package version), **to be created on `main` by the project owner once the last pull request is merged** | PR #23, #24, branch `fix/review-gaps` | 2026-10-09 to 2026-10-10 |
 
 Work remaining for production readiness is listed in `docs/remaining-work.md`.
 

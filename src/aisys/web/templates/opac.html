@@ -9,6 +9,12 @@
     <a href="/" class="btn ghost small" style="margin-left:auto">{{ icon("dash") }} Return to home page</a>
   </header>
 
+  {% if staff_signed_in %}
+  <div class="notice show warn" role="alert" style="margin:0 0 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:220px"><b>A staff member is still signed in on this browser.</b> Before leaving this screen for visitors, sign out.</span>
+    <form method="post" action="/handover" style="margin:0"><button class="btn small" type="submit">Sign out and keep the catalogue open</button></form>
+  </div>
+  {% endif %}
   <form id="form" role="search" class="panel" style="padding:16px">
     <label for="q" style="font-weight:600">Search by title, author, subject word, publisher or ISBN</label>
     <div style="display:flex;gap:8px;margin-top:8px">

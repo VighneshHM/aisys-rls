@@ -9,6 +9,7 @@ What was checked, how, and what is left. Each row can be re-run.
 | Static analysis for security defects (Bandit rules) | `ruff check` with the `S` rule set, on every pull request | clean; the few intentional exceptions (subprocess with a fixed argument list, the demo password, constant SQL in migrations) carry a comment saying why |
 | Known vulnerabilities in dependencies | `pip-audit` on `requirements.lock` and `requirements-dev.lock` on every pull request | found 7 in the signing library `cryptography` 48.0.0 during this work; fixed by pinning 50.0.2; clean now |
 | Secrets in the repository | review of `git ls-files`, `.gitignore` (keys, `.env`, `config/config.toml`, databases, `release-keys/` ignored) | none committed; the only credentials are the synthetic demo cards and the documented demo administrator password |
+| Every administrative action recorded (SOP section 10) | the audit log | staff, cards, roles, settings, backups, restores, catalogue corrections and status changes, and the hand-run notification actions (send queued messages, run reminders, retry: added for D-058) each write an audit line with the actor; circulation goes to the append-only history |
 | Permissions on every endpoint | `docs/api-reference.md` is generated from the routes and lists the permission each needs; tests call the sensitive ones with the wrong role | a role without the permission gets 403 and an audit line; no endpoint but sign-in, health and the public catalogue is public |
 | Passwords and sign-in | `test_foundation`: scrypt hashing, lockout after repeated failures, patron card cannot sign in, disabled person or card refused | passes |
 | Session handling | `test_admin`: deactivating a person ends their open sessions at once; tokens are stored hashed | passes |
@@ -48,9 +49,13 @@ What was checked, how, and what is left. Each row can be re-run.
 * All data is synthetic.
 * The audit log and the application log never hold a whole card number (`STA…N01`), a password or a token; patron e-mail and phone
   are never written to the audit log (`test_security_ops`, `test_reminders`).
-* The public catalogue is not in the staff menu; it is linked from the sign-in page. Opening it, by any route, ends any staff session in
-  that browser (server side, audited as `public_catalogue`), and pages are never cached, so the public screen cannot be used to step
-  back into a staff workspace left signed in. Its only way out is **Return to home page**, the sign-in page (`test_opac_session`).
+* Handing a screen to visitors is a deliberate act (DR-17): the staff menu's **Public catalogue** entry is a sign-out button
+  (POST `/handover`) that ends the session on the server and in the browser, is audited as `public_catalogue`, and refuses a
+  request whose Origin is another site. Loading the public page itself changes nothing, so no link, second tab or API client
+  can sign anyone out (D-055); if a staff session is still open in that browser the page says so and offers the sign-out.
+  Pages are never cached, so the Back button cannot show a workspace after signing out (`test_opac_session`).
+* Public terminals use a kiosk host name (`[opac] kiosk_hosts`): there only the catalogue, its search API, static files and
+  the health checks exist, sign-in is impossible, and any cookie or token sent is removed before the request is handled.
 * The public catalogue shows no accession number, barcode, tag, member, loan or due date (`test_search_shelves`).
 * The staff list shows staff card numbers masked.
 

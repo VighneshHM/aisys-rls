@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import sqlite3
+import time
+from dataclasses import replace
 
 import pytest
 from fastapi.testclient import TestClient
 
 from aisys import migrate
+from aisys.app import create_app
 from aisys.cli import main as cli_main
+from aisys.cli import seed_demo
+from aisys.config import load_settings
+from aisys.gate.config import GateConfig
 from aisys.gate.service import classify
 from aisys.notifications.providers import (
     NotificationConfig,
     ProviderConfigError,
     build_providers,
 )
+from aisys.rfid.mock import MockGate
 from aisys.rfid.registry import DeviceConfig, DeviceRegistry
 from conftest import login_card
 from test_circulation import out, sql
@@ -259,6 +266,24 @@ def test_a_message_is_marked_failed_after_the_attempt_limit_and_can_be_retried(c
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 200
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 409  # no longer failed
     assert client.post("/api/notifications/dispatch", headers=admin_h).json()["sent"] == 1
+    # every one of these hand-run administrative actions is in the audit log (SOP section 10)
+    log = client.get("/api/audit/events?action=notification.&limit=50", headers=admin_h).json()["events"]
+    kinds = [e["action"] for e in log]
+    assert kinds.count("notification.dispatch") == 4 and kinds.count("notification.retry") == 1, kinds
+    retried = next(e for e in log if e["action"] == "notification.retry")
+    assert (
+        retried["entity_id"] == str(row["id"])
+        and retried["actor"] == "admin"
+        and retried["detail"] == {"channel": "print"}
+    )
+    assert log[0]["detail"]["sent"] == 1
+
+
+@pytest.mark.req("FR09", "NFR02")
+def test_running_the_reminders_by_hand_is_audited(client, admin_h):
+    assert client.post("/api/notifications/reminders/run", headers=admin_h).status_code == 200
+    [ev] = client.get("/api/audit/events?action=notification.reminders_run", headers=admin_h).json()["events"]
+    assert ev["actor"] == "admin" and "queued" in ev["detail"]
 
 
 # ================================================================== preferences and access
@@ -412,3 +437,102 @@ def test_dispatch_says_when_the_next_retry_is_due(tmp_path):
         assert first["retry_later"] == 1 and first["next_attempt_at"]  # it says when it will be tried again
         again = nq.dispatch(db, providers, cfg)
         assert again["tried"] == 0 and again["waiting"] == 1 and again["next_attempt_at"] == first["next_attempt_at"]
+
+
+# ================================================================== the production path from a real gate (FR07)
+class VendorGate(MockGate):
+    """Stands in for a real gate driver (a vendor SDK): not a simulator, so the production poller reads it."""
+
+    is_mock = False
+
+
+@pytest.fixture
+def vendor_gate():
+    DeviceRegistry.register_driver("vendorgate", VendorGate, kind="gate")
+    yield
+    DeviceRegistry._kind_drivers.pop(("gate", "vendorgate"), None)
+
+
+def vendor_settings(settings, poll_seconds: float = 0):
+    devices = (*settings.devices, DeviceConfig("gate-9", kind="gate", driver="vendorgate"))
+    return replace(settings, devices=devices, gate=GateConfig(poll_seconds=poll_seconds))
+
+
+def _client(settings):
+    app = create_app(settings)
+    seed_demo(settings)
+    return TestClient(app)
+
+
+@pytest.mark.req("FR07")
+def test_the_poller_reads_real_gates_and_leaves_the_simulator_alone(vendor_gate, settings):
+    with _client(vendor_settings(settings)) as c:
+        lib_h = login_card(c, "STAFFLIB0001")
+        _, uid = tagged(c, lib_h, "PG1")
+        real = c.app.state.devices.get("gate-9", "gate")
+        real.walk_through([(uid, True)], people=2)
+        c.app.state.devices.get("gate-1", "gate").walk_through([(uid, True)])  # a simulator passage: not ours to read
+        result = c.post("/api/gate/poll", headers=lib_h).json()
+        assert result["gates"] == {"gate-9": {"ok": True, "events": 1, "alarms": 1}}
+        assert result["events"] == 1 and result["alarms"] == 1
+        [ev] = c.get("/api/gate/events", headers=lib_h).json()["events"]
+        assert ev["gate_id"] == "gate-9" and ev["accession_no"] == "PG1" and ev["alarm"]
+        assert c.post("/api/gate/poll", headers=lib_h).json()["events"] == 0, "each passage is read once"
+
+
+@pytest.mark.req("FR07")
+def test_an_offline_gate_is_reported_and_does_not_stop_the_others(vendor_gate, settings):
+    two = replace(
+        vendor_settings(settings),
+        devices=(*vendor_settings(settings).devices, DeviceConfig("gate-10", kind="gate", driver="vendorgate")),
+    )
+    with _client(two) as c:
+        lib_h = login_card(c, "STAFFLIB0001")
+        c.app.state.devices.get("gate-9", "gate").online = False
+        c.app.state.devices.get("gate-10", "gate").walk_through([("E2801160600002AB12CD3401", True)])
+        result = c.post("/api/gate/poll", headers=lib_h).json()
+        assert result["gates"]["gate-9"]["ok"] is False and "offline" in result["gates"]["gate-9"]["error"]
+        assert result["gates"]["gate-10"] == {"ok": True, "events": 1, "alarms": 1}
+
+
+@pytest.mark.req("FR07")
+def test_the_application_reads_the_gates_by_itself_when_configured(vendor_gate, settings):
+    with _client(vendor_settings(settings, poll_seconds=0.5)) as c:
+        lib_h = login_card(c, "STAFFLIB0001")
+        assert c.app.state.gate_loop is not None
+        _, uid = tagged(c, lib_h, "PG2")
+        c.app.state.devices.get("gate-9", "gate").walk_through([(uid, True)])
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not c.get("/api/gate/events", headers=lib_h).json()["events"]:
+            time.sleep(0.1)
+        [ev] = c.get("/api/gate/events", headers=lib_h).json()["events"]
+        assert ev["accession_no"] == "PG2" and ev["alarm"]
+    assert not c.app.state.gate_loop.thread.is_alive(), "the loop stops with the application"
+
+
+@pytest.mark.req("FR07")
+def test_the_gate_loop_is_off_unless_configured_and_bad_values_are_refused(client, tmp_path):
+    assert client.app.state.gate_loop is None
+    cfg = tmp_path / "g.toml"
+    for bad in ("0.1", "99999", "-1"):
+        cfg.write_text(f"[gate]\npoll_seconds = {bad}\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="poll_seconds"):
+            load_settings(cfg)
+    cfg.write_text("[gate]\npoll_seconds = 2\n", encoding="utf-8")
+    assert load_settings(cfg).gate.poll_seconds == 2
+
+
+@pytest.mark.req("FR07")
+def test_polling_needs_gate_view(client):
+    assert client.post("/api/gate/poll", headers=login_card(client, "STAFFCLERK01")).status_code == 403
+    assert client.post("/api/gate/poll", headers=login_card(client, "STAFFAUDIT01")).status_code == 200
+
+
+@pytest.mark.req("FR07")
+def test_the_command_line_reads_the_gates(tmp_path, capsys):
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(f'[database]\nurl = "sqlite:///{(tmp_path / "g.db").as_posix()}"\n', encoding="utf-8")
+    assert cli_main(["--config", str(cfg), "seed-demo"]) == 0
+    assert cli_main(["--config", str(cfg), "gate-poll"]) == 0  # only the simulator gate is configured: nothing to read
+    assert "'events': 0" in capsys.readouterr().out
+    assert cli_main(["--config", str(cfg), "gate-poll", "--every", "0.1"]) == 2
