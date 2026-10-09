@@ -72,6 +72,24 @@ class Camera(Device, Protocol):
         """A snapshot. `caption` is overlaid by cameras that support it (the mock does)."""
 
 
+@dataclass(frozen=True)
+class CardJob:
+    """What is printed and encoded on one patron card."""
+
+    uid: str  # the card number written to the card's chip and barcode
+    member_no: str
+    name: str
+    library: str
+
+
+@runtime_checkable
+class CardPrinter(Device, Protocol):
+    """Card printer / encoder: prints the member's name and number on a card and writes the card number to its chip."""
+
+    def personalise(self, job: CardJob) -> str:
+        """Print and encode one card. Returns the printer's job reference. Raises DeviceError / DeviceUnavailable."""
+
+
 @runtime_checkable
 class StaffReader(Device, Protocol):
     """Staff-station reader/encoder: reads tags on the pad and writes the item identifier + security bit."""

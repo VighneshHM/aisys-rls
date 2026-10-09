@@ -13,6 +13,9 @@ data as a safety copy, so a restore can itself be undone.
   nothing is touched.
 - Taken automatically before every spreadsheet import (`pre-migration-batchN-...`) and before every restore (`pre-restore-...`).
 
+The full-text search index (`item_fts`) is derived data kept current by triggers; it is not part of the proof and comes back with the
+data (it is rebuilt by the migration, and a restore copies it with everything else).
+
 ## Proof that data is intact: the fingerprint
 
 For every table, the row count and a SHA-256 checksum over its rows in a fixed order. Comparing the live database with a

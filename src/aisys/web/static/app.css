@@ -242,3 +242,25 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .filter.check input { width: 18px; height: 18px; accent-color: var(--accent); }
 th.num, td.num { text-align: right; }
 
+
+/* virtual bookshelf */
+.bookshelf { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 3px; padding: 18px 14px 0; background: linear-gradient(var(--surface-2), var(--surface-2)); border-bottom: 10px solid color-mix(in srgb, var(--warn) 55%, var(--line)); border-radius: 8px 8px 0 0; min-height: 190px; }
+.spine { position: relative; width: 30px; border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent); border-bottom: none; border-radius: 3px 3px 0 0; background: var(--good-soft); color: var(--ink); cursor: pointer; padding: 6px 0 4px; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: space-between; overflow: hidden; }
+.spine .t { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11.5px; font-weight: 600; max-height: 124px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spine .n { font-size: 9px; color: var(--muted); letter-spacing: -.02em; }
+.spine.loan { background: var(--warn-soft); } .spine.ref { background: var(--accent-soft); } .spine.off { background: var(--surface); opacity: .65; }
+.spine.untagged { border-style: dashed; }
+.spine.stray { outline: 2px solid var(--bad); outline-offset: 1px; background: var(--bad-soft); }
+.spine:focus-visible { outline: 3px solid var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); margin: 10px 0 0; } .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--line); margin-right: 5px; vertical-align: -2px; }
+.meter { height: 7px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 6px; } .meter > b { display: block; height: 100%; background: var(--accent); } .meter.full > b { background: var(--bad); }
+
+/* patron card face (preview and browser print) */
+.cardface { width: 336px; max-width: 100%; aspect-ratio: 1.586; border-radius: 14px; background: linear-gradient(135deg, #fff, #eef2ff); color: #111; border: 1px solid #c7d2fe; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between; margin-top: 12px; }
+.cardface .cf-lib { font-weight: 800; letter-spacing: .02em; color: #4338ca; font-size: 13px; } .cardface .cf-name { font-size: 20px; font-weight: 700; } .cardface .cf-no { font-size: 13px; }
+.cardface .cf-bars { width: 100%; height: 38px; } .cardface .cf-uid { font-size: 11px; text-align: center; color: #333; }
+@media print {
+  body.printing-card * { visibility: hidden; }
+  body.printing-card .print-area, body.printing-card .print-area * { visibility: visible; }
+  body.printing-card .print-area { position: fixed; left: 0; top: 0; }
+}

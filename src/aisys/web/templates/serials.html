@@ -1,0 +1,116 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Serials · {{ app_name }}{% endblock %}
+{% block heading %}Serials{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Journals and magazines</h2>
+  <p>Each subscription has a schedule of expected issues. Receive an issue when it arrives (and add it to the catalogue if it should be lent), and claim from the supplier the ones that are more than a week late.</p>
+</div>
+
+<section class="panel" id="late-panel">
+  <header><h3>Late issues</h3><span class="badge" id="late-badge"></span></header>
+  <div class="table-wrap" id="late"></div>
+</section>
+
+<div class="grid two" style="margin-top:18px">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Subscriptions</h3><span class="badge" id="count"></span></header>
+      <div class="table-wrap" id="list"></div>
+    </section>
+    <section class="panel">
+      <header><h3>New subscription</h3></header>
+      <div class="body">
+        <div class="field"><label for="s-title">Title</label><input id="s-title" maxlength="500" autocomplete="off"></div>
+        <div class="field"><label for="s-issn">ISSN (optional)</label><input id="s-issn" maxlength="9" placeholder="0378-5955" autocomplete="off"></div>
+        <div class="field"><label for="s-freq">How often</label><select id="s-freq"><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></div>
+        <div class="field"><label for="s-first">First issue expected on</label><input id="s-first" type="date"></div>
+        <div class="field"><label for="s-supplier">Supplier</label><input id="s-supplier" maxlength="200" autocomplete="off"></div>
+        <div class="field"><label for="s-loc">Shelf for received issues</label><input id="s-loc" maxlength="100" autocomplete="off" placeholder="e.g. Periodicals"></div>
+        <div class="field"><label for="s-ahead">Issues to schedule</label><input id="s-ahead" type="number" min="1" max="24" value="6"></div>
+        <div class="actions"><button class="btn" id="s-create" type="button">Add subscription</button></div>
+        <div id="s-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <header><h3 id="d-title">Choose a subscription</h3><span class="badge" id="d-badge"></span></header>
+    <div class="body" id="detail"><div class="empty">Pick a subscription to see its issues.</div></div>
+  </section>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, fmt} = UI;
+  let current = null;
+  const day = iso => iso ? new Date(iso + "T00:00:00").toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
+  const why = e => e.message;
+  $("s-first").value = new Date().toISOString().slice(0, 10);
+
+  async function loadLate() {
+    try {
+      const d = await api("/api/serials/late");
+      $("late-badge").className = "badge " + (d.late.length ? "warn" : "good"); $("late-badge").textContent = d.late.length ? d.late.length + " late" : "none late";
+      fill($("late"), d.late.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Title", "Issue", "Was due", "Days late", "Supplier", ""].map(t => h("th", {}, t)))),
+        h("tbody", {}, d.late.map(i => h("tr", {}, h("td", {}, i.title), h("td", {}, i.label, i.status === "claimed" ? h("span", {class: "badge", style: "margin-left:6px"}, "claimed") : null), h("td", {}, day(i.expected_on)),
+          h("td", {class: "num"}, i.days_late), h("td", {}, i.supplier || "—"),
+          h("td", {}, h("div", {class: "actions", style: "margin:0;gap:6px"},
+            h("button", {class: "btn ghost small", type: "button", onclick: () => receive(i.id, i.serial_id)}, "Received"),
+            i.status === "expected" ? h("button", {class: "btn ghost small", type: "button", onclick: () => mark(i, "claimed")}, "Claim") : null,
+            h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => mark(i, "missing")}, "Give up")))))))
+        : h("div", {class: "empty"}, "Nothing is late."));
+    } catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("late"), h("div", {class: "empty"}, e.message)); }
+  }
+
+  async function loadList() {
+    const d = await api("/api/serials");
+    $("count").textContent = fmt(d.serials.length) + " titles";
+    fill($("list"), d.serials.length ? h("table", {}, h("tbody", {}, d.serials.map(s => h("tr", {style: current === s.id ? "background:var(--accent-soft)" : ""},
+      h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: () => open(s.id)}, s.title), h("div", {class: "sub"}, s.frequency + (s.issn ? " · ISSN " + s.issn : "") + (s.active ? "" : " · stopped"))),
+      h("td", {class: "sub"}, s.counts.received + " received", s.counts.late ? h("div", {}, h("span", {class: "badge warn"}, s.counts.late + " late")) : null))))) : h("div", {class: "empty"}, "No subscriptions yet."));
+  }
+
+  async function open(id) {
+    current = id;
+    let s; try { s = await api("/api/serials/" + id); } catch (e) { fill($("detail"), h("div", {class: "empty"}, e.message)); return; }
+    $("d-title").textContent = s.title; $("d-badge").textContent = s.frequency;
+    fill($("detail"),
+      h("p", {class: "sub", style: "margin:0 0 10px"}, [s.supplier, s.location ? "shelf " + s.location : "", s.active ? "" : "stopped"].filter(Boolean).join(" · ")),
+      h("div", {class: "table-wrap"}, h("table", {}, h("thead", {}, h("tr", {}, ["Issue", "Expected", "Status", ""].map(t => h("th", {}, t)))),
+        h("tbody", {}, s.issues.map(i => h("tr", {}, h("td", {}, h("b", {}, i.label)), h("td", {}, day(i.expected_on)),
+          h("td", {}, h("span", {class: "badge " + (i.status === "received" ? "good" : i.late ? "warn" : i.status === "missing" ? "bad" : "")}, i.late && i.status === "expected" ? "late" : i.status), i.received_on ? h("div", {class: "sub"}, day(i.received_on)) : null),
+          h("td", {}, i.status === "expected" || i.status === "claimed" ? h("button", {class: "btn ghost small", type: "button", onclick: () => receive(i.id, s.id)}, "Received") : null)))))),
+      h("div", {class: "actions"}, h("button", {class: "btn ghost small", type: "button", onclick: () => extend(s.id)}, "Schedule 6 more"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => setActive(s)}, s.active ? "Stop this subscription" : "Resume")),
+      h("label", {style: "display:flex;gap:8px;align-items:center;margin-top:10px"}, h("input", {id: "book-in", type: "checkbox"}), "Add received issues to the catalogue so they can be tagged and lent"),
+      h("div", {id: "d-notice", class: "notice", role: "alert"}));
+    loadList();
+  }
+
+  async function receive(issueId, serialId) {
+    const bookIn = $("book-in") ? $("book-in").checked : false;
+    try { await api("/api/serials/issues/" + issueId + "/receive", {json: {book_in: bookIn}}); await Promise.all([open(serialId), loadLate()]); say("d-notice", "ok", "Issue received" + (bookIn ? " and added to the catalogue." : ".")); }
+    catch (e) { say("d-notice", "bad", why(e)); if (!$("d-notice")) alert(e.message); }
+  }
+  async function mark(i, status) {
+    try { await api("/api/serials/issues/" + i.id + "/mark", {json: {status, note: status === "claimed" ? "Claimed from supplier" : ""}}); await Promise.all([loadLate(), loadList(), current ? open(current) : null]); }
+    catch (e) { alert(e.message); }
+  }
+  async function extend(id) { try { await api("/api/serials/" + id + "/extend", {json: {count: 6}}); open(id); } catch (e) { say("d-notice", "bad", why(e)); } }
+  async function setActive(s) { try { await api("/api/serials/" + s.id + "/active", {json: {active: !s.active}}); open(s.id); loadLate(); } catch (e) { say("d-notice", "bad", why(e)); } }
+
+  $("s-create").onclick = async () => {
+    clear("s-notice");
+    try {
+      const s = await api("/api/serials", {json: {title: $("s-title").value, issn: $("s-issn").value, frequency: $("s-freq").value, supplier: $("s-supplier").value, location: $("s-loc").value, first_expected_on: $("s-first").value, issues_ahead: +$("s-ahead").value}});
+      say("s-notice", "ok", "Added " + s.title + "."); ["s-title", "s-issn", "s-supplier", "s-loc"].forEach(i => $(i).value = "");
+      await loadList(); open(s.id); loadLate();
+    } catch (e) { say("s-notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
+  };
+  loadLate(); loadList();
+})();
+</script>
+{% endblock %}

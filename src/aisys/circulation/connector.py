@@ -33,6 +33,10 @@ class CirculationConfig:
     max_fine_per_loan_cents: int = 1000  # one loan never costs more than this
     ilms_driver: str = "mock"
     ilms_protocol: str = "sip2"  # which dialect the mock imitates in its messages: sip2 | ncip
+    ilms_endpoint: str = (
+        ""  # host name or IP address of the ILMS server (a real connector uses it; the mock ignores it)
+    )
+    ilms_port: int = 0  # the SIP2 / NCIP port of the ILMS server (0 = not set)
     ilms_retries: int = 2  # extra attempts after the first
     ilms_backoff_s: float = 0.1
 

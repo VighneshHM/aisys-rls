@@ -36,6 +36,11 @@ kind = "handheld"        # walks a shelf for inventory
 driver = "mock"
 
 [[devices]]
+id = "card-printer-1"
+kind = "card_printer"   # prints and encodes patron cards
+driver = "mock"
+
+[[devices]]
 id = "gate-1"
 kind = "gate"            # security gate at the exit
 driver = "mock"
@@ -77,8 +82,22 @@ auto_dispatch_seconds = 60
 
 [ilms]
 driver = "mock"
-#endpoint = "192.168.1.50" # ip of ILMS server 
-port = "6001" #sip2/ncip port of ILMS server
-#protocol = "sip2"                # sip2 | ncip
+protocol = "sip2"                # sip2 | ncip (the dialect the mock imitates; a real adapter speaks its own)
+#endpoint = "192.168.1.50"       # host name or IP address of the ILMS server (used by a real connector)
+#port = 6001                     # the SIP2 / NCIP port of the ILMS server
 retries = 2
 backoff_s = 0.1
+
+# The public catalogue search at /opac (no sign-in; shows titles, shelves and availability only).
+[opac]
+enabled = true
+
+# Net cataloguing: look a book up by ISBN in an outside catalogue. "mock" is a built-in synthetic set.
+[netcat]
+driver = "mock"
+
+# Encrypted transport. Leave both empty to serve plain HTTP on localhost and put a TLS proxy in front (docs/deployment.md),
+# or give the certificate and private key (PEM files, kept outside the repository) to serve HTTPS directly.
+[server]
+tls_certfile = ""
+tls_keyfile = ""

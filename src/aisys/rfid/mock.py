@@ -206,6 +206,37 @@ class MockGate:
         self.indications.append(pattern)
 
 
+class MockCardPrinter:
+    """Mock card printer: records the cards it was asked to print instead of printing them."""
+
+    kind = "card_printer"
+    is_mock = True
+
+    def __init__(self, device_id: str = "card-printer-1", **_options: object) -> None:
+        self.device_id = device_id
+        self.online = True
+        self.jobs: list[dict] = []
+        self._fail_next = 0
+
+    def fail_next(self, times: int = 1) -> None:
+        self._fail_next += times
+
+    def health(self) -> DeviceHealth:
+        return DeviceHealth(self.online, "mock card printer" if self.online else "mock card printer switched off")
+
+    def personalise(self, job) -> str:
+        if not self.online:
+            raise DeviceUnavailable(f"{self.device_id} is offline")
+        if self._fail_next:
+            self._fail_next -= 1
+            raise DeviceError(f"{self.device_id}: simulated card jam")
+        ref = f"CARD-{len(self.jobs) + 1:04d}"
+        self.jobs.append(
+            {"ref": ref, "uid": job.uid, "member_no": job.member_no, "name": job.name, "library": job.library}
+        )
+        return ref
+
+
 class MockCamera:
     """Mock CCTV camera: draws a labelled placeholder frame (an SVG) instead of a real photograph."""
 

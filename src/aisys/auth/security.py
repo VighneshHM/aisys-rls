@@ -35,3 +35,9 @@ def new_token() -> str:
 def token_hash(token: str) -> str:
     """Sessions are stored hashed so a DB leak does not leak live tokens."""
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def card_hint(uid: str) -> str:
+    """Enough of a card number to recognise it, not enough to use it: 'STAFFADMIN01' -> 'STA…N01'."""
+    uid = str(uid or "")
+    return uid if len(uid) <= 6 else uid[:3] + "…" + uid[-3:]

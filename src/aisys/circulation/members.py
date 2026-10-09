@@ -15,6 +15,8 @@ from aisys import audit
 from aisys.circulation.service import CircError, find_member
 from aisys.models import Card, Member
 from aisys.notifications.providers import valid_address
+from aisys.rfid.devices import CardJob, DeviceError, DeviceUnavailable
+from aisys.rfid.registry import DeviceRegistry
 
 CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
 MEMBER_NO_RE = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,31}$")
@@ -174,3 +176,51 @@ def search(db: Session, q: str, limit: int = 10) -> list[dict]:
         }
         for m in rows
     ]
+
+
+def _active_card(db: Session, member: Member) -> Card:
+    card = db.scalar(select(Card).where(Card.kind == "patron", Card.member_ref == member.member_no, Card.active))
+    if card is None:
+        raise CircError(409, "no_card", f"{member.name} has no card yet: issue one first, then print it")
+    return card
+
+
+def card_face(db: Session, member_no: str, library: str) -> dict:
+    """What is printed on a member's card: name, number and a barcode of the card number."""
+    from aisys.labels import code128
+
+    member = find_member(db, member_no)
+    card = _active_card(db, member)
+    return {
+        "library": library,
+        "name": member.name,
+        "member_no": member.member_no,
+        "card_uid": card.uid,
+        "modules": code128.encode(card.uid) if code128.encodable(card.uid) else "",
+    }
+
+
+def personalise_card(
+    db: Session, devices: DeviceRegistry, member_no: str, library: str, *, actor: str, ip: str = ""
+) -> dict:
+    """Print and encode the member's current card on the card printer. Nothing changes in the catalogue or the loans."""
+    member = find_member(db, member_no)
+    card = _active_card(db, member)
+    printer = next((d for d in devices.all() if d.kind == "card_printer"), None)
+    if printer is None:
+        raise CircError(503, "no_printer", "No card printer is configured")
+    try:
+        ref = printer.personalise(CardJob(card.uid, member.member_no, member.name, library))
+    except (DeviceError, DeviceUnavailable) as exc:
+        audit.record(
+            db, actor=actor, action="member.card_personalise", entity="member", entity_id=member.member_no,
+            outcome="failure", detail={"printer": printer.device_id, "error": str(exc)}, ip=ip,
+        )  # fmt: skip
+        db.commit()
+        raise CircError(503, "printer_failed", f"The card was not printed: {exc}") from exc
+    audit.record(
+        db, actor=actor, action="member.card_personalise", entity="member", entity_id=member.member_no,
+        detail={"printer": printer.device_id, "job": ref}, ip=ip,
+    )  # fmt: skip
+    db.commit()
+    return {"printer": printer.device_id, "job": ref, "member_no": member.member_no, "name": member.name}

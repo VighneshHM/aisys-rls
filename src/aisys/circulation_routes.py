@@ -204,6 +204,38 @@ def set_member_contact(
     return service.member_out(db, member, config)
 
 
+@router.get("/members/{member_no}/card/face")
+def card_face(
+    member_no: str,
+    settings: Settings = Depends(get_settings),
+    _: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+):
+    """What is printed on the member's card (for the preview and the browser's print)."""
+    try:
+        return members.card_face(db, member_no, settings.app_name)
+    except service.CircError as exc:
+        raise _http(exc) from exc
+
+
+@router.post("/members/{member_no}/card/personalise")
+def personalise_card(
+    member_no: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal = Depends(require("member.write")),
+    db: Session = Depends(get_db),
+    devices: DeviceRegistry = Depends(get_devices),
+):
+    """Print the member's name and number on their card and encode it, on the card printer."""
+    try:
+        return members.personalise_card(
+            db, devices, member_no, settings.app_name, actor=principal.user.username, ip=client_ip(request)
+        )
+    except service.CircError as exc:
+        raise _http(exc) from exc
+
+
 @router.post("/members/{member_no}/block")
 def block_member(
     member_no: str,

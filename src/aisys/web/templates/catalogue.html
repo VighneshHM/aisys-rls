@@ -31,7 +31,8 @@
   <div class="body">
     <p class="muted" style="margin-top:0">The same rules as the spreadsheet import apply. <b>*</b> is required.</p>
     <form id="add-form" novalidate><div class="form-grid" id="add-fields"></div>
-      <div class="actions"><button class="btn" type="submit">Save item</button></div>
+      <div class="actions"><button class="btn" type="submit">Save item</button>
+        <button class="btn ghost" id="lookup" type="button" title="Fill in the title, author and so on from the outside catalogue">Look up the ISBN</button></div>
     </form>
     <div id="add-notice" class="notice" role="alert"></div>
   </div>
@@ -139,6 +140,20 @@
   function clearErrors() { FIELDS.forEach(([k]) => { $("e-" + k).textContent = ""; $("f-" + k).classList.remove("invalid"); }); clear("add-notice"); }
   $("add-btn").onclick = () => { buildForm(); $("add-panel").classList.remove("hidden"); $("f-accession_no").focus(); $("add-panel").scrollIntoView({behavior: "smooth", block: "nearest"}); };
   $("add-close").onclick = () => $("add-panel").classList.add("hidden");
+  // net cataloguing: fill the form from an outside catalogue; the person checks it and saves it
+  $("lookup").onclick = async () => {
+    clearErrors();
+    const isbn = $("f-isbn").value.trim();
+    if (!isbn) { say("add-notice", "warn", "Type the ISBN first, then look it up."); $("f-isbn").focus(); return; }
+    const button = $("lookup"); button.disabled = true; button.textContent = "Looking up…";
+    try {
+      const r = await api("/api/catalogue/lookup?isbn=" + encodeURIComponent(isbn));
+      ["title", "author", "publisher", "pub_year", "edition", "language", "isbn"].forEach(k => { if (r[k] != null && $("f-" + k)) $("f-" + k).value = r[k]; });
+      say("add-notice", "ok", "Found “" + r.title + "” in the " + r.source + " catalogue. Check the details, add the accession number and location, then save.");
+      $("f-accession_no").focus();
+    } catch (err) { say("add-notice", err.status === 404 ? "warn" : "bad", err.message); }
+    finally { button.disabled = false; button.textContent = "Look up the ISBN"; }
+  };
   $("add-form").onsubmit = async e => {
     e.preventDefault(); clearErrors();
     const body = {};

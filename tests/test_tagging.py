@@ -142,6 +142,7 @@ def test_devices_are_configured_in_toml_not_in_code(tmp_path):
         "handheld-1",
         "gate-1",
         "camera-1",
+        "card-printer-1",
     ]  # sensible default
 
 

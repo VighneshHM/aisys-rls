@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from aisys.catalogue import service
 from aisys.deps import Principal, client_ip, get_db, require
+from aisys.integrations.netcat import NetCatalogueError
+from aisys.migration import validation
 from aisys.models import RfidTag
 from aisys.rfid.events import normalize_tag_uid
 
@@ -58,6 +60,30 @@ def search_items(
             entry["matched_tag"] = {"uid": normalize_tag_uid(q), "status": matched[item.id]}
         out.append(entry)
     return {"total": total, "items": out}
+
+
+@router.get("/lookup")
+def lookup_isbn(
+    isbn: str,
+    request: Request,
+    _: Principal = Depends(require("catalogue.write")),
+):
+    """Net cataloguing: the description of a book from the outside catalogue, to fill in the add-item form."""
+    digits = isbn.replace("-", "").replace(" ", "")
+    if not (len(digits) == 13 and digits.isdigit()) or not validation.isbn_valid(digits):
+        raise HTTPException(
+            422,
+            detail={"message": "That is not a valid ISBN-13 (13 digits with a correct check digit).", "problems": []},
+        )
+    try:
+        found = request.app.state.netcat.lookup(digits)
+    except NetCatalogueError as exc:
+        raise HTTPException(502, detail={"message": str(exc) + ". Enter the details by hand.", "problems": []}) from exc
+    if found is None:
+        raise HTTPException(
+            404, detail={"message": "The outside catalogue has no book with that ISBN.", "problems": []}
+        )
+    return found
 
 
 @router.get("/items/{item_id}")

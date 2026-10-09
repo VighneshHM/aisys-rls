@@ -27,10 +27,15 @@ router = APIRouter(include_in_schema=False)
 NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
+    ("opac", "Public catalogue", "scan", "/opac", None, True),
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "/inventory", "inventory.run", True),
+    ("shelves", "Shelves", "book", "/shelves", "catalogue.read", True),
+    ("labels", "Labels", "tag", "/labels", "catalogue.write", True),
+    ("acquisitions", "Acquisitions", "upload", "/acquisitions", "acquisitions.manage", True),
+    ("serials", "Serials", "list", "/serials", "serials.manage", True),
     ("gate", "Gate events", "gate", "/gate", "gate.view", True),
     ("reports", "Reports", "chart", "/reports", "reports.view", True),
     ("migration", "Data migration", "upload", "/migration", "migration.run", True),
@@ -311,6 +316,55 @@ def backups_page(
         "backups.html",
         "backups",
         simulator=settings.environment != "production",
+    )
+
+
+@router.get("/shelves", response_class=HTMLResponse)
+def shelves_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request, settings, principal, "catalogue.read", "shelves.html", "shelves", can_manage="shelves.manage" in perms
+    )
+
+
+@router.get("/labels", response_class=HTMLResponse)
+def labels_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "catalogue.write", "labels.html", "labels")
+
+
+@router.get("/acquisitions", response_class=HTMLResponse)
+def acquisitions_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "acquisitions.manage", "acquisitions.html", "acquisitions")
+
+
+@router.get("/serials", response_class=HTMLResponse)
+def serials_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    return _gated_page(request, settings, principal, "serials.manage", "serials.html", "serials")
+
+
+@router.get("/opac", response_class=HTMLResponse)
+def opac_page(request: Request, settings: Settings = Depends(get_settings)):
+    """The public catalogue search: no sign-in."""
+    if not settings.opac_enabled:
+        return HTMLResponse("Not found", status_code=404)
+    return TEMPLATES.TemplateResponse(
+        request, "opac.html", {"app_name": settings.app_name, "version": __version__, "asset_v": asset_version()}
     )
 
 

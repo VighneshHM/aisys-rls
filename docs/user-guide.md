@@ -8,6 +8,12 @@ card never signs anyone in. Your menu shows only what your role may do.
 | Check an item out | **Circulation** | Present the patron card (or search the member), place the item's tag on the reader, **Check out**. If it is refused, the message says why. |
 | Return or renew | **Circulation** | Check in or Renew the item. A late return adds a fine to the member. |
 | Set where a member's reminders go | **Circulation** | Choose the member, **Contact and reminders**: e-mail, phone, on or off. They are told a day before a loan is due and on the due day. |
+| Find a book (for a visitor) | `/opac` (no sign-in) | Type words; results appear as you type; **Show the shelf** shows where it stands |
+| Look at a shelf | **Shelves** | Choose a shelf: its books in call-number order, coloured by status; red outline = out of order after the last sweep |
+| Print labels | **Labels** | Choose a shelf or type item numbers, preview, print or send to the label printer |
+| Order books | **Acquisitions** | New order, add lines, **Place order**; when books arrive **Book in what arrived** |
+| Track a journal | **Serials** | Add the subscription; **Received** when an issue arrives; claim the late ones |
+| Print a member's card | **Circulation** | Choose the member, **Print the card** |
 | Tag a new book | **Catalogue**, then **RFID tagging** | Open the item, **Tag this item**, read the reader, generate or read a tag, **Check**, **Link tag to item**. |
 | Take a tag off a book | **Tag registry** | Choose the tag, then remove it (it can be reused) or retire it (never again). |
 | Count a shelf | **Inventory** | Start a session for a location, run the handheld sweep, close it: found, missing, unexpected. Export CSV. |

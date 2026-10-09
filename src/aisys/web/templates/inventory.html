@@ -153,6 +153,10 @@
       table("Misplaced", r.misplaced, [["Item", item], ["Belongs in", x => x.home_location || "—"], ["Signal", x => signal(x.signal)]], "Seen here, but belongs in another location."),
       table("Unknown tags", r.unknown, [["Tag", tagcell, "mono"], ["Why", x => x.note], ["Signal", x => signal(x.signal)]]),
       table("On loan but on the shelf", r.shelved_on_loan, [["Item", item], ["Note", x => x.note], ["Signal", x => signal(x.signal)]]),
+      r.shelf_order && s.sweeps ? (r.shelf_order.in_order
+        ? (r.shelf_order.checked ? h("p", {class: "sub", style: "margin:0 0 14px"}, "The " + r.shelf_order.checked + " books read are in call-number order.") : null)
+        : table("Out of call-number order", r.shelf_order.out_of_order, [["Item", item], ["Call no.", x => x.call_number || "—"]],
+            "Move these so the shelf is in order. The books left out of this list already form a correct run.")) : null,
       table("Found", r.found, [["Item", item], ["Reads", x => x.reads], ["Signal", x => signal(x.signal)]]),
       s.sweeps ? h("p", {class: "sub", style: "margin:0"}, fmt(c.reads) + " reads of " + fmt(c.distinct_tags) + " different tags" +
         (c.untagged ? " · " + c.untagged + " untagged item(s) on this shelf cannot be read" : "") + (c.on_loan ? " · " + c.on_loan + " on loan, not expected" : "")) : null);

@@ -1,0 +1,46 @@
+# Defect log (D6)
+
+Every defect found while building and testing, with severity, how to reproduce it, owner, status, where it was fixed and how it
+was retested. **Owner** is the developer (VighneshHM, with the AI pair-programming assistant). **Fix version** is the feature
+branch (and its pull request) that carried the fix; all are in the `0.1.0` line before the evaluation tag. Severity: **High** (data
+loss or corruption, security exposure, a scenario cannot be completed), **Medium** (wrong result with a workaround or a feature
+degraded), **Low** (wording, layout, convenience). At the time of writing **no defect is open**.
+
+| ID | Sev. | Area | Found by | Defect and how to reproduce | Status | Fixed in | Retest evidence |
+|---|---|---|---|---|---|---|---|
+| D-001 | Medium | Tagging UI | User review of AC02 | Opening "Tag this item" for a new book showed the previously tagged book's tag until "generate" was pressed | Fixed | `feature/ac02-tagging` | `test_tagging`, browser check |
+| D-002 | Medium | Tagging UI | User review | A tag was created automatically when the form opened; staff expected to generate it themselves | Fixed | `feature/ac02-tagging` | `test_tagging`, browser check |
+| D-003 | Medium | Circulation UI | User review of AC03 | The simulated patron card list and the member search showed two different people; the card field said "no card issued" for a member who had one | Fixed | `feature/members` | `test_circulation`, `test_members`, browser check |
+| D-004 | Low | Circulation UI | User review | The simulated card list was empty on a fresh database; the page gave no hint | Fixed (message says to run `seed-demo`) | `feature/members` | browser check |
+| D-005 | High | Circulation | Bug hunt, AC04 | Renewing an overdue item erased the fine it had earned (renew, then check the member's balance) | Fixed (the fine is charged on renewal) | `feature/ac04` | `test_fines` |
+| D-006 | Medium | Reports | Bug hunt, AC08 | A report filtered with `to=9999-12-31` raised an overflow and returned 500 | Fixed (the far-future date means "no upper limit") | `feature/ac08-reports` (PR 13) | `test_reports` |
+| D-007 | Low | Reports | Bug hunt, AC08 | Dashboard numbers had no thousands separators; an empty chart had unclear wording | Fixed | `feature/ac08-reports` (PR 13) | browser check |
+| D-008 | Medium | Search | Bug hunt | Searching `%` (or `_`) matched every member or every report row (the character was passed to `LIKE` as a wildcard) | Fixed (wildcards escaped) | `feature/ac10-restore` (PR 14) | `test_members`, `test_reports`, `test_backup` |
+| D-009 | Medium | Gate | Bug hunt, AC06 | Unfinished notifications were hidden behind finished ones by a 10-row cap in the queue view | Fixed (unfinished first) | `feature/ac06-gate` (PR 12) | `test_gate` |
+| D-010 | Low | Gate | Bug hunt, AC06 | "Nothing was due" after Send queued messages did not say why (messages waiting for a retry time) | Fixed (shows the next attempt time) | `feature/ac06-gate` (PR 12) | `test_gate` |
+| D-011 | Medium | Gate, privacy | Bug hunt, AC06 | CCTV snapshots could be cached by the browser for an hour | Fixed (`Cache-Control: private, no-store`) | `feature/ac06-gate` (PR 12) | `test_gate` |
+| D-012 | High | Restore | Bug hunt, AC10 | A change made by another user during a restore could be lost or half applied (restore while a second client checks out a book) | Fixed (maintenance mode: everyone else gets a clean 503 for the few seconds; two restores cannot overlap) | `feature/ac10-restore` (PR 14) | `test_backup`, concurrent probe |
+| D-013 | High | Restore | Bug hunt, AC10 | A locked database made a restore hang for ever (Python's backup call retries without limit) | Fixed (gives up after 20 s with "nothing was changed") | `feature/ac10-restore` (PR 14) | `test_backup` |
+| D-014 | Medium | Backups | Bug hunt, AC10 | One damaged manifest file broke the whole backup list with a 500 | Fixed (a bad manifest means "no manifest") | `feature/ac10-restore` (PR 14) | `test_backup` |
+| D-015 | Medium | Backups | Bug hunt, AC10 | Files with spaces or accents in their names were listed, then returned 404 when used | Fixed (only plain names are listed; the page names the ignored files) | `feature/ac10-restore` (PR 14) | `test_backup` |
+| D-016 | Medium | Backups | Bug hunt, AC10 | A backup label with accents or symbols returned 500 | Fixed (names are plain ASCII) | `feature/ac10-restore` (PR 14) | `test_backup` |
+| D-017 | Low | Backups UI | Bug hunt, AC10 | The list of hundreds of backups was one endless page; a double click on Restore started two restores | Fixed (paging; buttons disable while working) | `feature/ac10-restore` (PR 14) | `test_backup`, browser check |
+| D-018 | High | Offline install | Bug hunt, AC09 | Installing into a deep folder on Windows failed with a raw error (the 260-character path limit hit inside the new environment) | Fixed (checked up front with a plain message and advice) | `feature/ac09-offline-lifecycle` (PR 16) | `test_lifecycle`, install probe |
+| D-019 | Medium | Offline update | Bug hunt, AC09 | A refused update ("the application is running") was recorded in the history as a failed update | Fixed (a refusal records nothing) | `feature/ac09-offline-lifecycle` (PR 16) | `test_lifecycle` |
+| D-020 | Low | Offline update | Bug hunt, AC09 | On Windows the rehearsal's temporary folder could not be deleted while the test copy was still closing | Fixed (cleanup ignores the lock) | `feature/ac09-offline-lifecycle` (PR 16) | demo run |
+| D-021 | Medium | CI | CI run | The dependency scan failed: 7 known vulnerabilities in `cryptography` 48.0.0 | Fixed (pinned 50.0.2) | `feature/ac09-offline-lifecycle` (PR 16, last commit) | CI `pip-audit` clean |
+| D-022 | Low | CI | CI run | The test job was cancelled at the 20-minute limit | Fixed (limit 30 minutes) | `feature/ac09-offline-lifecycle` (PR 16, last commit) | CI green |
+| D-023 | Medium | Administration | Bug hunt | A very large `offset` or id (`99999999999999999999`) returned 500 on the list endpoints | Fixed for every endpoint with one handler | `feature/audit-admin-pages` (PR 18) | `test_admin` |
+| D-024 | Low | Administration | Bug hunt | A patron card could be issued to a member number that does not exist | Fixed (422) | `feature/audit-admin-pages` (PR 18) | `test_admin` |
+| D-025 | Low | Administration | Bug hunt | A staff card could be issued to a deactivated person | Fixed (409) | `feature/audit-admin-pages` (PR 18) | `test_admin` |
+| D-026 | Low | Administration UI | Bug hunt | A bad username said only "check the highlighted fields" with nothing highlighted | Fixed (names the field and reason) | `feature/audit-admin-pages` (PR 18) | browser check |
+| D-027 | Medium | Gate UI | Browser check | After adding the patron-reminder label, the Gate events page showed no data (a duplicate `const` made the browser drop the whole script) | Fixed; a test now checks every page for duplicate declarations | `feature/patron-reminders` (PR 19) | `test_ui_assets` |
+| D-028 | High | Search | Performance run | Catalogue search took 1.3 to 3.3 s at 20,000 items (full-text match beside "contains" matching forced a scan of every row) | Fixed (the index is used when it has hits; substring matching only when it has none): about 120 ms | `overall-fixes` | `scripts/perf_report.py`, `test_search_shelves` |
+| D-029 | Medium | Reminders | Bug hunt | Two dispatchers (the in-app loop and the command line) delivered the same message twice: 120 queued messages produced 200 deliveries | Fixed (each message is claimed atomically before it is sent) | `feature/patron-reminders` (PR 19) | `test_reminders` (three dispatchers, exactly once) |
+| D-030 | Medium | Reminders | Bug hunt | A whole day's reminders were delivered 100 a minute (3,000 would take 30 minutes) | Fixed (a pass drains the backlog, capped at 10,000) | `feature/patron-reminders` (PR 19) | `test_reminders` |
+| D-031 | Medium | Reminders, security | Bug hunt | A line break in a book title ended up in a message subject (a header injection risk with a real mail gateway) | Fixed (line breaks removed) | `feature/patron-reminders` (PR 19) | `test_reminders` |
+| D-032 | Low | Validation | Bug hunt | An e-mail or phone ending in a newline passed validation | Fixed (the rule matches the whole value) | `feature/patron-reminders` (PR 19) | `test_reminders` |
+| D-033 | Low | Config | Bug hunt | `auto_dispatch_seconds = 0.001` was accepted and would spin the processor | Fixed (minimum one second; 0 means off) | `feature/patron-reminders` (PR 19) | `test_reminders` |
+| D-034 | Low | Circulation UI | Browser check | After printing one member's card, the card preview stayed on screen when another member was chosen | Fixed | `overall-fixes` | browser check (`docs/uat.md`) |
+| D-035 | Medium | Privacy | Review against the SOP ("mask logs") | The audit log stored whole card numbers (failed sign-ins and card issues) | Fixed (masked, `STA…N01`) | `overall-fixes` | `test_security_ops` |
+| D-036 | Low | Configuration | Review | The sample config's ILMS address and port fields were commented or not read by the application | Fixed (read, validated, used by real connectors) | `overall-fixes` | `test_config` |

@@ -31,8 +31,8 @@ MIGRATION = '''"""demo schema change shipped by the 0.2.0 update package"""
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0010"
-down_revision = "0009"
+revision = "{rev}"
+down_revision = "{down}"
 branch_labels = None
 depends_on = None
 
@@ -127,7 +127,12 @@ def main() -> None:
             "*.db",
         ),
     )
-    (src2 / "src" / "aisys" / "migrations" / "versions" / "0010_update_marker.py").write_text(MIGRATION)
+    versions = src2 / "src" / "aisys" / "migrations" / "versions"
+    head = max(
+        int(f.name[:4]) for f in versions.glob("[0-9][0-9][0-9][0-9]_*.py")
+    )  # the demo change comes after the last real one
+    rev, down = f"{head + 1:04d}", f"{head:04d}"
+    (versions / f"{rev}_update_marker.py").write_text(MIGRATION.format(rev=rev, down=down))
     print(
         run(
             [
@@ -212,7 +217,7 @@ def main() -> None:
     print("without --yes:", run([*manage, "rollback"], expect_fail=True))
     print(run([*manage, "rollback", "--yes"], offline=True))
     assert not has_table(db, "update_marker") and count(db, "users") == users and count(db, "cards") == cards
-    print(f"after rollback: schema back to 0009, {users} users and {cards} cards as before the update")
+    print(f"after rollback: schema back to {down}, {users} users and {cards} cards as before the update")
     print(run([*manage, "status"]))
     print("\nALL CHECKS PASSED")
     if a.keep:

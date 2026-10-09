@@ -21,6 +21,69 @@ python scripts/lifecycle_demo.py --keep     # leaves the installation so you can
 | Signature check | `aisys_lifecycle/ed25519.py` (pure Python, so it runs before anything is installed) | No |
 | See the state | **Updates** page and `manage.py status` | No |
 
+## Environment checklist (before installing)
+
+Run `python -m aisys.cli doctor` on the target (or `python manage.py doctor` after installing) and fix every FAIL; it checks the
+items below and prints OK, WARN or FAIL for each, changing nothing.
+
+| Item | Needed | Checked by the doctor |
+|---|---|---|
+| Operating system | Windows 11 (staff PCs) and Windows Server 2022 or later (server); Linux is expected to work and is unverified | reported |
+| Python | 3.12 or newer on the server, for the installer only (the application runs in its own environment) | yes |
+| SQLite | 3.9 or newer; with FTS5 for full-text search (every normal Python build has it; without it search falls back to plain matching) | yes |
+| Disk | at least 500 MB free beside the data folder (a 20,000-item library is about 35 MB; each backup is a full copy; an update needs room for a second environment and a backup) | yes |
+| Folders | the install folder (short path on Windows, about 150 characters at most); `data/` and `data/backups/` writable by the account that runs the service | yes |
+| Network | Ethernet to the readers, gate, camera, card printer and the ILMS; staff browsers reach the server on the HTTPS port; **no internet needed** | port free: yes |
+| Port | 8000 on the loopback address by default; 443 when a proxy or the built-in TLS is used | yes |
+| Secret key | 32 or more characters in `AISYS_SECRET_KEY` (the installer writes one to `config/secret.key`) | yes (in production) |
+| TLS | a certificate and key (PEM) from the site's own CA or a public one, or a TLS proxy | yes |
+| Licence and key | `licence.json` and the vendor's public key supplied with the package | `manage.py status` |
+| Backups | a place outside the server to copy `data/backups/` to | not checked |
+| Accounts | the service account's rights on the folders; one administrator staff card issued | not checked |
+
+## Configuration reference
+
+Settings come from `config/config.toml` (copy `config/config.sample.toml`); environment variables override the file. A wrong
+value stops the start with a plain message. Devices, the ILMS, notification channels and net cataloguing are chosen by *driver
+name*; `mock` is built in and a real one is a class registered in code (`docs/architecture.md` section 6).
+
+| Section and key | Default | Meaning |
+|---|---|---|
+| `[app] name` | AISYS RFID Library | name shown on pages and in messages |
+| `[app] environment` | development | `production` turns the simulators off (404), makes cookies Secure and demands a secret key |
+| `[app] host`, `port` | 127.0.0.1, 8000 | where the application listens |
+| `[database] url` | `sqlite:///data/aisys.db` | the database file |
+| `[security] session_ttl_minutes` | 480 | how long a sign-in lasts |
+| `[security] max_failed_logins`, `lockout_minutes` | 5, 15 | account lock after repeated wrong passwords |
+| `[logging] level`, `format` | INFO, json | `json` or `text` |
+| `[backup] dir` | `data/backups` | where backups and safety copies go |
+| `[[devices]] id, kind, driver` | one of each kind, `mock` | `staff_reader`, `handheld`, `gate`, `camera`, `card_printer` |
+| `[circulation] fine_limit_cents` | 500 | a member whose fines exceed this cannot borrow |
+| `[circulation] loan_days`, `max_renewals`, `max_loans` | 14, 2, 5 | loan policy (the ILMS owns it; the mock applies it) |
+| `[circulation] fine_per_day_cents`, `grace_days`, `max_fine_per_loan_cents` | 25, 1, 1000 | the fine rule |
+| `[ilms] driver` | mock | the ILMS connector |
+| `[ilms] protocol` | sip2 | `sip2` or `ncip` (the dialect the mock imitates) |
+| `[ilms] endpoint`, `port` | empty, 0 | the ILMS host and its SIP2 / NCIP port, used by a real connector |
+| `[ilms] retries`, `backoff_s` | 2, 0.1 | extra attempts and the wait between them |
+| `[gate] duplicate_window_s` | 60 | a repeat alarm for the same tag within this many seconds is recorded, not re-sent |
+| `[notifications] email, sms, print` | mock | the provider driver per channel |
+| `[notifications] max_attempts`, `backoff_s` | 3, 60 | delivery attempts before a message is marked failed; the wait grows with each failure |
+| `[notifications] reminders`, `remind_days_before` | true, 1 | patron loan reminders and how many days ahead (1 to 30) |
+| `[notifications] auto_dispatch_seconds` | 0 (sample file: 60) | how often the running app queues reminders and delivers messages; 0 = off |
+| `[opac] enabled` | true | the public catalogue at `/opac` |
+| `[netcat] driver` | mock | where net cataloguing looks books up |
+| `[server] tls_certfile`, `tls_keyfile` | empty | serve HTTPS directly (both or neither) |
+
+| Environment variable | Effect |
+|---|---|
+| `AISYS_CONFIG` | path of the config file |
+| `AISYS_ENV` | overrides `environment` |
+| `AISYS_DATABASE_URL`, `AISYS_BACKUP_DIR` | override the database and backup folder |
+| `AISYS_HOST`, `AISYS_PORT` | override the listening address |
+| `AISYS_SECRET_KEY` | the secret (32+ characters; required in production) |
+| `AISYS_TLS_CERTFILE`, `AISYS_TLS_KEYFILE` | override the TLS files (an empty value switches TLS off) |
+| `AISYS_HOME` | set by the installer: the installation folder (enables the Updates page) |
+
 ## What is inside a package
 
 ```

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import shutil
+import sqlite3
+
 import pytest
 from fastapi.testclient import TestClient
 
+from aisys import migrate
 from aisys.app import create_app
 from aisys.circulation.connector import CirculationConfig
 from aisys.cli import DEMO_PASSWORD, seed_demo
@@ -10,8 +14,24 @@ from aisys.config import Settings
 from aisys.notifications.providers import NotificationConfig
 
 
+@pytest.fixture(scope="session")
+def migrated_db(tmp_path_factory):
+    """An empty database at the newest schema, built once per test process.
+
+    Running every migration for every test is slow on a CI disk (fsync-heavy), so each test copies this file instead."""
+    path = tmp_path_factory.mktemp("template") / "template.db"
+    migrate.upgrade(f"sqlite:///{path.as_posix()}")
+    con = sqlite3.connect(path)
+    try:
+        con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        con.close()
+    return path
+
+
 @pytest.fixture
-def settings(tmp_path) -> Settings:
+def settings(tmp_path, migrated_db) -> Settings:
+    shutil.copyfile(migrated_db, tmp_path / "test.db")  # create_app then finds nothing left to migrate
     return Settings(
         database_url=f"sqlite:///{(tmp_path / 'test.db').as_posix()}",
         log_level="WARNING",
@@ -25,7 +45,7 @@ def settings(tmp_path) -> Settings:
 
 @pytest.fixture
 def client(settings):
-    app = create_app(settings)  # runs real Alembic migrations
+    app = create_app(settings)  # the copied database is already at head; migrations are tested in their own files
     seed_demo(settings)
     with TestClient(app) as c:
         c.settings = settings  # type: ignore[attr-defined]
