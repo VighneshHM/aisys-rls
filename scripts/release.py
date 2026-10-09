@@ -32,6 +32,7 @@ INSTALL_PY = '''"""Install AISYS: python install.py --root <dir> --licence <file
 import os
 import sys
 
+sys.dont_write_bytecode = True  # importing the tools must not add files to the signed package folder
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "tools"))
 

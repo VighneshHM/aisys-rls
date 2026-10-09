@@ -639,3 +639,46 @@ def test_cli_status_and_verify_and_errors(installed, tmp_path, vendor, capsys):
     assert "no previous" in capsys.readouterr().err
     assert main(["--root", str(tmp_path / "nothing"), "status"]) == 0
     assert "Nothing installed" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------ the entry scripts must not touch the package
+def _release_script():
+    import importlib.util
+
+    path = Path(__file__).resolve().parent.parent / "scripts" / "release.py"
+    spec = importlib.util.spec_from_file_location("release_script", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run_entry_script(tmp_path: Path, name: str, text: str) -> list[Path]:
+    """Run an entry script next to a stand-in `tools` folder, with bytecode writing ON; list the files left behind."""
+    import os
+    import subprocess
+
+    pkg = tmp_path / "pkg"
+    shutil.rmtree(pkg, ignore_errors=True)
+    tools = pkg / "tools" / "aisys_lifecycle"
+    tools.mkdir(parents=True)
+    (tools / "__init__.py").write_text("")
+    (tools / "__main__.py").write_text("def main(argv):\n    return 0\n")
+    (pkg / name).write_text(text, encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+    done = subprocess.run(  # noqa: S603
+        [sys.executable, str(pkg / name), "--root", str(tmp_path / "root")], env=env, capture_output=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    return sorted(pkg.rglob("*"))
+
+
+@pytest.mark.parametrize("which", ["install.py", "manage.py"])
+def test_running_an_entry_script_adds_no_files_to_the_signed_package(tmp_path, which):
+    """Found by CI: importing the tools wrote __pycache__ into the package, so the installer refused it as tampered."""
+    text = _release_script().INSTALL_PY if which == "install.py" else ops.MANAGE_PY
+    files = _run_entry_script(tmp_path, which, text)
+    assert not [p for p in files if "__pycache__" in p.parts or p.suffix == ".pyc"], files
+    # a control, so this test cannot pass for the wrong reason: without the fix the folder DOES get bytecode
+    unfixed = _run_entry_script(tmp_path, which, text.replace("sys.dont_write_bytecode = True", "pass"))
+    assert [p for p in unfixed if "__pycache__" in p.parts], "the control run did not write bytecode"

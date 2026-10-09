@@ -57,7 +57,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_gate.py` | 22 | AC06/FR07/FR09: alarms, offline behaviour, duplicates, CCTV, queued delivery, retries |
 | `test_reports.py` | 17 | AC08/FR08: reports, filters, dashboards, CSV, hostile input, scale |
 | `test_backup.py` | 25 | AC10/NFR01: backups, proof, restore, busy database, maintenance mode, hostile names |
-| `test_lifecycle.py`, `test_lifecycle_api.py` | 47, 12 | AC09/FR12: signatures, tampering, install, update, failure paths, rollback, recovery |
+| `test_lifecycle.py`, `test_lifecycle_api.py` | 49, 12 | AC09/FR12: signatures, tampering, install, update, failure paths, rollback, recovery |
 | `test_admin.py` | 17 | FR11: audit log, staff and cards, lock-out rules |
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
@@ -68,7 +68,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_security_ops.py`, `test_config.py` | 11, 8 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
 | `test_ui_assets.py`, `test_docs.py` | 31, 7 | page assets and scripts, generated documents, SBOM, hashed lock file, sample reports, deliverables present |
 
-Total: 715 test cases (some are parametrised).
+Total: 717 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

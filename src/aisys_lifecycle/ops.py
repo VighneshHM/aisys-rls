@@ -449,6 +449,7 @@ MANAGE_PY = '''"""Operator entry point: python manage.py status | run | update <
 import os
 import sys
 
+sys.dont_write_bytecode = True  # keep the installed tools exactly as they were delivered
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "tools"))
 
