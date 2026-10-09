@@ -222,3 +222,136 @@ def test_card_issuing_rules(client, admin):
         "/api/admin/cards", json={"uid": "STAFFINACT01", "kind": "staff", "username": "clerk"}, headers=admin
     )
     assert off.status_code == 409 and "deactivated" in str(off.json())
+
+
+# ---------- roles ----------
+def roles(client, headers):
+    r = client.get("/api/admin/roles", headers=headers)
+    assert r.status_code == 200, r.text
+    return {x["name"]: x for x in r.json()["roles"]}
+
+
+def test_roles_list_the_built_in_ones_and_the_permission_catalogue(client, admin):
+    d = client.get("/api/admin/roles", headers=admin).json()
+    by_name = {r["name"]: r for r in d["roles"]}
+    assert {"admin", "librarian", "circulation_clerk", "auditor"} <= set(by_name)
+    assert all(by_name[n]["built_in"] for n in ("admin", "librarian", "circulation_clerk", "auditor"))
+    assert by_name["circulation_clerk"]["holders"] >= 1
+    assert "circulation.checkout" in {p["code"] for p in d["permissions"]}
+
+
+def test_a_custom_role_is_created_given_to_someone_and_enforced(client, admin):
+    r = client.post(
+        "/api/admin/roles",
+        json={
+            "name": "Stock_Checker",
+            "description": "  Shelf   reading only ",
+            "permissions": ["catalogue.read", "inventory.run"],
+        },
+        headers=admin,
+    )
+    assert r.status_code == 201, r.text
+    assert r.json() == {
+        "name": "stock_checker",
+        "description": "Shelf reading only",
+        "built_in": False,
+        "permissions": ["catalogue.read", "inventory.run"],
+        "holders": 0,
+    }
+    cid = people(client, admin)["clerk"]["id"]
+    assert client.patch(f"/api/admin/users/{cid}", json={"role": "stock_checker"}, headers=admin).status_code == 200
+    clerk_h = login_card(client, "STAFFCLERK01")
+    me = client.get("/api/auth/me", headers=clerk_h).json()
+    assert set(me["permissions"]) == {"catalogue.read", "inventory.run"}
+    assert client.get("/api/circulation/members?q=priya", headers=clerk_h).status_code == 403, "member.read is gone"
+    # widening the role takes effect on the next request, without signing in again
+    assert (
+        client.patch(
+            "/api/admin/roles/stock_checker",
+            json={"permissions": ["catalogue.read", "inventory.run", "member.read"]},
+            headers=admin,
+        ).json()["holders"]
+        == 1
+    )
+    assert client.get("/api/circulation/members?q=priya", headers=clerk_h).status_code == 200
+
+
+def test_bad_roles_are_refused(client, admin):
+    def create(**body):
+        return client.post("/api/admin/roles", json={"permissions": ["catalogue.read"], **body}, headers=admin)
+
+    assert create(name="librarian").status_code == 409, "a built-in name cannot be reused"
+    assert create(name="x").status_code == 422
+    assert create(name="9lives").status_code == 422
+    assert create(name="has space").status_code == 422
+    assert create(name="okname", permissions=["wizardry"]).status_code == 422
+    assert create(name="okname", permissions=[]).status_code == 422
+    assert create(name="okname").status_code == 201
+    assert create(name="okname").status_code == 409
+
+
+def test_built_in_roles_cannot_be_changed_or_removed(client, admin):
+    for name in ("admin", "librarian", "circulation_clerk", "auditor"):
+        assert client.patch(f"/api/admin/roles/{name}", json={"description": "x"}, headers=admin).status_code == 409
+        assert client.delete(f"/api/admin/roles/{name}", headers=admin).status_code == 409
+    assert client.patch("/api/admin/roles/nosuch", json={"description": "x"}, headers=admin).status_code == 404
+    assert client.delete("/api/admin/roles/nosuch", headers=admin).status_code == 404
+
+
+def test_a_role_in_use_cannot_be_removed_and_an_unused_one_can(client, admin):
+    client.post("/api/admin/roles", json={"name": "night_desk", "permissions": ["catalogue.read"]}, headers=admin)
+    cid = people(client, admin)["clerk"]["id"]
+    client.patch(f"/api/admin/users/{cid}", json={"role": "night_desk"}, headers=admin)
+    r = client.delete("/api/admin/roles/night_desk", headers=admin)
+    assert r.status_code == 409 and "another" in r.text
+    client.patch(f"/api/admin/users/{cid}", json={"role": "circulation_clerk"}, headers=admin)
+    assert client.delete("/api/admin/roles/night_desk", headers=admin).status_code == 200
+    assert "night_desk" not in roles(client, admin)
+
+
+def test_an_administrator_cannot_take_admin_users_from_their_own_role(client, admin):
+    client.post(
+        "/api/admin/roles", json={"name": "deputy_admin", "permissions": ["admin.users", "audit.read"]}, headers=admin
+    )
+    r = client.post(
+        "/api/admin/users", json={"username": "deputy", "display_name": "Deputy", "role": "deputy_admin"}, headers=admin
+    )
+    client.post("/api/admin/cards", json={"uid": "STAFFDEPUTY1", "kind": "staff", "username": "deputy"}, headers=admin)
+    assert r.status_code == 201
+    deputy = login_card(client, "STAFFDEPUTY1")
+    cut = client.patch("/api/admin/roles/deputy_admin", json={"permissions": ["audit.read"]}, headers=deputy)
+    assert cut.status_code == 409
+    assert "admin.users" in roles(client, admin)["deputy_admin"]["permissions"]
+    # another administrator may do it
+    assert (
+        client.patch("/api/admin/roles/deputy_admin", json={"permissions": ["audit.read"]}, headers=admin).status_code
+        == 200
+    )
+
+
+def test_role_changes_are_audited_and_only_for_administrators(client, admin, aud, clerk):
+    for h in (aud, clerk):
+        assert client.get("/api/admin/roles", headers=h).status_code == 403
+        assert (
+            client.post(
+                "/api/admin/roles", json={"name": "abc", "permissions": ["catalogue.read"]}, headers=h
+            ).status_code
+            == 403
+        )
+    client.post("/api/admin/roles", json={"name": "temp_role", "permissions": ["catalogue.read"]}, headers=admin)
+    client.patch("/api/admin/roles/temp_role", json={"permissions": ["catalogue.read", "reports.view"]}, headers=admin)
+    client.delete("/api/admin/roles/temp_role", headers=admin)
+    events = client.get("/api/audit/events?action=admin.role", headers=aud).json()["events"]
+    assert [e["action"] for e in events] == ["admin.role.delete", "admin.role.update", "admin.role.create"]
+    assert events[1]["detail"] == {"added": ["reports.view"], "removed": []}
+
+
+def test_built_in_roles_are_restored_at_start(client, admin):
+    from aisys.auth.permissions import sync_rbac
+    from aisys.models import Role
+
+    with client.app.state.session_factory() as db:
+        db.query(Role).filter_by(name="auditor").one().permissions = []
+        db.commit()
+        sync_rbac(db)  # what every start does
+    assert "audit.read" in roles(client, admin)["auditor"]["permissions"]

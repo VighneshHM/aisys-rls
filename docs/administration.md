@@ -49,18 +49,29 @@ Page `/admin`, permission `admin.users` (administrator only).
 - **Add a staff member** (username, name, role, optional password) and **issue a card**. A staff card signs in; a patron card only
   identifies a member and can never sign in (enforced in the service and by a database constraint).
 - **Deactivate or activate** a person: takes effect at once and ends their open sessions. **Deactivate or reactivate** a card.
-  **Unlock** an account locked by wrong passwords. **Change role** among `admin`, `librarian`, `circulation_clerk`, `auditor`.
-- **Card rules.** A patron card needs an existing member number; a staff card cannot be issued to a deactivated person.
+  **Unlock** an account locked by wrong passwords. **Change role** to any built-in or custom role.
+- **Card rules.** A patron card is checked by the same member-record validation as the circulation desk (the member exists and
+  has a name, the card number is 6 to 64 letters and digits and not already used); issuing one switches off the member's old
+  card. A staff card cannot be issued to a deactivated person.
+- **Roles.** The **Roles** panel lists every role with its permissions and how many staff hold it. The four built-in roles
+  (`admin`, `librarian`, `circulation_clerk`, `auditor`) come with the software and are restored at every start, so they are
+  read-only here. **Add a custom role** with a name (3 to 32 lowercase letters, digits or `_`), a description and the
+  permissions to tick; **Edit** changes a custom role's description and permissions (holders get the change on their next
+  click); **Remove** works only when nobody holds the role. Example: a `stock_checker` with `catalogue.read` and
+  `inventory.run` only.
 
 Safety rules the page enforces (and the audit log records):
 
-- You cannot deactivate your own account or change your own role.
+- You cannot deactivate your own account or change your own role, and you cannot take `admin.users` away from your own role.
 - The last active administrator cannot be deactivated or demoted, so the library cannot lock itself out.
-- Every change is audited with who, what, and the old and new role. Nothing secret is written to the log.
+- A role that someone holds cannot be removed; built-in roles cannot be changed or removed.
+- Every change is audited with who, what, and the old and new role; role changes as `admin.role.create`, `admin.role.update`
+  (with the permissions added and removed) and `admin.role.delete`. Nothing secret is written to the log.
 
-Limits: no password reset, no custom
-roles or per-permission editing, no deleting users (deactivate instead, so history stays attributable).
-API: `GET /api/admin/people`, `PATCH /api/admin/users/{id}`, `PATCH /api/admin/cards/{id}`, `POST /api/admin/users`, `POST /api/admin/cards`.
+Limits: no password reset; no new permission types (a custom role combines the permissions the software defines); no deleting
+users (deactivate instead, so history stays attributable).
+API: `GET /api/admin/people`, `PATCH /api/admin/users/{id}`, `PATCH /api/admin/cards/{id}`, `POST /api/admin/users`, `POST /api/admin/cards`,
+`GET /api/admin/roles`, `POST /api/admin/roles`, `PATCH /api/admin/roles/{name}`, `DELETE /api/admin/roles/{name}`.
 
 ## 4. The audit log
 

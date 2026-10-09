@@ -26,7 +26,8 @@ from aisys.deps import (
     require,
 )
 from aisys.integrations.credentials import CardPresentation, CredentialProvider
-from aisys.models import AuditEvent, Card, Member, Role, User
+from aisys.models import AuditEvent, Card, Role, User
+from aisys.rfid import tagging
 from aisys.timeutil import iso
 
 router = APIRouter()
@@ -196,9 +197,16 @@ def issue_card(
     else:
         if not body.member_ref:
             raise HTTPException(422, "Patron card requires member_ref")
-        if db.scalar(select(Member.id).where(Member.member_no == body.member_ref)) is None:
-            raise HTTPException(422, f"There is no member numbered {body.member_ref}.")
-        card = Card(uid=body.uid, kind="patron", member_ref=body.member_ref)
+        # the same member-record validation as the circulation desk (FR05), so the two paths cannot drift apart
+        chk = tagging.validate_member_tagging(db, body.member_ref, body.uid)
+        if not chk.ok:
+            codes = {p["code"] for p in chk.problems}
+            status = 409 if codes <= {"card_in_use"} else 422  # an unknown member is a bad request here, as before
+            raise HTTPException(status, "; ".join(p["message"] for p in chk.problems))
+        assert chk.member is not None
+        if chk.current_card is not None:  # a member has one working patron card: the old one is switched off
+            chk.current_card.active = False
+        card = Card(uid=chk.uid, kind="patron", member_ref=chk.member.member_no)
     db.add(card)
     try:
         db.flush()

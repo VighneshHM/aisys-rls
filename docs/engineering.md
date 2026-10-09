@@ -14,8 +14,9 @@ How the work is controlled, so a reviewer can see the practice and not only the 
 * **Change control**: when behaviour changes, the requirement (`docs/requirements.csv`), design document, code, tests and
   `docs/traceability.md` change in the same pull request. Tests carry `@pytest.mark.req("FR..", "AC..")` so the matrix is generated, not
   remembered; `tests/test_docs.py` fails if a generated document is stale or a requirement marked done has no test.
-* **Release tag.** The evaluation release is tagged once `main` is final: `git tag -a v1.0.0 -m "Evaluation release" && git push origin v1.0.0`.
-  The package version in `pyproject.toml` and `src/aisys/__init__.py` is the version the update tools report.
+* **Release tag.** The evaluation release is tagged on `main` once it is final, with the package version (the version in
+  `pyproject.toml` and `src/aisys/__init__.py`, which the update tools report): `git tag -a v0.1.0 -m "Evaluation release"`, then
+  `git push origin v0.1.0`. The tag and the package version must agree, so a later release bumps both together.
 
 ## Build pipeline (GitHub Actions, on every pull request and push to `main`)
 
@@ -25,20 +26,27 @@ How the work is controlled, so a reviewer can see the practice and not only the 
 | Type checking | `mypy` (configured in `pyproject.toml`, covers `src/`) | any type error |
 | Lint and static analysis | `ruff check` with `E F I B UP S` (the `S` rules are the Bandit security checks) | any finding (tests may use `assert`) |
 | Automated tests | `pytest -q -n auto` (parallel workers; each test copies a database that was migrated once, which cut a 25-30 minute CI run) on Windows (`windows-latest` with Python 3.12 and 3.13, and `windows-2022` with 3.12, the Server 2022 image) | any test fails |
-| Real offline lifecycle | `scripts/lifecycle_demo.py` on `windows-latest`: a real install from signed package, refusals, signed update, rollback with the data proven | any step fails |
-| Dependency scan | `pip-audit -r requirements.lock` | any known vulnerability in a pinned dependency (it caught and forced the upgrade of `cryptography`) |
+| Real offline lifecycle | `scripts/lifecycle_demo.py` on `windows-latest`: a real install from signed package, refusals, signed update, rollback with the data proven, with every connection off the machine refused and logged on the target-machine steps | any step fails, or any step tried to reach the network |
+| Dependency scan | `pip-audit` on `requirements.lock` and `requirements-dev.lock` | any known vulnerability in a pinned dependency (it caught and forced the upgrade of `cryptography`) |
 | Dependency updates | Dependabot, weekly, for pip and for the actions | opens pull requests; they go through the same gates |
 
-Every job installs from `requirements.lock` with `--require-hashes`, so CI runs the exact versions that were audited.
+Every job installs from `requirements.lock` and `requirements-dev.lock` with `--require-hashes`, and builds the project with
+the pinned `setuptools` (`--no-build-isolation`), so CI runs the exact versions that were audited.
 
 Concurrency is set so a newer push cancels the older run of the same branch; the test job has a 30-minute limit.
 
 ## Dependencies and licences
 
-* Runtime dependencies are pinned in `pyproject.toml` (exact versions) and `requirements.lock` (every package, including the
-  transitive ones). Development tools (`pytest`, `pytest-xdist`, `httpx`, `ruff`, `mypy`, `cryptography`) are only in the `dev` extra.
-* `docs/third-party-licences.md` is the licence inventory (23 packages, none copyleft); every update package also carries a
-  CycloneDX `SBOM.json` and `LICENSES.md` generated from the wheels it actually ships, with copyleft or unknown licences flagged.
+* Two lock files, both with sha256 hashes. `requirements.lock` holds the runtime packages (the direct ones are also pinned
+  exactly in `pyproject.toml`), every transitive one included; these are the wheels shipped to a site.
+  `requirements-dev.lock` holds the development tools (`pytest`, `pytest-xdist`, `httpx`, `ruff`, `mypy`, `cryptography`
+  and their dependencies) and the build backend `setuptools`; they are never shipped. `scripts/sbom_lock.py --check` fails
+  if a package is in the wrong file.
+* `docs/third-party-licences.md` is the licence inventory of all 43 pinned packages with their scope (runtime, development,
+  build), and `docs/sbom.cdx.json` the same as a CycloneDX SBOM with licences and hashes; both are generated and checked
+  by `tests/test_docs.py`. No runtime package is copyleft; two development tools are MPL-2.0 and are not shipped.
+  Redistribution and offline-use obligations: `docs/deployment.md`. Every update package also carries a CycloneDX
+  `SBOM.json` and `LICENSES.md` generated from the wheels it actually ships, with copyleft or unknown licences flagged.
 * Offline installation needs nothing from the internet: the package contains every wheel (`docs/deployment.md`).
 
 ## Configuration and secrets

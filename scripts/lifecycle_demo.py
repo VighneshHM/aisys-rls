@@ -2,12 +2,17 @@
 
     python scripts/lifecycle_demo.py [--keep] [--wheels-from DIR] [--work DIR]
 
-It builds a 0.1.0 package and a 0.2.0 package that ships a database change, then, with the network deliberately broken
-(a dead proxy, and pip told never to use an index):
+It builds a 0.1.0 package and a 0.2.0 package that ships a database change, then, with the network blocked:
+  0. proves the block works (a probe, and a grandchild started with a clean environment, are both refused)
   1. installs 0.1.0 and loads demo data
   2. refuses a tampered 0.2.0, a foreign-signed one and a downgrade
   3. applies 0.2.0 (backup, rehearsal on a copy, migration, start-up check, switch)
   4. rolls back to 0.1.0 and proves the data is as it was
+How the network is blocked on the target-machine steps: every Python process (install.py, manage.py, pip, the new
+release's migrate and start-up check, and anything they start) loads a `sitecustomize` that refuses every connection and
+name lookup that is not to this machine (127.0.0.1, ::1, localhost), logs the attempt, and passes itself on to each
+child process, even one started with a cleaned environment as the installer does. A dead proxy is set as well.
+At the end the log must be empty: no step tried to reach the network. pip also gets `--no-index`.
 With --keep the folder stays (0.2.0 waits in incoming/) so the Updates page can be tried: see docs/deployment.md.
 Needs the dev extras (cryptography) and internet for the build step unless --wheels-from is given.
 """
@@ -26,6 +31,80 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RELEASE = [sys.executable, str(REPO / "scripts" / "release.py")]
 OFFLINE = {"HTTP_PROXY": "http://127.0.0.1:9", "HTTPS_PROXY": "http://127.0.0.1:9", "NO_PROXY": "127.0.0.1,localhost"}
+NETGUARD = r'''"""Written by scripts/lifecycle_demo.py: refuse non-local connections here and in every child process."""
+
+import errno
+import os
+import socket
+import subprocess
+
+_DIR = os.path.dirname(os.path.abspath(__file__))
+_LOG = os.environ.get("AISYS_NETGUARD_LOG", "")
+_LOCAL = ("127.", "::1", "localhost", "0.0.0.0", "::")
+
+
+def _local(host):
+    host = host.decode() if isinstance(host, bytes) else str(host or "")
+    return host == "" or host.lower().startswith(_LOCAL)
+
+
+def _refuse(what):
+    if _LOG:
+        with open(_LOG, "a", encoding="utf-8") as fh:
+            fh.write(f"{os.getpid()} {what}\n")
+    raise OSError(errno.ENETUNREACH, f"network blocked by lifecycle_demo: {what}")
+
+
+_connect, _connect_ex, _getaddrinfo = socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo
+
+
+def connect(self, address):
+    if self.family in (socket.AF_INET, socket.AF_INET6) and not _local(address[0]):
+        _refuse(f"connect {address[0]}:{address[1]}")
+    return _connect(self, address)
+
+
+def connect_ex(self, address):
+    if self.family in (socket.AF_INET, socket.AF_INET6) and not _local(address[0]):
+        _refuse(f"connect {address[0]}:{address[1]}")
+    return _connect_ex(self, address)
+
+
+def getaddrinfo(host, *args, **kwargs):
+    if not _local(host):
+        _refuse(f"lookup {host}")
+    return _getaddrinfo(host, *args, **kwargs)
+
+
+socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo = connect, connect_ex, getaddrinfo
+_popen_init = subprocess.Popen.__init__
+
+
+def _popen(self, *args, **kwargs):
+    env = dict(os.environ if kwargs.get("env") is None else kwargs["env"])
+    paths = [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
+    env["PYTHONPATH"] = os.pathsep.join([_DIR, *[p for p in paths if p != _DIR]])
+    env["AISYS_NETGUARD_LOG"] = _LOG
+    kwargs["env"] = env
+    _popen_init(self, *args, **kwargs)
+
+
+subprocess.Popen.__init__ = _popen
+'''
+PROBE = """
+import socket, subprocess, sys
+try:
+    socket.create_connection(("192.0.2.1", 443), timeout=2)
+    sys.exit("probe: the connection was NOT blocked")
+except OSError as exc:
+    assert "blocked by lifecycle_demo" in str(exc), exc
+clean = {"SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}  # like the installer: no PYTHONPATH
+child = subprocess.run([sys.executable, "-c", "import socket; socket.getaddrinfo('pypi.org', 443)"], env=clean,
+                       capture_output=True, text=True)
+assert child.returncode != 0 and "blocked by lifecycle_demo" in child.stderr, child.stderr
+print("network block active in this process and in a child started with a clean environment")
+"""
+GUARD: dict[str, str] = {}  # PYTHONPATH and log location, set once the guard is written
 MIGRATION = '''"""demo schema change shipped by the 0.2.0 update package"""
 
 import sqlalchemy as sa
@@ -48,7 +127,7 @@ def downgrade() -> None:
 
 def run(cmd: list[str], offline: bool = False, expect_fail: bool = False) -> str:
     env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}  # run as a fresh machine would
-    env.update(OFFLINE if offline else {})
+    env.update({**OFFLINE, **GUARD} if offline else {})
     proc = subprocess.run(cmd, capture_output=True, text=True, env=env, check=False)  # noqa: S603
     out = (proc.stdout + proc.stderr).strip()
     if expect_fail and proc.returncode == 0:
@@ -173,6 +252,14 @@ def main() -> None:
     )
 
     manage = [sys.executable, str(root / "manage.py")]
+    step("Target machine: block the network and prove the block works")
+    guard_dir, guard_log = work / "netguard", work / "netguard.log"
+    guard_dir.mkdir()
+    (guard_dir / "sitecustomize.py").write_text(NETGUARD, encoding="utf-8")
+    GUARD.update(PYTHONPATH=str(guard_dir), AISYS_NETGUARD_LOG=str(guard_log))
+    print(run([sys.executable, "-c", PROBE], offline=True))
+    guard_log.unlink()  # the probe's two refusals; from here on the log must stay empty
+
     step("Target machine, NO network: install 0.1.0")
     print(
         run(
@@ -199,9 +286,9 @@ def main() -> None:
     shutil.copytree(dist / "aisys-0.2.0", tampered)
     with (tampered / "config.sample.toml").open("a") as fh:
         fh.write("\n# tampered\n")
-    print("tampered :", run([*manage, "update", str(tampered)], expect_fail=True))
-    print("foreign  :", run([*manage, "update", str(foreign / "aisys-0.3.0.zip")], expect_fail=True))
-    print("downgrade:", run([*manage, "update", str(dist / "aisys-0.1.0.zip")], expect_fail=True))
+    print("tampered :", run([*manage, "update", str(tampered)], offline=True, expect_fail=True))
+    print("foreign  :", run([*manage, "update", str(foreign / "aisys-0.3.0.zip")], offline=True, expect_fail=True))
+    print("downgrade:", run([*manage, "update", str(dist / "aisys-0.1.0.zip")], offline=True, expect_fail=True))
 
     step("Dry run, then apply 0.2.0 (offline)")
     print(run([*manage, "update", str(dist / "aisys-0.2.0.zip"), "--dry-run"], offline=True))
@@ -215,11 +302,15 @@ def main() -> None:
     con.commit()
     con.close()
     print(f"(simulated damage: cards now {count(db, 'cards')})")
-    print("without --yes:", run([*manage, "rollback"], expect_fail=True))
+    print("without --yes:", run([*manage, "rollback"], offline=True, expect_fail=True))
     print(run([*manage, "rollback", "--yes"], offline=True))
     assert not has_table(db, "update_marker") and count(db, "users") == users and count(db, "cards") == cards
     print(f"after rollback: schema back to {down}, {users} users and {cards} cards as before the update")
-    print(run([*manage, "status"]))
+    print(run([*manage, "status"], offline=True))
+    attempts = guard_log.read_text(encoding="utf-8") if guard_log.exists() else ""
+    if attempts:
+        sys.exit(f"A target-machine step tried to reach the network:\n{attempts}")
+    print("network log empty: no target-machine step tried to reach the network")
     print("\nALL CHECKS PASSED")
     if a.keep:
         shutil.copyfile(dist / "aisys-0.2.0.zip", root / "incoming" / "aisys-0.2.0.zip")

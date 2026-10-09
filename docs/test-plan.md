@@ -18,7 +18,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 | Performance | search, reports, import, backup, restore, reminders and concurrent desks with 20,000 items | `scripts/perf_report.py` | `docs/performance-results.md` |
 | Security | permissions, hostile input, injection, path traversal, TLS, headers, masking, signed packages, dependency audit | pytest, `ruff` (Bandit rules), `pip-audit`, probe scripts | `docs/security-checks.md` |
 | Regression | the whole suite on every pull request, on three Windows images | GitHub Actions | CI history |
-| Backup, restore, offline update, rollback | proving the original data is intact | pytest and `scripts/lifecycle_demo.py` (network disabled) | `test_backup`, `test_lifecycle`, demo output |
+| Backup, restore, offline update, rollback | proving the original data is intact | pytest and `scripts/lifecycle_demo.py` (network blocked and logged) | `test_backup`, `test_lifecycle`, demo output |
 | User acceptance | the scenarios a library person performs, in the browser | the scripted scenarios in `docs/uat.md` | `docs/uat.md` |
 | Usability and layout | pages at desktop and phone width, dark and light themes, keyboard use, empty states, error messages | browser checks recorded in `docs/uat.md`; asset checks in `test_ui_assets` | `docs/uat.md` |
 
@@ -37,7 +37,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 * **Entry for a pull request**: the branch is up to date with `main`, formatted and lint-clean locally.
 * **Exit (merge)**: formatter, linter, all tests and the dependency scan pass in CI; the requirement, design document and
   traceability matrix are updated; any defect found while testing is fixed or logged.
-* **Exit (release)**: the whole suite passes on the final `main`; `scripts/lifecycle_demo.py` passes with the network disabled;
+* **Exit (release)**: the whole suite passes on the final `main`; `scripts/lifecycle_demo.py` passes with the network blocked (every connection off the machine refused and logged; the log must stay empty);
   `docs/uat.md` has no open failure; `docs/defect-log.md` has no open defect of high severity; the evaluation tag is created.
 
 ## 5. Traceability
@@ -52,13 +52,13 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_foundation.py` | 23 | sign-in (card and password), lockout, roles, audit log, health, migrations up and down |
 | `test_migration.py` | 30 | AC01: staging, mapping, validation rules, duplicates, reconciliation, rollback, the 20,000-row run |
 | `test_tagging.py`, `test_tag_lifecycle.py` | 37, 26 | AC02/FR05: validate, link, re-tag, remove, retire, monitoring, database invariants |
-| `test_circulation.py`, `test_fines.py`, `test_members.py`, `test_member_cards.py` | 22, 8, 8, 8 | AC03/AC04/FR04: check-out, renew, check-in, blocks, fines ledger, members, cards |
+| `test_circulation.py`, `test_fines.py`, `test_members.py`, `test_member_cards.py` | 22, 8, 8, 11 | AC03/AC04/FR04/FR05: check-out, renew, check-in, blocks, fines ledger, members, cards and the member-record check |
 | `test_inventory.py` | 10 | AC05/FR06: sweeps, signals, missing and misplaced, closing |
 | `test_gate.py` | 22 | AC06/FR07/FR09: alarms, offline behaviour, duplicates, CCTV, queued delivery, retries |
-| `test_reports.py` | 17 | AC08/FR08: reports, filters, dashboards, CSV, hostile input, scale |
+| `test_reports.py` | 18 | AC08/FR08: reports, filters, dashboards, CSV, hostile input, scale |
 | `test_backup.py` | 25 | AC10/NFR01: backups, proof, restore, busy database, maintenance mode, hostile names |
 | `test_lifecycle.py`, `test_lifecycle_api.py` | 49, 12 | AC09/FR12: signatures, tampering, install, update, failure paths, rollback, recovery |
-| `test_admin.py` | 17 | FR11: audit log, staff and cards, lock-out rules |
+| `test_admin.py` | 25 | FR11: audit log, staff and cards, lock-out rules, custom roles |
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
 | `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
@@ -66,9 +66,9 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_sip2_codec.py` | 70 | FR03: SIP2 message encoding and decoding, checksum, sequence, limits, hostile and fuzzed input |
 | `test_sip2.py` | 61 | FR03/AC03: SIP2 client and connector against the simulator over a real socket, including the web API end to end; lost, dropped and damaged answers; verify-before-resend; error mapping; configuration and password handling |
 | `test_security_ops.py`, `test_config.py` | 11, 8 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
-| `test_ui_assets.py`, `test_docs.py` | 31, 7 | page assets and scripts, generated documents, SBOM, hashed lock file, sample reports, deliverables present |
+| `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 717 test cases (some are parametrised).
+Total: 732 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

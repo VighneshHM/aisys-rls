@@ -7,7 +7,8 @@ production task in `docs/remaining-work.md`). Nothing in it has been filled in o
 browser), **not by library staff**, and against simulated devices. It is development evidence, not acceptance. Only a completed and signed copy of this
 form, made by library staff on the site's system, is acceptance evidence.
 
-Copy this file for each run; fill in a copy, never this master. Use the steps in `docs/uat.md` and `docs/demo-script.md` for each
+Copy this file for each run; fill in a copy, never this master. The development team's completed copy, for its own run on simulated
+devices, is `docs/uat-signoff-development.md`; it is not site acceptance. Use the steps in `docs/uat.md` and `docs/demo-script.md` for each
 scenario.
 
 ## 1. Test details

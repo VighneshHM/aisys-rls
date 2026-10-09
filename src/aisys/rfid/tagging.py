@@ -13,6 +13,7 @@ A removed tag can be linked again to any item; a retired tag (damaged or lost) c
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -22,7 +23,7 @@ from sqlalchemy.orm import Session, aliased, contains_eager
 
 from aisys import audit
 from aisys.catalogue.service import active_tag, item_out, tag_out
-from aisys.models import BibRecord, Item, RfidTag, TagEvent
+from aisys.models import BibRecord, Card, Item, Member, RfidTag, TagEvent
 from aisys.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
 from aisys.rfid.events import TagObserved, is_valid_tag_uid, normalize_tag_uid
 from aisys.rfid.registry import DeviceRegistry
@@ -164,6 +165,88 @@ def validate_tagging(
                     "replace",
                 )
             )
+    return chk
+
+
+# ------------------------------------------------------------------ member side (patron cards)
+CARD_RE = re.compile(r"^[A-Z0-9]{6,64}$")
+
+
+@dataclass
+class MemberCheck:
+    """The member-side twin of `Check`: is this member record fit to carry this card (a new card or a re-tag)?"""
+
+    problems: list[dict] = field(default_factory=list)
+    warnings: list[dict] = field(default_factory=list)
+    member: Member | None = None
+    current_card: Card | None = None  # the member's active patron card, if any
+    uid: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return not self.problems
+
+    def status_code(self) -> int:
+        codes = {p["code"] for p in self.problems}
+        if "no_such_member" in codes:
+            return 404
+        return 409 if codes <= {"card_in_use"} else 422
+
+    def out(self) -> dict:
+        m = self.member
+        return {
+            "ok": self.ok,
+            "card_uid": self.uid,
+            "problems": self.problems,
+            "warnings": self.warnings,
+            "member": {"member_no": m.member_no, "name": m.name, "status": m.status} if m else None,
+            "current_card": self.current_card.uid if self.current_card else None,
+        }
+
+
+def normalize_card_uid(uid: str) -> str:
+    return re.sub(r"[\s:-]", "", uid or "").upper()
+
+
+def card_problems(db: Session, uid: str) -> list[dict]:
+    """Checks on the card number alone, shared by a new member's first card and any later one."""
+    if not CARD_RE.match(uid):
+        return [_p("bad_card", "A card number is 6 to 64 letters and digits", "card_uid")]
+    if db.scalar(select(Card).where(Card.uid == uid)):
+        return [_p("card_in_use", "That card number is already registered to someone", "card_uid")]
+    return []
+
+
+def validate_member_tagging(db: Session, member_no: str, card_uid: str) -> MemberCheck:
+    """Validate the member record before a card is linked to it (FR05). Every problem at once, nothing written.
+
+    Used by the circulation desk and by the Administration page, so both paths apply the same rules.
+    """
+    uid = normalize_card_uid(card_uid)
+    chk = MemberCheck(uid=uid)
+    member = db.scalar(select(Member).where(Member.member_no == (member_no or "").strip().upper()))
+    if member is None:
+        chk.problems.append(_p("no_such_member", f"No member with number '{member_no}'", "member_no"))
+        return chk
+    chk.member = member
+    if not member.name.strip():
+        chk.problems.append(_p("name_missing", "The member record has no name to print on the card", "name"))
+    chk.problems += card_problems(db, uid)
+    chk.current_card = db.scalar(
+        select(Card).where(Card.kind == "patron", Card.member_ref == member.member_no, Card.active)
+    )
+    if chk.current_card is not None:
+        chk.warnings.append(
+            _p(
+                "will_replace_old_card",
+                f"The member's card {chk.current_card.uid} will be switched off (lost or replaced)",
+                "card_uid",
+            )
+        )
+    if member.status == "blocked":
+        chk.warnings.append(
+            _p("member_blocked", "The member is blocked: the card will identify them, but loans stay refused", "")
+        )
     return chk
 
 

@@ -238,8 +238,8 @@ details.notes summary { cursor: pointer; font-weight: 600; }
   <ul>
     <li><b>Rollback:</b> the previous version returns; if the layout changed, data returns from the pre-update backup and newer entries stay in a safety copy.</li>
     <li><b>Recover</b> after a crash mid-update with <code>manage.py recover</code>.</li>
-    <li><b>Supply chain:</b> a software bill of materials and a licence inventory ship in every package (23 packages, all permissive, none copyleft).</li>
-    <li>Demonstrated by <code>scripts/lifecycle_demo.py</code> with the network deliberately broken.</li>
+    <li><b>Supply chain:</b> a software bill of materials and a licence inventory ship in every package (22 runtime packages, all permissive, none copyleft); the repository's inventory covers all 43 pinned packages, development tools included.</li>
+    <li>Demonstrated by <code>scripts/lifecycle_demo.py</code> with the network blocked: every connection off the machine is refused and logged, and the log must stay empty.</li>
   </ul>
   <details class="notes"><summary>Speaker notes</summary>
     <p>docs/deployment.md. Measured on the development machine: offline install about 53 s, update about 45 s, rollback about 3.5 s (docs/performance-results.md). Applying and rolling back are command-line only because they restart the application; the Updates page reads and checks only.</p></details>
@@ -275,9 +275,9 @@ details.notes summary { cursor: pointer; font-weight: 600; }
 <!-- 9 -->
 <section class="slide" data-title="Testing"><div class="inner">
   <div class="kicker">Testing &middot; 9 of 12</div>
-  <h2>717 test cases, each mapped to a requirement</h2>
+  <h2>732 test cases, each mapped to a requirement</h2>
   <div class="cols">
-    <div class="card"><div class="big">717</div><p>automated test cases (some parametrised). A generated matrix (<code>docs/traceability.md</code>) lists every requirement against its tests; a test fails if it is stale.</p></div>
+    <div class="card"><div class="big">732</div><p>automated test cases (some parametrised). A generated matrix (<code>docs/traceability.md</code>) lists every requirement against its tests; a test fails if it is stale.</p></div>
     <div class="card"><h3>Continuous integration</h3>
       <ul>
         <li><code>windows-latest</code> with Python 3.12</li>

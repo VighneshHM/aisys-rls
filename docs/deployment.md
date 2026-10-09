@@ -4,8 +4,8 @@ AISYS is delivered as one **signed package** (a folder or `.zip`). It contains t
 tools to install it, a software bill of materials and the licence inventory. Nothing is downloaded at any point after
 the package is built, so it works on a computer with no internet.
 
-Try the whole thing in one command (builds two packages, installs, updates, rolls back, with the network deliberately
-broken):
+Try the whole thing in one command (builds two packages, then installs, updates and rolls back with the network
+blocked: every connection off the machine is refused and logged, and the run fails unless the log stays empty):
 
 ```
 python scripts/lifecycle_demo.py            # needs the dev extras and internet once, for the build step
@@ -209,11 +209,45 @@ trusted vendor key: no network, no phone-home. An invalid or expired licence sto
 * Verification is a short pure-Python implementation of RFC 8032 (so it works before anything is installed), checked
   against the RFC test vector and against signatures made by the `cryptography` library. Signing uses that library on the
   build machine only.
-* Dependency versions are pinned in `pyproject.toml` and `requirements.lock`; the wheels shipped are exactly those.
+* Dependency versions are pinned with sha256 hashes: `requirements.lock` holds the 22 runtime packages (the wheels shipped
+  are exactly those) and `requirements-dev.lock` the development and build tools, which are never shipped.
 * `SBOM.json` (CycloneDX) and `LICENSES.md` are generated from the shipped wheels and included in every package. The
-  current inventory is `docs/third-party-licences.md`: 23 packages, all permissive (MIT, BSD, Apache-2.0, PSF), none
-  copyleft. The AISYS code itself is marked `LicenseRef-AISYS-Candidate-Exercise`.
+  repository's full inventory, runtime, development and build, is `docs/third-party-licences.md` (with `docs/sbom.cdx.json`),
+  generated from both lock files. The AISYS code itself is marked `LicenseRef-AISYS-Candidate-Exercise`.
 * The private signing key and the secrets are never in a package. `config/secret.key` is generated at install.
+
+## Redistribution and offline use (NFR04)
+
+What a site receives, and what it may and must do with it. This is an engineering summary of the licences, not legal advice;
+the licence texts in each wheel are what count.
+
+**What is redistributed.** Only the 22 **runtime** packages in `docs/third-party-licences.md`, as the wheels inside each offline
+package. Every one is under a permissive licence: MIT, BSD-2/3-Clause, Apache-2.0 or PSF-2.0. None is copyleft, so shipping them
+inside the package creates no duty to publish the AISYS source code. The development tools (pytest, ruff, mypy, httpx, and
+`cryptography` for signing) and the build backend (`setuptools`) stay on the developer's and the build machine and are
+**not redistributed**. Two of them, `certifi` and `pathspec`, are MPL-2.0 (weak copyleft); because they are never shipped, MPL
+places no duty on the package. If a future release ever ships one of them, MPL-2.0 requires making the source of those files (not
+of AISYS) available, and the release script flags any copyleft wheel for review before it is shipped.
+
+**What every package must keep (the obligations).**
+* *Notices.* MIT, BSD and PSF require the copyright notice and licence text to travel with the software. They do: each wheel's
+  `.dist-info` folder holds its own `LICENSE` file, and the installed releases keep those folders. Do not strip `.dist-info`
+  folders to save space.
+* *Apache-2.0* (`opentelemetry-api`, `python-multipart`): keep the licence and any `NOTICE` file the wheel carries (they stay in
+  `.dist-info`); a modified copy must say it was changed. AISYS ships them unmodified.
+* *Attribution in one place.* `LICENSES.md` and `SBOM.json` at the top of every package list every shipped component with its
+  licence, for the site's records.
+* *No endorsement.* BSD-3-Clause forbids using the authors' names to promote the product; nothing in AISYS does.
+
+**Offline use.** No shipped licence restricts use on an isolated network, needs online activation, phones home or limits the
+number of machines. Licence checking in AISYS itself is offline (the signed licence file, section *Activation*). The one runtime
+component that is **not** in the package is **Python** (PSF licence, permissive), which the site installs from the official
+Windows installer before AISYS (environment checklist). `certifi` (a bundle of web certificate authorities) is not shipped, so
+nothing in a site installation depends on an internet trust store.
+
+**Changing a dependency.** A new or upgraded package goes through `requirements.lock` or `requirements-dev.lock`, then
+`python scripts/sbom_lock.py` regenerates the inventory; the test suite fails until it is current, and a copyleft or unknown
+licence in a runtime package is marked **needs review** and must be cleared before release.
 
 ## Running in production: service, scheduled jobs, TLS
 

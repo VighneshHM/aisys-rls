@@ -17,6 +17,7 @@ from aisys.circulation.resilience import ResilientConnector
 from aisys.config import Settings
 from aisys.deps import Principal, client_ip, get_db, get_principal, get_settings, require
 from aisys.models import Card, Loan, Member, utcnow
+from aisys.rfid import tagging
 from aisys.rfid.mock import MockStaffReader
 from aisys.rfid.registry import DeviceRegistry
 from aisys.timeutil import iso
@@ -131,6 +132,14 @@ def add_member(
     except service.CircError as exc:
         raise _http(exc) from exc
     return service.member_out(db, member, config)
+
+
+@router.post("/members/{member_no}/card/validate")
+def validate_card(
+    member_no: str, body: CardIn, _: Principal = Depends(require("member.write")), db: Session = Depends(get_db)
+):
+    """Dry run of a card issue (FR05, member side): every problem and warning at once, nothing written."""
+    return tagging.validate_member_tagging(db, member_no, body.uid).out()
 
 
 @router.post("/members/{member_no}/card")

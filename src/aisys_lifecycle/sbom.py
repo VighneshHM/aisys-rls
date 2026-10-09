@@ -11,7 +11,7 @@ from pathlib import Path
 REVIEW = re.compile(r"\b(GPL|AGPL|LGPL|MPL|EPL|CDDL|SSPL|CC-BY-SA|CC-BY-NC)\b", re.IGNORECASE)
 
 
-def _licence_of(msg) -> str:
+def licence_of(msg) -> str:
     expr = (msg.get("License-Expression") or "").strip()
     if expr:
         return expr
@@ -35,7 +35,7 @@ def read_wheel(path: Path) -> dict:
     return {
         "name": msg.get("Name"),
         "version": msg.get("Version"),
-        "licence": _licence_of(msg),
+        "licence": licence_of(msg),
         "home": (msg.get("Home-page") or "").strip(),
         "licence_file_shipped": has_licence_file,
         "wheel": path.name,

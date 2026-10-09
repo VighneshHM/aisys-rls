@@ -2,7 +2,8 @@
 
 Audit (`audit.read`): a searchable, paged view of the append-only log, and a CSV export that neutralises formulas.
 Administration (`admin.users`): see staff and their cards, activate or deactivate accounts and cards, unlock a locked
-account, change a role. Creating users and issuing cards stays in `routes.py`. Two safety rules protect the system from
+account, change a role, and define custom roles (the four built-in roles are fixed by the release and reset at every
+start by `sync_rbac`). Creating users and issuing cards stays in `routes.py`. Two safety rules protect the system from
 locking itself out: you cannot deactivate or demote yourself, and the last active administrator cannot be removed.
 """
 
@@ -11,18 +12,20 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from aisys import audit
+from aisys.auth.permissions import PERMISSIONS, ROLES
 from aisys.auth.security import card_hint
 from aisys.deps import Principal, client_ip, get_db, require
-from aisys.models import AuditEvent, AuthSession, Card, Role, User
+from aisys.models import AuditEvent, AuthSession, Card, Permission, Role, User
 from aisys.timeutil import aware, iso
 
 router = APIRouter(tags=["admin"])
@@ -239,6 +242,127 @@ def patch_user(
     return _person(
         user, list(db.scalars(select(Card).where(Card.user_id == user.id, Card.kind == "staff"))), datetime.now(UTC)
     )
+
+
+# ---------------------------------------------------------------- roles
+ROLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,31}$")
+
+
+def _role(r: Role, holders: int) -> dict:
+    return {
+        "name": r.name,
+        "description": r.description,
+        "built_in": r.name in ROLES,
+        "permissions": sorted(p.code for p in r.permissions),
+        "holders": holders,
+    }
+
+
+def _holders(db: Session) -> dict[int, int]:
+    return {role_id: n for role_id, n in db.execute(select(User.role_id, func.count()).group_by(User.role_id))}
+
+
+class RoleIn(BaseModel):
+    name: str = Field(min_length=1, max_length=32)
+    description: str = Field(default="", max_length=200)
+    permissions: list[str] = Field(min_length=1, max_length=len(PERMISSIONS))
+
+
+class RolePatch(BaseModel):
+    description: str | None = Field(default=None, max_length=200)
+    permissions: list[str] | None = Field(default=None, min_length=1, max_length=len(PERMISSIONS))
+
+
+def _permissions(db: Session, codes: list[str]) -> list[Permission]:
+    unknown = sorted(set(codes) - set(PERMISSIONS))
+    if unknown:
+        raise HTTPException(422, f"Unknown permission: {', '.join(unknown)}")
+    return list(db.scalars(select(Permission).where(Permission.code.in_(set(codes))).order_by(Permission.code)))
+
+
+def _custom_role(db: Session, name: str) -> Role:
+    role = db.scalar(select(Role).where(Role.name == name))
+    if role is None:
+        raise HTTPException(404, "No such role")
+    if role.name in ROLES:
+        raise HTTPException(409, f"'{role.name}' is a built-in role: its permissions are set by the software release.")
+    return role
+
+
+@router.get("/api/admin/roles", tags=["admin"])
+def roles(_: Principal = CanAdmin, db: Session = Depends(get_db)):
+    """Every role with its permissions, and the catalogue of permissions a custom role can be given."""
+    holders = _holders(db)
+    return {
+        "roles": [_role(r, holders.get(r.id, 0)) for r in db.scalars(select(Role).order_by(Role.name))],
+        "permissions": [{"code": c, "description": d} for c, d in PERMISSIONS.items()],
+    }
+
+
+@router.post("/api/admin/roles", status_code=201, tags=["admin"])
+def create_role(body: RoleIn, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)):
+    """A custom role: a name and a chosen set of permissions. Built-in roles cannot be redefined."""
+    name = body.name.strip().lower()
+    if not ROLE_NAME_RE.match(name):
+        raise HTTPException(422, "A role name is 3 to 32 lowercase letters, digits or _, starting with a letter")
+    if db.scalar(select(Role.id).where(Role.name == name)) is not None:
+        raise HTTPException(409, f"There is already a role called '{name}'")
+    role = Role(
+        name=name, description=" ".join(body.description.split()), permissions=_permissions(db, body.permissions)
+    )
+    db.add(role)
+    db.flush()
+    audit.record(
+        db, actor=principal.user.username, action="admin.role.create", entity="role", entity_id=name,
+        detail={"permissions": sorted(p.code for p in role.permissions)}, ip=client_ip(request),
+    )  # fmt: skip
+    db.commit()
+    return _role(role, 0)
+
+
+@router.patch("/api/admin/roles/{name}", tags=["admin"])
+def patch_role(
+    name: str, body: RolePatch, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)
+):
+    """Change a custom role's description or permissions. People holding it get the new rights on their next request."""
+    role = _custom_role(db, name)
+    changes: dict = {}
+    if body.description is not None and " ".join(body.description.split()) != role.description:
+        role.description = " ".join(body.description.split())
+        changes["description"] = role.description
+    if body.permissions is not None:
+        before, wanted = {p.code for p in role.permissions}, _permissions(db, body.permissions)
+        after = {p.code for p in wanted}
+        if after != before:
+            if principal.user.role_id == role.id and "admin.users" in before - after:
+                raise HTTPException(409, "You cannot take 'admin.users' away from your own role.")
+            role.permissions = wanted
+            changes["added"], changes["removed"] = sorted(after - before), sorted(before - after)
+    if changes:
+        audit.record(
+            db, actor=principal.user.username, action="admin.role.update", entity="role", entity_id=role.name,
+            detail=changes, ip=client_ip(request),
+        )  # fmt: skip
+        db.commit()
+    return _role(role, _holders(db).get(role.id, 0))
+
+
+@router.delete("/api/admin/roles/{name}", tags=["admin"])
+def delete_role(name: str, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)):
+    """Remove a custom role that nobody holds. Its history stays in the audit log."""
+    role = _custom_role(db, name)
+    holders = _holders(db).get(role.id, 0)
+    if holders:
+        raise HTTPException(
+            409, f"{holders} staff member(s) still have the role '{role.name}': give them another first."
+        )
+    audit.record(
+        db, actor=principal.user.username, action="admin.role.delete", entity="role", entity_id=role.name,
+        detail={"permissions": sorted(p.code for p in role.permissions)}, ip=client_ip(request),
+    )  # fmt: skip
+    db.delete(role)
+    db.commit()
+    return {"deleted": role.name}
 
 
 @router.patch("/api/admin/cards/{card_id}", tags=["admin"])

@@ -56,7 +56,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-05 No SIP2 or NCIP wire protocol (FR03)
 
-**Superseded for SIP2 by DR-12 (2026-10-09). NCIP is still not built.** The entry is kept as it was written.
+**Superseded for SIP2 by DR-12 (2026-10-09). NCIP is not built, by the decision in DR-13.** The entry is kept as it was written.
 
 * **Date:** 2026-10-06 (circulation, PR #8); recorded as A-15 and C-01.
 * **Proposed:** build the connector boundary, a mock that words replies as SIP2 or NCIP, retries and tests; do not implement a wire
@@ -124,7 +124,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-11 Settings page: rules in the browser, secrets and devices in TOML
 
-* **Date:** 2026-10-09 (work on branch `overall-fixes`; not yet committed when this was written).
+* **Date:** 2026-10-09 (`39d38fe`, merged in PR #22).
 * **Proposed:** library rules that are safe to change while running (loan days, renewals, fine rates and limit, reminder days, gate
   duplicate window, sign-in limits, public catalogue switch) are editable by an administrator on a Settings page and stored in a new
   `app_settings` table (migration `0011`). A stored value overrides the TOML file; removing it returns to the file. Database, devices,
@@ -137,7 +137,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-12 SIP2 wire protocol built after all
 
-* **Date:** 2026-10-09 (work on branch `overall-fixes`; not yet committed when this was written); recorded as C-09 and A-33 to A-40.
+* **Date:** 2026-10-09 (`d777380`, merged in PR #22); recorded as C-09 and A-33 to A-40.
   Supersedes DR-05 for SIP2.
 * **Context:** DR-05 left the wire protocol out because it seemed untestable without a real ILMS, which kept FR03 `partial`. After the
   review the owner asked for it to be added.
@@ -154,3 +154,59 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 * **Consequence:** FR03 is `done`, with limits stated plainly: tested only against the simulator, **not certified and not tested against
   any vendor ILMS**; a subset of SIP2; NCIP 2.0 not implemented; SIP2 is unencrypted so a tunnel is needed; vendor wording may need keyword
   changes in `adapter.py`. Risk R-16 was reworded accordingly. Details: `docs/sip2.md`.
+
+## DR-13 NCIP 2.0 is not implemented; SIP2 is the protocol
+
+* **Date:** 2026-10-09 (branch `fix/sop-gaps`); recorded as C-10 and A-41.
+* **Context:** SOP FR03 reads "Support NCIP 2.0 and an SIP2 adapter boundary", and AC03 asks for "a mocked NCIP or SIP2 flow". After
+  DR-12 the SIP2 client was real, and the final coverage review asked whether an NCIP 2.0 adapter was still needed.
+* **Proposed:** treat the protocol requirement as met by SIP2; keep NCIP as a documented extension point only.
+* **Alternatives considered:** an NCIP 2.0 XML adapter with its own simulator (another protocol of the same size as SIP2, with no
+  real NCIP responder to test against either); an NCIP message model with no transport (looks like support but is not).
+* **Decision:** the project owner decided that **SIP2 satisfies the "NCIP 2.0 / SIP2" protocol requirement for this exercise and NCIP
+  2.0 is not to be built.** AC03 is met through SIP2 ("NCIP or SIP2"). Nothing in the repository claims NCIP support (SOP section 3).
+* **Consequence:** an NCIP 2.0 connector stays future work behind the same `CirculationConnector` boundary (one class plus a
+  `register_driver` line, `docs/remaining-work.md`). The mock ILMS can still word its replies NCIP-style for demonstrations; that is
+  wording, not protocol. A site whose ILMS speaks only NCIP needs that connector first (risk R-16).
+
+## DR-14 Custom roles next to the four built-in ones
+
+* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Context:** FR11 asks for "user and role management". Roles could be assigned to people but not created or changed.
+* **Proposed:** an administrator (`admin.users`) can create a role with any set of the catalogued permissions, change its
+  description and permissions, and remove it when nobody holds it. The four built-in roles (admin, librarian,
+  circulation_clerk, auditor) stay read-only, because `sync_rbac` restores them from the code at every start.
+* **Alternatives considered:** make the built-in roles editable too (an edit would be silently undone at the next start, or the
+  release could never fix a role); a new permission `admin.roles` (one more thing to grant; the people who manage staff are the
+  people who should decide their rights).
+* **Decision:** custom roles only, with two guards: an administrator cannot remove `admin.users` from their own role, and a role
+  in use cannot be removed. Every create, change and removal is audited (`admin.role.*`), with the permissions added and removed.
+* **Consequence:** a site can define, for example, a stock checker with only `catalogue.read` and `inventory.run`. Rights change
+  on the holder's next request. No schema change was needed: roles and permissions were already tables.
+
+## DR-15 One member-record check for every way a patron card is linked
+
+* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Context:** FR05 asks to validate "title or member records before tagging or re-tagging". Items had one validation
+  (`validate_tagging`); patron cards were checked in `circulation/members.py`, and the Administration page's card form had its own,
+  weaker checks (it did not switch off a member's previous card).
+* **Decision:** `rfid/tagging.py` has `validate_member_tagging`, the member-side twin of `validate_tagging`: it reports every
+  problem at once (no such member, no name, bad or used card number) and the warnings (the old card will be switched off; the
+  member is blocked). The circulation desk, the Administration page and a new dry-run endpoint
+  (`POST /api/circulation/members/{no}/card/validate`) all use it.
+* **Consequence:** issuing a patron card from the Administration page now also switches off the member's old card, as the desk
+  always did.
+
+## DR-16 Runtime and development locks; a real network block for the offline rehearsal
+
+* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Lock files:** `requirements.lock` now holds only what the application needs to run (it is also what `scripts/release.py`
+  builds the shipped wheels from); `requirements-dev.lock` holds the test, lint, type-check and signing tools and the build backend
+  (`setuptools`, pinned, so the editable install builds without fetching an unpinned backend). Both carry sha256 hashes and CI
+  installs both with `--require-hashes`.
+* **Offline rehearsal:** `scripts/lifecycle_demo.py` used to set a dead proxy, which only stops programs that honour proxy
+  settings. It now loads a guard into every Python process of the target-machine steps (passed on to child processes even when the
+  installer cleans their environment) that refuses any connection or name lookup that is not to the machine itself and logs it;
+  the run fails if the log is not empty. A probe at the start proves the guard is active.
+* **Alternative considered:** a firewall rule on the CI machine (it would also cut the runner off from GitHub and needs
+  administrator rights on a developer's PC).

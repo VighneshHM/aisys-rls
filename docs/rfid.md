@@ -59,6 +59,21 @@ Staff reader (mock)  <-- encode / set_security / clear / indicate --   Tagging s
 | `item_already_tagged` | Item has another tag and `replace` was not confirmed | 409 |
 | (warning) `will_replace_old_tag` | `replace` is set; the item's current tag will be removed or retired (`old_tag_fate`) | - |
 
+### The member side: before a patron card is linked (`POST /api/circulation/members/{no}/card/validate`)
+
+FR05 asks for title **or member** records to be validated before tagging or re-tagging. `validate_member_tagging` in
+`rfid/tagging.py` is the member-side twin of the item check above. The circulation desk (`POST .../members/{no}/card`), the
+Administration page (`POST /api/admin/cards` with `kind = patron`) and the dry run all use it, so every path applies the same rules.
+
+| Code | Meaning | HTTP when issuing |
+|---|---|---|
+| `no_such_member` | No member with that number | 404 (422 from the Administration page) |
+| `name_missing` | The member record has no name to print on the card | 422 |
+| `bad_card` | Not 6 to 64 letters and digits (case, spaces, `:` and `-` are normalised) | 422 |
+| `card_in_use` | The card number is already registered (to a member or a member of staff) | 409 |
+| (warning) `will_replace_old_card` | Re-tagging a member: their current card will be switched off | - |
+| (warning) `member_blocked` | The card will identify the member, but loans stay refused until the block is lifted | - |
+
 Device failures: reader offline -> 503 and nothing saved; write refused or tag not on the reader -> 409 and nothing saved; the
 reader signals `error` (and `ok` on success). If the database fails after the device wrote, the write is cleared again.
 
@@ -71,6 +86,7 @@ reader signals `error` (and `ok` on success). If the database fails after the de
 | GET | `/api/rfid/readers` | `rfid.tag` |
 | POST | `/api/rfid/readers/{id}/read` | `rfid.tag` |
 | POST | `/api/rfid/tagging/validate`, `/api/rfid/tagging` | `rfid.tag` |
+| POST | `/api/circulation/members/{no}/card/validate` (member-side dry run), `/api/circulation/members/{no}/card` | `member.write` |
 | GET | `/api/rfid/tags/{uid}` (both directions + history) | `catalogue.read` |
 | GET | `/api/rfid/tags?state=&q=&limit=&offset=` (the tag registry, with counts per state) | `catalogue.read` |
 | POST | `/api/rfid/tags/{uid}/remove` (take off an item; reusable) and `/retire` (out of service for good; also works on an already removed tag). The response says what the reader did: `cleared`, `not_on_reader`, `reader_offline`, `device_error` or `not_linked` | `rfid.tag` |

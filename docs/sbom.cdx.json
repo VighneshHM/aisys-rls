@@ -16,6 +16,19 @@
       "version": "1.20.0",
       "scope": "required",
       "purl": "pkg:pypi/alembic@1.20.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -33,6 +46,19 @@
       "version": "0.0.5",
       "scope": "required",
       "purl": "pkg:pypi/annotated-doc@0.0.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -50,6 +76,19 @@
       "version": "0.8.0",
       "scope": "required",
       "purl": "pkg:pypi/annotated-types@0.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -67,6 +106,19 @@
       "version": "4.15.1",
       "scope": "required",
       "purl": "pkg:pypi/anyio@4.15.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -84,6 +136,19 @@
       "version": "0.12.1",
       "scope": "optional",
       "purl": "pkg:pypi/ast-serialize@0.12.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -321,6 +386,19 @@
       "version": "2026.7.22",
       "scope": "optional",
       "purl": "pkg:pypi/certifi@2026.7.22",
+      "licenses": [
+        {
+          "license": {
+            "name": "Mozilla Public License 2.0 (MPL 2.0)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -338,6 +416,19 @@
       "version": "2.1.1",
       "scope": "optional",
       "purl": "pkg:pypi/cffi@2.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT-0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -747,6 +838,19 @@
       "version": "8.5.0",
       "scope": "required",
       "purl": "pkg:pypi/click@8.5.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -764,6 +868,19 @@
       "version": "0.4.6",
       "scope": "optional",
       "purl": "pkg:pypi/colorama@0.4.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -781,6 +898,19 @@
       "version": "50.0.2",
       "scope": "optional",
       "purl": "pkg:pypi/cryptography@50.0.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0 OR BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1026,6 +1156,19 @@
       "version": "2.0.0",
       "scope": "required",
       "purl": "pkg:pypi/et-xmlfile@2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1043,6 +1186,19 @@
       "version": "2.1.2",
       "scope": "optional",
       "purl": "pkg:pypi/execnet@2.1.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1060,6 +1216,19 @@
       "version": "0.142.2",
       "scope": "required",
       "purl": "pkg:pypi/fastapi@0.142.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1077,6 +1246,19 @@
       "version": "0.16.0",
       "scope": "required",
       "purl": "pkg:pypi/h11@0.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1094,6 +1276,19 @@
       "version": "1.0.9",
       "scope": "optional",
       "purl": "pkg:pypi/httpcore@1.0.9",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1111,6 +1306,19 @@
       "version": "0.28.1",
       "scope": "optional",
       "purl": "pkg:pypi/httpx@0.28.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1128,6 +1336,19 @@
       "version": "3.20",
       "scope": "required",
       "purl": "pkg:pypi/idna@3.20",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1145,6 +1366,19 @@
       "version": "2.3.0",
       "scope": "optional",
       "purl": "pkg:pypi/iniconfig@2.3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1162,6 +1396,19 @@
       "version": "3.1.6",
       "scope": "required",
       "purl": "pkg:pypi/jinja2@3.1.6",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1179,6 +1426,19 @@
       "version": "0.16.0",
       "scope": "optional",
       "purl": "pkg:pypi/librt@0.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1736,6 +1996,19 @@
       "version": "1.4.3",
       "scope": "required",
       "purl": "pkg:pypi/mako@1.4.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -1753,6 +2026,19 @@
       "version": "3.0.4",
       "scope": "required",
       "purl": "pkg:pypi/markupsafe@3.0.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2366,6 +2652,19 @@
       "version": "2.4.0",
       "scope": "optional",
       "purl": "pkg:pypi/mypy@2.4.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2583,6 +2882,19 @@
       "version": "1.1.0",
       "scope": "optional",
       "purl": "pkg:pypi/mypy-extensions@1.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2600,6 +2912,19 @@
       "version": "3.1.5",
       "scope": "required",
       "purl": "pkg:pypi/openpyxl@3.1.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2617,6 +2942,19 @@
       "version": "1.45.0",
       "scope": "required",
       "purl": "pkg:pypi/opentelemetry-api@1.45.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2634,6 +2972,19 @@
       "version": "26.3",
       "scope": "optional",
       "purl": "pkg:pypi/packaging@26.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0 OR BSD-2-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2651,6 +3002,19 @@
       "version": "1.1.1",
       "scope": "optional",
       "purl": "pkg:pypi/pathspec@1.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "Mozilla Public License 2.0 (MPL 2.0)"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2668,6 +3032,19 @@
       "version": "1.6.0",
       "scope": "optional",
       "purl": "pkg:pypi/pluggy@1.6.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT License"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2685,6 +3062,19 @@
       "version": "3.0",
       "scope": "optional",
       "purl": "pkg:pypi/pycparser@3.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2702,6 +3092,19 @@
       "version": "2.13.5",
       "scope": "required",
       "purl": "pkg:pypi/pydantic@2.13.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -2719,6 +3122,19 @@
       "version": "2.46.5",
       "scope": "required",
       "purl": "pkg:pypi/pydantic-core@2.46.5",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3208,6 +3624,19 @@
       "version": "2.21.0",
       "scope": "optional",
       "purl": "pkg:pypi/pygments@2.21.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-2-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3225,6 +3654,19 @@
       "version": "9.1.1",
       "scope": "optional",
       "purl": "pkg:pypi/pytest@9.1.1",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3242,6 +3684,19 @@
       "version": "3.8.0",
       "scope": "optional",
       "purl": "pkg:pypi/pytest-xdist@3.8.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3259,6 +3714,19 @@
       "version": "0.0.32",
       "scope": "required",
       "purl": "pkg:pypi/python-multipart@0.0.32",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3276,6 +3744,19 @@
       "version": "0.16.10",
       "scope": "optional",
       "purl": "pkg:pypi/ruff@0.16.10",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "development"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3353,10 +3834,53 @@
     },
     {
       "type": "library",
+      "name": "setuptools",
+      "version": "84.0.0",
+      "scope": "optional",
+      "purl": "pkg:pypi/setuptools@84.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "build"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "sqlalchemy",
       "version": "2.1.3",
       "scope": "required",
       "purl": "pkg:pypi/sqlalchemy@2.1.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3654,6 +4178,19 @@
       "version": "1.7.0",
       "scope": "required",
       "purl": "pkg:pypi/starlette@1.7.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3671,6 +4208,19 @@
       "version": "4.16.0",
       "scope": "required",
       "purl": "pkg:pypi/typing-extensions@4.16.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "PSF-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3688,6 +4238,19 @@
       "version": "0.4.4",
       "scope": "required",
       "purl": "pkg:pypi/typing-inspection@0.4.4",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
@@ -3705,6 +4268,19 @@
       "version": "0.54.0",
       "scope": "required",
       "purl": "pkg:pypi/uvicorn@0.54.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD-3-Clause"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisys:scope",
+          "value": "runtime"
+        }
+      ],
       "hashes": [
         {
           "alg": "SHA-256",
