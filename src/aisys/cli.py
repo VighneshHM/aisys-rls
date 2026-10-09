@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 
 from sqlalchemy import select
 
@@ -228,6 +229,23 @@ def _notify_command(args, settings: Settings) -> int:
     return 0
 
 
+def _sip2_sim(args: argparse.Namespace, settings: Settings) -> int:
+    """Run the SIP2 simulator until interrupted. It is a stand-in for an ILMS, never for production."""
+    from aisys.circulation.sip2.server import Sip2Server
+
+    users = {args.user: args.password} if args.user else None
+    server = Sip2Server(args.host, args.port, config=settings.circulation, users=users, institution="LIBRARY").start()
+    print(f"SIP2 simulator listening on {server.host}:{server.port} (Ctrl+C to stop)", flush=True)
+    print("login:", f"user {args.user!r}" if args.user else "none needed", flush=True)
+    try:
+        threading.Event().wait()
+    except KeyboardInterrupt:
+        print("stopping")
+    finally:
+        server.stop()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="aisys")
     parser.add_argument("--config", help="path to config TOML")
@@ -251,6 +269,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run", help="start the web application")
     nd = sub.add_parser("notify-dispatch", help="queue due patron reminders and deliver queued notifications")
     nd.add_argument("--every", type=float, default=0, metavar="SECONDS", help="keep running, repeating every N seconds")
+    sim = sub.add_parser("sip2-sim", help="run a SIP2 test server that stands in for an ILMS (simulator)")
+    sim.add_argument("--host", default="127.0.0.1")
+    sim.add_argument("--port", type=int, default=6001)
+    sim.add_argument("--user", default="", help="require this login user (with --password)")
+    sim.add_argument("--password", default="", help="the login password; omit both for a server with no login")
     sub.add_parser("doctor", help="check this computer and configuration (environment checklist)")
     sub.add_parser("version", help="print version")
     args = parser.parse_args(argv)
@@ -268,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
     elif args.cmd == "notify-dispatch":
         return _notify_command(args, settings)
+    elif args.cmd == "sip2-sim":
+        return _sip2_sim(args, settings)
     elif args.cmd == "doctor":
         from aisys import doctor
 

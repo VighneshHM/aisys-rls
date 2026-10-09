@@ -94,7 +94,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
         <li>No real reader, gate, camera, printer, mail service or ILMS was connected.</li>
       </ul></div>
   </div>
-  <p class="muted">What is mocked, and why: no real hardware or wire protocol was available, and the exercise rule is to prove the interfaces, not any vendor.</p>
+  <p class="muted">What is mocked, and why: no real hardware or vendor ILMS was available, and the exercise rule is to prove the interfaces, not any vendor. The SIP2 client is tested against a simulator only.</p>
   <details class="notes"><summary>Speaker notes</summary>
     <p>Open with the scope: this is an add-on, not an ILMS replacement. Say clearly that everything outside the add-on is a mock, so nothing later sounds like a claim about real hardware. The data is synthetic throughout (docs/index.md, docs/assumptions.md).</p></details>
 </div></section>
@@ -107,7 +107,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
     <div class="layer"><b>User layer</b><span>staff web interface, public catalogue, dashboard, reports, administration</span></div>
     <div class="layer"><b>Application layer</b><span>cataloguing, circulation, members, fines, inventory, shelves, acquisitions, serials, reminders, reports, access control</span></div>
     <div class="layer"><b>RFID middleware</b><span>device-neutral commands and events: staff reader, handheld, gate, camera, card printer</span></div>
-    <div class="layer"><b>Interoperability</b><span>SIP2 / NCIP-shaped connector with retries, plus a mock</span></div>
+    <div class="layer"><b>Interoperability</b><span>ILMS connector with retries: a SIP2 client (simulator-tested) and a mock; no NCIP</span></div>
     <div class="layer"><b>Data layer</b><span>SQLite, full-text index, audit log, migration staging, backup and restore</span></div>
     <div class="layer"><b>Integration layer</b><span>e-mail, SMS, print, camera, net cataloguing</span></div>
     <div class="layer"><b>Operations layer</b><span>configuration, offline installer, logs, health, updates, rollback</span></div>
@@ -120,11 +120,11 @@ details.notes summary { cursor: pointer; font-weight: 600; }
 <!-- 3 -->
 <section class="slide" data-title="What was built"><div class="inner">
   <div class="kicker">What was built &middot; 3 of 12</div>
-  <h2>All ten scenarios, 30 of 31 requirements done</h2>
+  <h2>All ten scenarios, 31 of 31 requirements done</h2>
   <div class="cols">
     <div class="card"><h3>Requirement coverage</h3>
-      <div class="big">30 / 31</div>
-      <p>requirements done. <b>FR03 is partial</b>: device-neutral interfaces and a connector boundary exist, but no SIP2 or NCIP wire protocol is built or claimed.</p></div>
+      <div class="big">31 / 31</div>
+      <p>requirements done. <b>FR03 comes with limits:</b> a SIP2 client is built but tested only against a simulator (not certified, no vendor ILMS), and NCIP 2.0 is not built.</p></div>
     <div class="card"><h3>The ten scenarios</h3>
       <ul>
         <li>AC01 spreadsheet import with reconciliation</li>
@@ -141,7 +141,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
       </ul></div>
   </div>
   <details class="notes"><summary>Speaker notes</summary>
-    <p>The numbers come from docs/requirements.csv (31 requirements, FR03 partial) and docs/traceability.md. Be direct about FR03. For Settings: show the page, change the loan period, show the admin.settings.update line in the audit log, then use "Use file value". Settings cover 15 rules; everything else is read-only on the page and set in config/config.toml.</p></details>
+    <p>The numbers come from docs/requirements.csv (31 requirements, all done) and docs/traceability.md. Be direct about FR03: SIP2 is implemented and tested against a simulator written from the specification, it is not certified or tried on any vendor ILMS, and NCIP 2.0 is not built (docs/sip2.md). For Settings: show the page, change the loan period, show the admin.settings.update line in the audit log, then use "Use file value". Settings cover 15 rules; everything else is read-only on the page and set in config/config.toml.</p></details>
 </div></section>
 
 <!-- 4 -->
@@ -175,7 +175,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
       <ul>
         <li>Check-out, renew and check-in go through one <code>CirculationConnector</code>.</li>
         <li>Failed calls are retried; every retry carries the <b>same transaction id</b>, so a repeat is not applied twice.</li>
-        <li>The mock words its replies as SIP2 or NCIP; the real address goes in <code>[ilms] endpoint</code> and <code>port</code>.</li>
+        <li><code>driver = "sip2"</code> speaks SIP2 2.00 over TCP (<code>[ilms] endpoint</code>, <code>port</code>; password only from <code>AISYS_ILMS_PASSWORD</code>); a lost answer is verified with the ILMS before any repeat. Tested against a simulator only; <code>mock</code> is the default.</li>
       </ul></div>
     <div class="card"><h3>Devices</h3>
       <ul>
@@ -191,7 +191,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
       </ul></div>
   </div>
   <details class="notes"><summary>Speaker notes</summary>
-    <p>docs/circulation.md, docs/rfid.md, docs/gate.md, docs/reminders.md. A real device or provider needs a driver class; the address of a real device is not a [[devices]] key today and belongs to that driver (docs/site-addressing.md). Defect D-029 (two dispatchers sent the same message twice) is on slide 10.</p></details>
+    <p>docs/circulation.md, docs/sip2.md, docs/rfid.md, docs/gate.md, docs/reminders.md. A real device or provider needs a driver class; the address of a real device is not a [[devices]] key today and belongs to that driver (docs/site-addressing.md). Defect D-029 (two dispatchers sent the same message twice) is on slide 10.</p></details>
 </div></section>
 
 <!-- 6 -->
@@ -275,9 +275,9 @@ details.notes summary { cursor: pointer; font-weight: 600; }
 <!-- 9 -->
 <section class="slide" data-title="Testing"><div class="inner">
   <div class="kicker">Testing &middot; 9 of 12</div>
-  <h2>584 test cases, each mapped to a requirement</h2>
+  <h2>715 test cases, each mapped to a requirement</h2>
   <div class="cols">
-    <div class="card"><div class="big">584</div><p>automated test cases (some parametrised). A generated matrix (<code>docs/traceability.md</code>) lists every requirement against its tests; a test fails if it is stale.</p></div>
+    <div class="card"><div class="big">715</div><p>automated test cases (some parametrised). A generated matrix (<code>docs/traceability.md</code>) lists every requirement against its tests; a test fails if it is stale.</p></div>
     <div class="card"><h3>Continuous integration</h3>
       <ul>
         <li><code>windows-latest</code> with Python 3.12</li>
@@ -294,7 +294,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
         <li>Ten clients at once: 18 requests/s, p95 1.8 s</li>
       </ul></div>
   </div>
-  <p class="muted">Manual evidence: 22 manual scenarios in <code>docs/uat.md</code>, run by the development team, not library staff. Forty-one defects are logged with retests.</p>
+  <p class="muted">Manual evidence: 22 manual scenarios in <code>docs/uat.md</code>, run by the development team, not library staff. Forty-five defects are logged with retests.</p>
   <details class="notes"><summary>Speaker notes</summary>
     <p>docs/test-plan.md, docs/performance-results.md, docs/defect-log.md. Performance figures are one process on a Windows 11 development machine; use them as a shape, not a promise. No soak test and no server-class test has been done. The site acceptance form for real staff is docs/uat-signoff.md (blank).</p></details>
 </div></section>
@@ -323,7 +323,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
   <div class="cols">
     <div class="card"><h3>Not built, by decision</h3>
       <ul>
-        <li>No SIP2 or NCIP wire protocol (FR03 partial).</li>
+        <li>NCIP 2.0 is not built; SIP2 is built (a subset) but tested only against a simulator, not certified or tried on a vendor ILMS.</li>
         <li>No real reader, handheld, gate, camera, printer, mail or SMS drivers.</li>
         <li>Not a full ILMS: no budgets, holds or inter-library loan.</li>
       </ul></div>
@@ -342,7 +342,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
   </div>
   <p>The full list with next steps is <code>docs/remaining-work.md</code>.</p>
   <details class="notes"><summary>Speaker notes</summary>
-    <p>Say plainly that the UAT was run by the development team and the devices are simulated, so this is not acceptance by the library. The production backlog in docs/remaining-work.md is the next piece of work.</p></details>
+    <p>Say plainly that the UAT was run by the development team and the devices are simulated, so this is not acceptance by the library. The same goes for the ILMS: the SIP2 client has only met the simulator (docs/sip2.md), and SIP2 itself needs a tunnel because it is unencrypted. The production backlog in docs/remaining-work.md is the next piece of work.</p></details>
 </div></section>
 
 <!-- 12 -->
@@ -367,7 +367,7 @@ details.notes summary { cursor: pointer; font-weight: 600; }
       </ul></div>
   </div>
   <details class="notes"><summary>Speaker notes</summary>
-    <p>Likely questions and answers are at the end of docs/demo-script.md: is SIP2 or NCIP really implemented (no), can a real reader be plugged in (yes, one class), what stops a bad import (staging, insert-only commit, backup, rollback, proof), what if an update fails halfway (data restored, old version stays current), why SQLite, is it production-ready (no: a tested prototype).</p></details>
+    <p>Likely questions and answers are at the end of docs/demo-script.md: is SIP2 or NCIP really implemented (SIP2 yes, a subset, tested against a simulator only and not certified; NCIP no), can a real reader be plugged in (yes, one class), what stops a bad import (staging, insert-only commit, backup, rollback, proof), what if an update fails halfway (data restored, old version stays current), why SQLite, is it production-ready (no: a tested prototype).</p></details>
 </div></section>
 
 </main>

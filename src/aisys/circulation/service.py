@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from typing import Any, NoReturn, cast
 
@@ -493,6 +494,12 @@ def checkin(
         )
     member = loan.member
     result = connector.checkin(txn_id, _item_view(item, loan), now=now)
+    reconciled = False
+    if not result.ok and result.code == "not_on_loan":
+        # The library system already has this item in (it was returned at another desk there): the state the clerk
+        # wants is the state it is in, so close the local loan too instead of leaving it open for ever.
+        reconciled = True
+        result = replace(result, ok=True, code="ok", message="The library system already had this item checked in")
     if not result.ok:
         outcome = "failed" if result.code == "ilms_unavailable" else "refused"
         _refuse(db, code=result.code, message=result.message, status=409, source="ilms", outcome=outcome, **common)
@@ -513,7 +520,7 @@ def checkin(
         actor=actor,
         reader_id=reader_id,
         armed=True,
-        extra={"was_overdue": was_overdue, "fine_cents": fine["amount_cents"] if fine else 0},
+        extra={"was_overdue": was_overdue, "fine_cents": fine["amount_cents"] if fine else 0, "reconciled": reconciled},
     )
     out["fine"] = fine
     out["was_overdue"] = was_overdue

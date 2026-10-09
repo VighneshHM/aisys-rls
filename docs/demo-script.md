@@ -23,7 +23,7 @@ desk clerk `STAFFCLERK01`, auditor `STAFFAUDIT01`).
 | 2 | **AC07** card sign-in | Sign in as the librarian; try the patron card; sign in as the clerk and show the shorter menu | Staff card = login; patron card never logs in; menus follow the role |
 | 4 | **AC01** import | Librarian, **Data migration**, upload `library_200.xlsx`; show problems, duplicates; **Commit**; show the reconciliation; **Roll back** | Staged first, never touches existing records, counts reconcile, rollback by batch. Mention the 20,000-row run: 13 s validate, 7 s commit |
 | 8 | **AC02** tag a book | **Catalogue**, **Add item**, ISBN `9780001000032`, **Look up the ISBN**, save; **Tag this item**, read the reader, generate, **Check**, **Link** | Net cataloguing fills the form; validation is the same as import; the tag-to-item link is shown |
-| 11 | **AC03/AC04** circulation | Clerk, **Circulation**, Priya (`PATRON000001`), check out, renew, check in; then the blocked member and the member over the limit; a reference item | Goes through the SIP2/NCIP-shaped connector with retries; every action is in the history; refusals say why |
+| 11 | **AC03/AC04** circulation | Clerk, **Circulation**, Priya (`PATRON000001`), check out, renew, check in; then the blocked member and the member over the limit; a reference item | Goes through the ILMS connector (the mock by default; SIP2 is shown in the extras) with retries; every action is in the history; refusals say why |
 | 15 | **AC05** inventory | Librarian, **Inventory**, a shelf, simulate a handheld with missing and stray books, scan, close; then **Shelves** to see the books out of order | Beep and light per tag; missing, misplaced, unknown; the virtual bookshelf outlines books to move |
 | 19 | **AC06** gate | **Gate events**: walk an unissued book through; open the event; **Send queued messages** | Alarm from the security bit (works while the ILMS is down), accession number, camera snapshot, queued e-mail with retries |
 | 22 | **AC08** reports | Dashboard and **Reports** with filters; export CSV | Seven reports, charts, CSV that cannot run formulas |
@@ -31,9 +31,22 @@ desk clerk `STAFFCLERK01`, auditor `STAFFAUDIT01`).
 | 27 | **AC09** offline lifecycle | Second terminal: `python scripts/lifecycle_demo.py`; then open **Updates** | Install, refuse a tampered, a foreign-signed and an older package, update, roll back with the data proven; no network used |
 | 30 | Wrap-up | **Audit log** | Every action recorded with who, what, when; card numbers masked |
 
-Extras if there is time (each 2 minutes): the public catalogue `/opac` (signed out, search, **Show the shelf**); **Labels** (spine and
+Extras if there is time (each 2 minutes): **SIP2** (see below); the public catalogue `/opac` (signed out, search, **Show the shelf**); **Labels** (spine and
 barcode); **Acquisitions** (order, place, book in); **Serials** (late issue, claim); **Print the card**; patron reminders
 (**Due tomorrow** beside a loan, watch the message appear); **Administration** (deactivate someone, try to deactivate yourself); **Settings** (as administrator, change the loan period or fine per day, see it apply at once, find the `admin.settings.update` line in the **Audit log**, then **Use file value**).
+
+### The SIP2 extra (2 minutes)
+
+Say first: this is a SIP2 client talking to a **simulator** written from the specification, not to a real library system.
+
+1. Terminal A: `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`
+2. Terminal B: set `$env:AISYS_ILMS_PASSWORD = "demo"`; in `config/config.toml` set `[ilms]` to `driver = "sip2"`, `endpoint = "127.0.0.1"`,
+   `port = 6101`, `login = "aisys"`; run `python -m aisys.cli doctor` and point at the ILMS line (answered and online).
+3. Start the application (`python -m aisys.cli run`) in terminal B, sign in as the clerk, and check out a book to Priya. Show the history line.
+4. Stop the simulator and try a check-in: the clerk gets a clear "not answering" message and nothing is half-recorded. Restart the simulator
+   and repeat.
+
+Put `driver = "mock"` back afterwards. Details and limits: `docs/sip2.md`.
 
 ## If something goes wrong on the day
 
@@ -50,22 +63,22 @@ The deck is `docs/presentation.html`: one self-contained file (no network), open
 
 1. **The problem and the scope**: add RFID to an existing library system without touching its records; what is mocked and why.
 2. **Architecture**: the layered diagram (`docs/architecture.md` section 2) and the interface/mocks rule.
-3. **What was built**: the ten scenarios as a checklist, with the requirement coverage (30 of 31 requirements done; FR03 is partial because no wire protocol is built).
+3. **What was built**: the ten scenarios as a checklist, with the requirement coverage (all 31 requirements done; FR03 rests on a SIP2 client tested only against a simulator, with NCIP 2.0 not built, and says so).
 4. **Data safety (NFR01)**: staging, backup before every change, per-table proof, restore with a safety copy.
 5. **Integration**: the connector with retries and the same transaction id; devices behind Protocols; notifications queued first.
 6. **Security**: roles and permissions, signed packages, TLS, masked logs, hostile-input tests, dependency audit.
 7. **Offline lifecycle**: install, update with a rehearsal, rollback; the SBOM and licences.
 8. **Search and shelves**: full-text index kept current by triggers; the public catalogue; the virtual bookshelf.
-9. **Testing**: 584 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
+9. **Testing**: 715 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
 10. **What the testing found**: examples (the search that took 1.3 s, duplicate delivery, the restore race) and how they were fixed.
-11. **Known limits and production backlog**: `docs/remaining-work.md` (no real hardware or wire protocol, SQLite only, no pen test).
+11. **Known limits and production backlog**: `docs/remaining-work.md` (no real hardware, SIP2 tested only against a simulator and no NCIP, SQLite only, no pen test).
 12. **Questions and the live demonstration.**
 
 ## Questions to expect
 
 | Question | Answer |
 |---|---|
-| Is SIP2 or NCIP really implemented? | No. There is a documented connector boundary and a mock that words its replies either way; no wire protocol is built or claimed (SOP section 3) |
+| Is SIP2 or NCIP really implemented? | SIP2: yes, a subset of 3M SIP 2.00 over TCP (login, status, patron status and information, checkout, checkin, renew, item information, resend), with checksums and verify-before-resend. It is tested only against a simulator written from the specification: not certified, not tried against any vendor ILMS, and SIP2 itself is unencrypted so a tunnel is needed. NCIP 2.0: no, not built (`docs/sip2.md`) |
 | Can a real reader be plugged in? | Yes: one class implementing the device `Protocol`, registered by name, selected in `[[devices]]`; nothing else changes |
 | What stops a bad import corrupting the library? | Staging first, insert-only commit in one transaction, a verified backup before it, rollback by batch, and the table-by-table proof |
 | What happens if an update fails halfway? | The data is restored from the pre-update backup, the new release is removed and the old version stays current; `manage.py recover` handles a crash |

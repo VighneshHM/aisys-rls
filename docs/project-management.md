@@ -74,7 +74,7 @@ A requirement or scenario is `done` in `docs/requirements.csv` only when all of 
    are regenerated.
 5. Limits and exclusions are stated (in `docs/remaining-work.md` or the feature's document) rather than left implied.
 6. Any defect found on the way is in `docs/defect-log.md` with its retest evidence.
-7. The project owner has read the change and merged it. A requirement that is only partly met stays `partial` (FR03 is the one case).
+7. The project owner has read the change and merged it. A requirement that is only partly met stays `partial` (FR03 was the one case until the SIP2 client was added on 2026-10-09; it is now `done` with stated limits, see `docs/sip2.md`).
 
 ## Defects
 

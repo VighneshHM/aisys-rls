@@ -7,10 +7,10 @@ interface**, and every attempt is written to an append-only history.
 
 | Decision | Why | Cost |
 |---|---|---|
-| **One interface, `CirculationConnector`** (`patron_status`, `checkout`, `renew`, `checkin`, `due_date`). The application never calls an ILMS directly | The SOP asks for an "NCIP 2.0 adapter / SIP2 adapter *boundary*" with mocks where vendor endpoints are unavailable. A real SIP2 or NCIP adapter is a new class registered under a driver name; nothing else changes | The wire protocols themselves are not built (nor claimed: the SOP forbids unevidenced protocol claims) |
-| **Results are protocol-neutral** (`ok`, `code`, `message`, `due_at`); the mock words messages as SIP2 or NCIP (`[ilms] protocol`) | Both protocols report the same facts differently (SIP2 screen message, NCIP problem); callers should not care | Real adapters must map their replies to our codes |
+| **One interface, `CirculationConnector`** (`patron_status`, `checkout`, `renew`, `checkin`, `due_date`). The application never calls an ILMS directly | The SOP asks for an "NCIP 2.0 adapter / SIP2 adapter *boundary*" with mocks where vendor endpoints are unavailable. A real adapter is a new class registered under a driver name; nothing else changes. A SIP2 adapter now exists (`driver = "sip2"`, `docs/sip2.md`) | Only SIP2 is built, and it is tested against a simulator only (no certification claimed). NCIP 2.0 is not built |
+| **Results are protocol-neutral** (`ok`, `code`, `message`, `due_at`); the mock words messages as SIP2 or NCIP (`[ilms] protocol`) | Both protocols report the same facts differently (SIP2 screen message, NCIP problem); callers should not care | Real adapters must map their replies to our codes (the SIP2 mapping is in `docs/sip2.md`) |
 | **The ILMS owns loan policy** (loan period, renewal limit, loan limit). We check only what our own records know first: reference item, blocked member, fines over the limit, item already out | A real ILMS is the authority on rules; our local checks give a fast, explained refusal for the common blocks | In the demo the mock gets its limits from our config (it has no database of its own) |
-| **Same transaction id on every retry; the ILMS repeats its answer for a known id** | A lost reply must not lend the book twice (tested) | A real ILMS needs to support idempotent requests, or the adapter must emulate it |
+| **Same transaction id on every retry; the ILMS repeats its answer for a known id** | A lost reply must not lend the book twice (tested) | A real ILMS needs to support idempotent requests, or the adapter must emulate it. SIP2 has no transaction id, so the SIP2 adapter remembers answers by id and checks the ILMS before repeating a request whose answer was lost |
 | **Bounded retries, then `ilms_unavailable`; nothing local changes** | Staff are told clearly and can try again; no half-done loan | No offline queue yet (planned with FR12 offline lifecycle) |
 | **Security bit follows the loan**: switched off at check-out, back on at check-in; best effort | A book that leaves with its bit on sets off the gate. But a missing or offline reader must never stop the desk, so the loan goes through and staff get an amber note saying what to do | Needs the tag on the reader; otherwise manual follow-up |
 | **Every attempt is recorded**: done, refused (local or ILMS) or failed (ILMS down), with the ILMS transaction id | "Auditable transaction history" and traceability to the ILMS's own log | Refusals also add rows |
@@ -65,7 +65,13 @@ retries = 2
 backoff_s = 0.1
 ```
 
-To connect a real system: implement `CirculationConnector` (see `src/aisys/circulation/connector.py`), call
+For the SIP2 driver (`driver = "sip2"`) add `endpoint`, `port`, `login`, `institution`, `location`, `timeout_s` and `checksum`; the
+login password is read only from the environment variable `AISYS_ILMS_PASSWORD`. `aisys doctor` connects, logs in and reports the
+ILMS status (OK, WARN when it says it is offline, FAIL when it cannot be reached or refuses the login). To try it without a real
+system run `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`. Full reference: `docs/sip2.md`. When SIP2 is
+used the ILMS owns the loan rules; the Settings page's loan rules still govern the local checks.
+
+To connect another kind of system: implement `CirculationConnector` (see `src/aisys/circulation/connector.py`), call
 `register_driver("my-ilms", MyAdapter)` and set `driver = "my-ilms"`.
 
 ## API (`/api/circulation`)
@@ -105,7 +111,7 @@ Staff with `member.write` can **add a member** (name; the number is the next fre
 
 ## Known limits
 
-- No wire-level SIP2 / NCIP, and no certification claim.
+- SIP2 is implemented (a subset) but tested only against a simulator; no vendor ILMS was used and no certification is claimed. NCIP 2.0 is not implemented. SIP2 is unencrypted: use a tunnel.
 - Fines follow one simple rule (see Fines above): no per-item or per-member rates, no lost-item replacement charge, no refunds.
 - The mock ILMS keeps no loan database; it applies policy to the request it receives and remembers answers by transaction id in memory (lost on restart).
 - No holds or reservations; no notices (FR09) yet; no offline queue for when the ILMS is down.

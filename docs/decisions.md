@@ -56,6 +56,8 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-05 No SIP2 or NCIP wire protocol (FR03)
 
+**Superseded for SIP2 by DR-12 (2026-10-09). NCIP is still not built.** The entry is kept as it was written.
+
 * **Date:** 2026-10-06 (circulation, PR #8); recorded as A-15 and C-01.
 * **Proposed:** build the connector boundary, a mock that words replies as SIP2 or NCIP, retries and tests; do not implement a wire
   protocol client.
@@ -132,3 +134,23 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 * **Decision:** the split above. Each setting has a range check.
 * **Consequence:** rule changes take effect without a restart and are attributable (`updated_by`, `updated_at`). Two places now hold
   configuration; the table wins over the file for the listed keys. Tests are in `tests/test_settings.py`.
+
+## DR-12 SIP2 wire protocol built after all
+
+* **Date:** 2026-10-09 (work on branch `overall-fixes`; not yet committed when this was written); recorded as C-09 and A-33 to A-40.
+  Supersedes DR-05 for SIP2.
+* **Context:** DR-05 left the wire protocol out because it seemed untestable without a real ILMS, which kept FR03 `partial`. After the
+  review the owner asked for it to be added.
+* **Proposed:** a SIP2 (3M 2.00) client behind the existing connector boundary, registered as driver `sip2`: a pure codec, a TCP
+  session with login, resend handling and a checksum, and an adapter that maps ILMS answers to the application's neutral codes. Because
+  there is no real ILMS, a SIP2 simulator written from the specification is built with it, so the client can be tested over a real socket,
+  including lost, dropped and damaged answers. SIP2 has no transaction id, so a request without an answer is verified against the ILMS
+  before it is repeated.
+* **Alternatives considered:** NCIP 2.0 instead of, or as well as, SIP2 (an XML protocol, a larger piece of work; deferred, and it would be
+  another class behind the same boundary); keeping the exclusion and the mock only (FR03 stays partial); resending blindly after a lost
+  answer (risks lending or renewing twice).
+* **Decision:** SIP2 only, in the same branch. `[ilms] driver = "sip2"` selects it; `mock` stays the default. The password is read only from
+  `AISYS_ILMS_PASSWORD`.
+* **Consequence:** FR03 is `done`, with limits stated plainly: tested only against the simulator, **not certified and not tested against
+  any vendor ILMS**; a subset of SIP2; NCIP 2.0 not implemented; SIP2 is unencrypted so a tunnel is needed; vendor wording may need keyword
+  changes in `adapter.py`. Risk R-16 was reworded accordingly. Details: `docs/sip2.md`.

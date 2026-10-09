@@ -13,7 +13,7 @@ ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and doc
 |---|---|---|---|
 | AC01 | Import ~20,000 spreadsheet records | Staged import: map columns, validate, find duplicates, reconcile, commit in one transaction, roll back by batch, error CSV | `migration/`, `docs/migration.md` |
 | AC02 | Tag a book | Tag lifecycle (active, removed, retired), one tag per item and one item per tag enforced by the database | `rfid/`, `catalogue/`, `docs/rfid.md` |
-| AC03 | Check out / check in / renew through a mock ILMS | Connector boundary (SIP2- or NCIP-shaped), retries with the same transaction id, idempotent mock | `circulation/`, `docs/circulation.md` |
+| AC03 | Check out / check in / renew through a mock ILMS | Connector boundary, retries with the same transaction id, idempotent mock; plus a SIP2 driver tested against a simulator | `circulation/`, `docs/circulation.md`, `docs/sip2.md` |
 | AC04 | Circulation blocks | Blocked member, fines over the limit, loan limit, item status, renewal limits, each with a clear reason | `circulation/service.py`, `fines.py` |
 | AC05 | Handheld inventory | Sessions per location: found, missing, unexpected, on loan, untagged; CSV export | `inventory/`, `docs/inventory.md` |
 | AC06 | Security gate, CCTV, queued e-mail | Alarm decided from the tag's security bit only; unissued / armed-on-loan / bit-off events; footfall; camera snapshot; queued notifications with retry | `gate/`, `notifications/`, `docs/gate.md` |
@@ -47,7 +47,7 @@ flowchart LR
   end
   UI --> PAGES
   UI --> API
-  CONN --> ILMS[Mock ILMS - SIP2/NCIP shaped]
+  CONN --> ILMS[Mock ILMS, or SIP2 over TCP to an ILMS / the simulator]
   DEV --> RF[Mock staff reader / handheld / gate / camera]
   NOTIF --> MAIL[Mock e-mail / SMS / print]
   subgraph Lifecycle["aisys_lifecycle (standard library only)"]
@@ -97,7 +97,7 @@ src/aisys/
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
 src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
-tests/              23 test files, 584 test cases
+tests/              25 test files, 715 test cases
 scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
 docs/               one design doc per feature + requirements.csv + traceability.md
 ```
@@ -237,7 +237,10 @@ Every endpoint other than login and health needs a session and a named permissio
 - **Mock-only endpoints** (`/mock/...`: place a tag on the reader, power a device, fail the ILMS, walk through the gate,
   disaster drill, fail the next import) exist only outside production and return 404 in production.
 - **ILMS integration:** `CirculationConnector` (checkout, checkin, renew, patron status) with `ResilientConnector` on top.
-  The mock speaks "SIP2" or "NCIP" in naming only. **No wire protocol is built and no certification is claimed.**
+  The default mock speaks "SIP2" or "NCIP" in naming only. With `[ilms] driver = "sip2"` the **SIP2 protocol (3M 2.00) is spoken
+  over TCP** (`circulation/sip2/`, `docs/sip2.md`), verified before any repeat so a lost answer never lends or renews twice.
+  It was tested only against the simulator in the repository (`python -m aisys.cli sip2-sim`): **no certification is claimed and no
+  vendor ILMS was used. NCIP 2.0 is not implemented.** SIP2 is unencrypted, so use a tunnel to the ILMS.
 - **Devices:** `StaffReader`, `Handheld`, `Gate`, `Camera` Protocols; mock drivers; `register_driver(name, factory, kind)`.
 - **Notifications:** `NotificationProvider` per channel (email, sms, print), all mocks that record what they would send.
 
@@ -282,7 +285,7 @@ Every endpoint other than login and health needs a session and a named permissio
 
 ## 10. Testing: what was done, the results, the gaps
 
-- **584 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
+- **715 automated test cases, all passing** (about 2.5 minutes on 4 parallel workers), `ruff` format and lint clean (including security rules), `mypy` type check clean, CI on
   Windows for Python 3.12 and 3.13, plus a dependency audit. Every test is tagged with the requirement it proves and
   `docs/traceability.md` is generated from those tags.
 - **By area:** foundation/auth (test_foundation), import (test_migration, incl. the full 20,000-row run), tagging and tag
@@ -295,7 +298,8 @@ Every endpoint other than login and health needs a session and a named permissio
 - **Offline proof for AC09:** `scripts/lifecycle_demo.py` installs, updates and rolls back with the network deliberately
   disabled, and the data is shown unchanged.
 - **Gaps (honest):**
-  - Nothing is tested against real hardware, a real ILMS, a real mail server or a real camera: they are mocks.
+  - Nothing is tested against real hardware, a real ILMS, a real mail server or a real camera: they are mocks. The SIP2 client is
+    tested against a simulator written from the specification, not against any vendor system.
   - Automated UI tests only check assets and pages render; interactive behaviour was verified by hand in the browser.
   - Load tests are limited to the sizes above on one machine; there is no multi-user soak test.
   - The lifecycle was exercised on Windows only. Linux is expected to work but is unverified.
@@ -322,8 +326,8 @@ Every endpoint other than login and health needs a session and a named permissio
 The authoritative list, with the requirement each item belongs to, is `docs/remaining-work.md`. In short:
 
 **Not built, by decision**
-- No real SIP2 or NCIP wire protocol and no certification; the connector is protocol-shaped only (the one requirement still
-  marked partial, FR03).
+- SIP2 is built (a subset) but tested only against a simulator and not certified; NCIP 2.0 is not built (FR03 is marked done on
+  that basis, see `docs/requirements.csv` and `docs/sip2.md`).
 - No real RFID reader, gate, handheld, camera, card printer, SMS, e-mail or outside-catalogue driver: all are mocks behind interfaces.
 - Acquisitions and serials are reference-level (orders, receiving, subscriptions, late issues); budgets, invoices, claim letters,
   holds and inter-library loan are not built. Fines are a simple configurable rule; a real ILMS would own them.
@@ -342,7 +346,7 @@ The authoritative list, with the requirement each item belongs to, is `docs/rema
 - A first install trusts the key it is given; no key revocation; the licence has no hardware binding.
 
 **Reasonable next steps**
-1. A real driver for one reader family and one SIP2 server, behind the existing interfaces.
+1. A real driver for one reader family; a run of the SIP2 driver against the site's real ILMS (and an NCIP adapter if the site needs one).
 2. A PostgreSQL option, with backup hooks for it.
 3. Password reset and custom roles; overdue and hold-ready notices to patrons through the same queue.
 4. A service wrapper tested on Windows Server; verify the lifecycle on Linux.

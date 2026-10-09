@@ -21,7 +21,7 @@ confirmed against the actual product's manual. They are not measured facts about
 | Gate controller | 10.99.40.21 | vendor-specific | vendor protocol | 40 Devices | Server to gate on the vendor port; gate to server only if it posts events |
 | Cameras | 10.99.40.31 to 10.99.40.39 | 554 for RTSP; 443 or 80 for a snapshot URL | RTSP or HTTP(S) | 40 Devices (or a separate CCTV VLAN) | Server to camera for snapshots only; no camera to internet |
 | Card printer | 10.99.40.41 | 9100 (raw printing) or the vendor's port | raw TCP or vendor | 40 Devices | Server to printer on that port only |
-| ILMS server (the existing library system) | 10.99.50.10 | 6001 in the sample file (SIP2 or NCIP port of that system) | SIP2 or NCIP over TCP | 50 ILMS | Server to ILMS on that port only; confirm whether the ILMS needs a TLS wrapper |
+| ILMS server (the existing library system) | 10.99.50.10 | 6001 in the sample file (SIP2 or NCIP port of that system) | SIP2 over TCP (NCIP is not implemented) | 50 ILMS | Server to ILMS on that port only; SIP2 has no encryption, so use a VPN, stunnel or TLS-terminating proxy (`docs/sip2.md`) |
 | Mail relay (e-mail notifications) | 10.99.50.25 | 587 (submission) or 25 | SMTP | 50 Services | Server to relay on that port only; the relay decides what leaves the site |
 
 Notes on the example:
@@ -66,7 +66,7 @@ the file and need a restart.
 - [ ] Confirm each device's real port and protocol from its manual; replace the "usual" ports in section 1.
 - [ ] Give the fixed devices static addresses or DHCP reservations; write them into the network documentation.
 - [ ] Set `[app] host` and `port`, and the TLS proxy or `[server] tls_certfile` and `tls_keyfile`, for the real server.
-- [ ] Set `[ilms] driver`, `protocol`, `endpoint` and `port` when a real connector exists; agree the SIP2 or NCIP account with the ILMS owner.
+- [ ] Set `[ilms] driver = "sip2"`, `endpoint`, `port`, `login`, `institution` and `location`; set `AISYS_ILMS_PASSWORD` in the service's environment; agree the SIP2 account with the ILMS owner and run `aisys doctor` (the SIP2 client has only been tested against a simulator).
 - [ ] For each real device, register its driver and set `driver = "<name>"` in its `[[devices]]` block (see `rfid.md`).
 - [ ] Agree the mail relay's address, port and sender with the site's IT; set up the real e-mail driver.
 - [ ] Write the firewall rules from section 1 into the real firewall; test that a staff PC reaches only the server's HTTPS port.

@@ -7,7 +7,7 @@ a live site, and what the prototype deliberately does not do. Nothing here block
 
 | Area | Requirement | What is missing |
 |---|---|---|
-| Wire protocols | FR03 | A real SIP2 or NCIP 2.0 client. There is a documented connector boundary, a mock that words replies either way, retries and tests; no protocol conformance is claimed (SOP section 3) |
+| NCIP 2.0 | FR03 | An NCIP 2.0 client. Only SIP2 is built (`docs/sip2.md`); an NCIP adapter would be another class registered under a new driver name |
 | Real devices and services | FR03, FR07, FR09 | Drivers for a real reader, handheld, gate, camera, card printer, e-mail, SMS and print service, and the outside catalogue. Each is one class behind an existing interface plus a config line |
 | Full ILMS depth | FR01 | Budgets, invoices and claim letters in acquisitions; serial binding and prediction patterns; holds and reservations; an inter-library loan. The add-on is not an ILMS replacement (A-02) |
 | Patron notices | FR09 | Overdue repeat notices and hold-ready notices (the day-before and due-day reminders are built); a combined digest; patron language and quiet hours |
@@ -17,6 +17,7 @@ a live site, and what the prototype deliberately does not do. Nothing here block
 
 | Area | Requirement | What is missing |
 |---|---|---|
+| A real ILMS over SIP2 | FR03 | The SIP2 client was tested only against the simulator written from the specification. It needs a run against the site's real ILMS (account, institution id, location code, checksum setting), small keyword-mapping changes if its wording differs, and an encrypted path to it (VPN, stunnel or TLS proxy) because SIP2 has no encryption. Only a subset of SIP2 is implemented (`docs/sip2.md`) |
 | Acceptance by real users | NFR05 | A site acceptance test with library staff and real devices (the UAT in `docs/uat.md` was run by the development team; the blank sign-off form for library staff is `docs/uat-signoff.md`) |
 | Load and endurance | NFR05 | A soak test of hours or days on a server-class machine; the measured figures are one process on one machine (`docs/performance-results.md`) |
 | TLS in front | NFR02 | The application's own HTTPS is tested; the proxy and service-wrapper examples in `docs/deployment.md` are documented, not run |

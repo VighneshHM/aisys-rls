@@ -33,7 +33,7 @@ items below and prints OK, WARN or FAIL for each, changing nothing.
 | SQLite | 3.9 or newer; with FTS5 for full-text search (every normal Python build has it; without it search falls back to plain matching) | yes |
 | Disk | at least 500 MB free beside the data folder (a 20,000-item library is about 35 MB; each backup is a full copy; an update needs room for a second environment and a backup) | yes |
 | Folders | the install folder (short path on Windows, about 150 characters at most); `data/` and `data/backups/` writable by the account that runs the service | yes |
-| Network | Ethernet to the readers, gate, camera, card printer and the ILMS; staff browsers reach the server on the HTTPS port; **no internet needed** | port free: yes |
+| Network | Ethernet to the readers, gate, camera, card printer and the ILMS (SIP2 is unencrypted: use a VPN, stunnel or TLS proxy); staff browsers reach the server on the HTTPS port; **no internet needed** | port free: yes; the ILMS (when `driver = "sip2"`): connects, logs in and asks for its status |
 | Port | 8000 on the loopback address by default; 443 when a proxy or the built-in TLS is used | yes |
 | Secret key | 32 or more characters in `AISYS_SECRET_KEY` (the installer writes one to `config/secret.key`) | yes (in production) |
 | TLS | a certificate and key (PEM) from the site's own CA or a public one, or a TLS proxy | yes |
@@ -61,9 +61,13 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 | `[circulation] fine_limit_cents` | 500 | a member whose fines exceed this cannot borrow |
 | `[circulation] loan_days`, `max_renewals`, `max_loans` | 14, 2, 5 | loan policy (the ILMS owns it; the mock applies it) |
 | `[circulation] fine_per_day_cents`, `grace_days`, `max_fine_per_loan_cents` | 25, 1, 1000 | the fine rule |
-| `[ilms] driver` | mock | the ILMS connector |
-| `[ilms] protocol` | sip2 | `sip2` or `ncip` (the dialect the mock imitates) |
-| `[ilms] endpoint`, `port` | empty, 0 | the ILMS host and its SIP2 / NCIP port, used by a real connector |
+| `[ilms] driver` | mock | the ILMS connector: `mock`, or `sip2` to speak SIP2 over TCP (`docs/sip2.md`) |
+| `[ilms] protocol` | sip2 | `sip2` or `ncip` (the wording the mock imitates; the `sip2` driver ignores it) |
+| `[ilms] endpoint`, `port` | empty, 0 | the ILMS host and its SIP2 port; both are required by `driver = "sip2"` (the application will not start without them) |
+| `[ilms] login` | empty | SIP2 login user; empty means no login is sent |
+| `[ilms] institution`, `location` | empty, empty | SIP2 institution id (AO) and location code (CP, AP) |
+| `[ilms] timeout_s` | 5 | seconds to wait for an answer, 0.1 to 120 |
+| `[ilms] checksum` | true | SIP2 error detection (sequence digit and checksum); turn off only if the ILMS rejects it |
 | `[ilms] retries`, `backoff_s` | 2, 0.1 | extra attempts and the wait between them |
 | `[gate] duplicate_window_s` | 60 | a repeat alarm for the same tag within this many seconds is recorded, not re-sent |
 | `[notifications] email, sms, print` | mock | the provider driver per channel |
@@ -81,6 +85,7 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 | `AISYS_DATABASE_URL`, `AISYS_BACKUP_DIR` | override the database and backup folder |
 | `AISYS_HOST`, `AISYS_PORT` | override the listening address |
 | `AISYS_SECRET_KEY` | the secret (32+ characters; required in production) |
+| `AISYS_ILMS_PASSWORD` | the SIP2 login password for the ILMS; read only from the environment, a password in the file is ignored |
 | `AISYS_TLS_CERTFILE`, `AISYS_TLS_KEYFILE` | override the TLS files (an empty value switches TLS off) |
 | `AISYS_HOME` | set by the installer: the installation folder (enables the Updates page) |
 

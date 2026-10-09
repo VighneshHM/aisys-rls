@@ -7,6 +7,7 @@ card never signs anyone in. Your menu shows only what your role may do.
 |---|---|---|
 | Check an item out | **Circulation** | Present the patron card (or search the member), place the item's tag on the reader, **Check out**. If it is refused, the message says why. |
 | Return or renew | **Circulation** | Check in or Renew the item. A late return adds a fine to the member. |
+| The library system is not answering | **Circulation** | If a check-out, renew or check-in says to try again, the library system (ILMS) did not answer. Nothing was recorded. Wait a moment and try again; if it keeps happening, tell the administrator (`docs/troubleshooting.md`). |
 | Set where a member's reminders go | **Circulation** | Choose the member, **Contact and reminders**: e-mail, phone, on or off. They are told a day before a loan is due and on the due day. |
 | Find a book (for a visitor) | `/opac` (no sign-in) | Type words; results appear as you type; **Show the shelf** shows where it stands |
 | Look at a shelf | **Shelves** | Choose a shelf: its books in call-number order, coloured by status; red outline = out of order after the last sweep |

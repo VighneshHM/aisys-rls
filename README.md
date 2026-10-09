@@ -37,7 +37,8 @@ Details and design: `docs/rfid.md`.
 
 Sign in (`STAFFLIB0001` or `STAFFCLERK01`), open **Circulation**, pick a simulated patron card, name an item (accession
 no., barcode or tag UID) and check it out, renew it and check it in. Demo members include a blocked one and one over the
-fine limit, so you can see each refusal; the simulator can also make the mock library system time out or lose a reply.
+fine limit, so you can see each refusal; the simulator can also make the mock library system time out or lose a reply
+(`[ilms] driver = "sip2"` uses the SIP2 protocol instead; see "SIP2 and the simulator" below).
 Every attempt appears in the history. Late returns are charged a fine (see `docs/circulation.md`); staff can record
 payments and waivers on the member panel, add members and issue or replace their cards. Details and design:
 `docs/circulation.md`.
@@ -126,7 +127,25 @@ drivers and certificates stay in `config/config.toml` (see `docs/administration.
 ## More documentation
 
 `docs/index.md` (every document against the SOP deliverable it satisfies), `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`, `docs/deployment.md` (install, update, rollback, service, TLS),
-`docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).
+`docs/sip2.md` (the SIP2 connector), `docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).
+
+## SIP2 and the simulator (FR03)
+
+The library-system connector can speak the SIP2 protocol (3M 2.00) over TCP: set `[ilms] driver = "sip2"` with `endpoint`, `port`,
+`login`, `institution` and `location` in `config/config.toml`, and put the login password in the environment variable
+`AISYS_ILMS_PASSWORD` (never in the file). To try it without a real library system, run the simulator and point the application at it:
+
+```powershell
+python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo     # terminal 1
+$env:AISYS_ILMS_PASSWORD = "demo"                                         # terminal 2, then set [ilms] to
+                                                                          # driver sip2, endpoint 127.0.0.1, port 6101, login aisys
+python -m aisys.cli doctor                                                # the ILMS line should be OK
+python -m aisys.cli run
+```
+
+Honest limits: tested only against the simulator (written from the specification), not certified and not tried on any vendor
+system; a subset of SIP2; no encryption in SIP2 itself (use a VPN, stunnel or TLS proxy); NCIP 2.0 is not implemented.
+Details: `docs/sip2.md`.
 
 ## Loan reminders (FR09)
 

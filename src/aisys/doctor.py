@@ -38,6 +38,34 @@ def _port_free(host: str, port: int) -> bool:
         return s.connect_ex((host, port)) != 0  # nothing is listening there yet
 
 
+def _ilms_check(settings: Settings) -> tuple[str, str, str]:
+    """The library system: nothing to check for the mock; for SIP2, connect, log in and ask for its status."""
+    c = settings.circulation
+    if c.ilms_driver == "mock":
+        return "OK", "ILMS", 'mock (a stand-in; set [ilms] driver = "sip2" for a real system)'
+    if c.ilms_driver != "sip2":
+        return "OK", "ILMS", f"driver {c.ilms_driver}"
+    if not c.ilms_endpoint or not c.ilms_port:
+        return "FAIL", "ILMS", "driver sip2 needs [ilms] endpoint and port"
+    from aisys.circulation.connector import ConnectorError
+    from aisys.circulation.sip2.adapter import Sip2Connector
+
+    connector = Sip2Connector(c)
+    try:
+        status = connector.status()
+    except ConnectorError as exc:
+        return "FAIL", "ILMS", f"{c.ilms_endpoint}:{c.ilms_port}: {exc}"
+    finally:
+        connector.close()
+    online = status.fixed[:1].upper() == "Y"
+    return (
+        ("OK" if online else "WARN"),
+        "ILMS",
+        f"SIP2 at {c.ilms_endpoint}:{c.ilms_port} "
+        + ("answered and is online" if online else "answered but reports it is offline"),
+    )
+
+
 def run(settings: Settings) -> list[tuple[str, str, str]]:
     """[(OK | WARN | FAIL, check, detail)]"""
     out: list[tuple[str, str, str]] = []
@@ -110,6 +138,7 @@ def run(settings: Settings) -> list[tuple[str, str, str]]:
         )
     else:
         add("OK", "Environment", f"{settings.environment} (simulators are available; use production on a live site)")
+    add(*_ilms_check(settings))
     home = os.environ.get("AISYS_HOME", "")
     if home:
         add("OK" if (Path(home) / "state.json").is_file() else "WARN", "Installation", home)
