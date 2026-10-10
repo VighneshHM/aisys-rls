@@ -1,0 +1,142 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Patrons · {{ app_name }}{% endblock %}
+{% block heading %}Patrons{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Every library member</h2>
+  <p>See all members, block or unblock them, and remove one who has left. <b>Removing</b> keeps their loans, fines and history, stops them borrowing and switches their card off; it is refused while they still have items out or owe a fine. A removed member can be <b>restored</b>.{% if can_erase %} <b>Erasing</b> a removed member clears their name, contact details and card numbers for good (their loan and fine history stays, without a name).{% endif %} New members are added on the <a href="/circulation">Circulation</a> page.</p>
+</div>
+
+<section class="panel">
+  <header><h3>Members</h3><span class="badge" id="count"></span></header>
+  <div class="body">
+    <div class="toolbar" style="margin:0 0 12px">
+      <div class="field grow" style="margin:0"><label for="q">Name, number, e-mail or phone contains</label><input id="q" type="search" autocomplete="off" maxlength="64" placeholder="e.g. Nair, M0007, priya@"></div>
+      <div class="actions" style="margin:0;align-self:end"><button class="btn" id="apply" type="button">Search</button><button class="btn ghost" id="reset" type="button">Clear</button></div>
+    </div>
+    <div class="chips" id="chips" role="group" aria-label="Show"></div>
+    <div id="confirm"></div>
+    <div id="notice" class="notice" role="alert"></div>
+  </div>
+  <div class="table-wrap" id="list"></div>
+  <div class="pager" id="pager"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, fmt, money} = UI;
+  const CAN_WRITE = {{ can_write|tojson }}, CAN_REMOVE = {{ can_remove|tojson }}, CAN_ERASE = {{ can_erase|tojson }};
+  const PAGE = 25;
+  let offset = 0, view = "all", counts = {};
+  const VIEWS = [["all", "Everyone", "all"], ["blocked", "Blocked", "blocked"], ["with_loans", "Items out", "with_loans"], ["owing", "Owe a fine", "owing"], ["removed", "Removed", "removed"]];
+  const filter = () => ({blocked: "&status=blocked", with_loans: "&loans=true", owing: "&fines=true", removed: "&status=removed"}[view] || "");
+  const why = e => e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message;
+  const pill = (cls, text) => h("span", {class: "badge " + cls}, text);
+  const statusBadge = m => m.status === "removed" ? pill("", m.removed && m.removed.erased ? "Removed · erased" : "Removed") : m.status === "blocked" ? pill("warn", "Blocked") : pill("good", "Active");
+
+  function drawChips() {
+    fill($("chips"), VIEWS.map(([key, label, c]) => h("button", {type: "button", class: "chip" + (view === key ? " on" : ""), "aria-pressed": view === key ? "true" : "false",
+      onclick: () => { view = key; offset = 0; clear("notice"); fill($("confirm")); load(); }}, label, h("i", {}, " " + fmt(counts[c] ?? 0)))));
+  }
+
+  async function act(label, url, body, done) {
+    clear("notice");
+    try { await api(url, {json: body || {}}); say("notice", "ok", done); fill($("confirm")); await load(); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } say("notice", "bad", why(e)); }
+    $("notice").scrollIntoView({block: "nearest", behavior: "smooth"});  // so the answer is seen even from a row far down
+  }
+
+  const cancel = () => { fill($("confirm")); };
+  /** An inline confirmation: Enter in the box confirms, Escape cancels, and focus goes to the box. */
+  function panel(children, input, go) {
+    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); } else if (e.key === "Escape") cancel(); });
+    fill($("confirm"), h("div", {class: "confirm", role: "group"}, ...children));
+    input.focus();
+    $("confirm").scrollIntoView({block: "center", behavior: "smooth"});  // the table can be long: bring the question into view
+  }
+
+  function askRemove(m) {
+    const reason = h("input", {id: "why", maxlength: "200", placeholder: "Reason (optional), e.g. moved away", "aria-label": "Reason for removing " + m.name});
+    const go = () => act("remove", "/api/members/" + encodeURIComponent(m.member_no) + "/remove", {reason: reason.value.trim()}, m.name + " was removed.");
+    panel([
+      h("p", {style: "margin:0 0 8px"}, "Remove ", h("b", {}, m.name), " (", m.member_no, ")?"),
+      h("p", {class: "sub", style: "margin:0 0 8px"}, "They keep their history but cannot borrow, and their card stops working. You can restore them later."),
+      reason,
+      h("div", {class: "actions"}, h("button", {class: "btn danger", type: "button", onclick: go}, "Remove member"), h("button", {class: "btn ghost small", type: "button", onclick: cancel}, "Cancel"))], reason, go);
+  }
+
+  function askErase(m) {
+    const typed = h("input", {id: "typed", autocomplete: "off", maxlength: "32", placeholder: "Type " + m.member_no, "aria-label": "Type the member number " + m.member_no + " to confirm"});
+    const go = () => act("erase", "/api/members/" + encodeURIComponent(m.member_no) + "/erase", {confirm: typed.value.trim()}, "The details of " + m.member_no + " were erased.");
+    panel([
+      h("p", {style: "margin:0 0 8px"}, "Erase the personal details of ", h("b", {}, m.name), " (", m.member_no, ")?"),
+      h("p", {class: "sub", style: "margin:0 0 8px"}, "This cannot be undone. Their name, e-mail, phone, card numbers and the text of their reminder messages are cleared. Loans and fines stay, without a name, so reports still add up."),
+      typed,
+      h("div", {class: "actions"}, h("button", {class: "btn danger", type: "button", onclick: go}, "Erase for good"), h("button", {class: "btn ghost small", type: "button", onclick: cancel}, "Cancel"))], typed, go);
+  }
+
+  function askBlock(m) {
+    const reason = h("input", {id: "bwhy", maxlength: "200", placeholder: "Reason (optional), e.g. overdue items not returned", "aria-label": "Reason for blocking " + m.name});
+    const go = () => act("block", "/api/circulation/members/" + encodeURIComponent(m.member_no) + "/block", {blocked: true, reason: reason.value.trim()}, m.name + " was blocked.");
+    panel([
+      h("p", {style: "margin:0 0 8px"}, "Block ", h("b", {}, m.name), " (", m.member_no, ")?"),
+      h("p", {class: "sub", style: "margin:0 0 8px"}, "They cannot borrow until they are unblocked. Their history is not changed."),
+      reason,
+      h("div", {class: "actions"}, h("button", {class: "btn", type: "button", onclick: go}, "Block member"), h("button", {class: "btn ghost small", type: "button", onclick: cancel}, "Cancel"))], reason, go);
+  }
+
+  const unblock = m => act("unblock", "/api/circulation/members/" + encodeURIComponent(m.member_no) + "/block", {blocked: false}, m.name + " was unblocked.");
+
+  function actions(m) {
+    const out = [], who = " " + m.name;
+    const btn = (label, cls, fn) => h("button", {class: "btn ghost small" + cls, type: "button", "aria-label": label + who, onclick: fn}, label.replace("...", "…"));
+    if (m.status !== "removed" && CAN_WRITE) out.push(m.status === "blocked" ? btn("Unblock", "", () => unblock(m)) : btn("Block", "", () => askBlock(m)));
+    if (m.status !== "removed" && CAN_REMOVE) out.push(btn("Remove", " danger-text", () => askRemove(m)));
+    if (m.status === "removed" && CAN_REMOVE && !(m.removed && m.removed.erased)) out.push(btn("Restore", "", () => act("restore", "/api/members/" + encodeURIComponent(m.member_no) + "/restore", {}, m.name + " was restored. Their old card stays off: issue a new one on the Circulation page.")));
+    if (m.status === "removed" && CAN_ERASE && !(m.removed && m.removed.erased)) out.push(btn("Erase details...", " danger-text", () => askErase(m)));
+    return h("div", {class: "actions", style: "margin:0;gap:6px;flex-wrap:wrap"}, out);
+  }
+
+  function row(m) {
+    return h("tr", {},
+      h("td", {}, h("b", {}, m.name), h("div", {class: "sub mono"}, m.member_no), h("div", {}, statusBadge(m)),
+        m.status === "blocked" && m.block_reason ? h("div", {class: "sub"}, m.block_reason) : null,
+        m.removed ? h("div", {class: "sub"}, "by " + m.removed.by + (m.removed.reason ? ": " + m.removed.reason : "")) : null),
+      h("td", {}, m.email ? h("div", {}, m.email) : null, m.phone ? h("div", {class: "sub mono"}, m.phone) : null, !m.email && !m.phone ? h("span", {class: "sub"}, "none") : null),
+      h("td", {class: "mono"}, m.card || h("span", {class: "sub"}, "no card")),
+      h("td", {class: "num"}, String(m.open_loans)),
+      h("td", {class: "num"}, m.fines_cents ? money(m.fines_cents) : "0.00"),
+      h("td", {class: "time"}, m.joined ? m.joined.slice(0, 10) : ""),
+      h("td", {}, actions(m)));
+  }
+
+  let seq = 0;
+  async function load() {
+    const mine = ++seq;
+    let d;
+    try {
+      [counts, d] = await Promise.all([api("/api/members/counts"), api("/api/members?limit=" + PAGE + "&offset=" + offset + filter() + ($("q").value.trim() ? "&q=" + encodeURIComponent($("q").value.trim()) : ""))]);
+    } catch (e) { if (e.status === 401) { location.href = "/"; return; } say("notice", "bad", why(e)); return; }
+    if (mine !== seq) return;  // a newer search has been started: ignore this late answer
+    if (!d.members.length && offset > 0 && d.total > 0) { offset = Math.max(0, offset - PAGE); return load(); }
+    drawChips();
+    $("count").textContent = fmt(d.total) + " member" + (d.total === 1 ? "" : "s");
+    fill($("list"), d.members.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Member", "Contact", "Card", "Items out", "Fines", "Joined", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.members.map(row))) : h("div", {class: "empty"}, view === "removed" ? "No members have been removed." : "No members match."));
+    const to = offset + d.members.length;
+    fill($("pager"), h("span", {class: "muted"}, d.total ? fmt(offset + 1) + "–" + fmt(to) + " of " + fmt(d.total) : "0 members"),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - PAGE); load(); }}, "Previous"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= d.total ? "" : false, onclick: () => { offset += PAGE; load(); }}, "Next"));
+  }
+
+  const search = () => { offset = 0; load(); };
+  $("apply").onclick = search;
+  $("reset").onclick = () => { $("q").value = ""; view = "all"; search(); };
+  $("q").addEventListener("keydown", e => { if (e.key === "Enter") search(); });
+  load();
+})();
+</script>
+{% endblock %}

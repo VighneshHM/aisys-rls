@@ -15,6 +15,17 @@ What was checked, how, and what is left. Each row can be re-run.
 | Session handling | `test_admin`: deactivating a person ends their open sessions at once; tokens are stored hashed | passes |
 | ILMS password | `test_sip2`: `AISYS_ILMS_PASSWORD` is the only source (a password in the file is ignored) and it does not appear in a printout of the settings | passes; also not shown by `aisys doctor` |
 
+## Removing and erasing members
+
+* Removing a member keeps every loan, fine and audit line and refuses while items are out or a fine is owed; it needs
+  `member.remove` (librarians, administrators). Erasing personal details needs `member.erase` (administrators) and the typed
+  member number, works only on a removed member, deletes the card numbers and clears name, contact and reminder text
+  (`test_member_admin`).
+* The audit log and the circulation history are append-only, so they hold member numbers, never names: `member.create` no
+  longer records the name and refusal messages are kept with the member number in place of the name
+  (`service.event_text`). Entries written before this change may still hold a name and cannot be rewritten.
+* A removed member is stored as blocked with `removed_at` set, so a code path that predates the feature still refuses them.
+
 ## Input handling (hostile input tests)
 
 | Input | Where | Result |

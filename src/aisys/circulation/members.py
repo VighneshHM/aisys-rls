@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from aisys import audit
-from aisys.circulation.service import CircError, find_member
+from aisys.circulation.service import CircError, find_member, member_status
 from aisys.models import Card, Member
 from aisys.notifications.providers import valid_address
 from aisys.rfid import tagging
@@ -60,6 +60,8 @@ def set_contact(
 ) -> Member:
     """Change where reminders go. A field left out (None) is unchanged; an empty text clears it."""
     member = find_member(db, member_no)
+    if member.removed_at is not None:
+        raise CircError(409, "member_removed", f"{member.name} has been removed: restore them before changing anything")
     changed: dict[str, str] = {}
     if email is not None:
         member.email = clean_email(email)
@@ -112,7 +114,7 @@ def create_member(
         action="member.create",
         entity="member",
         entity_id=number,
-        detail={"name": name, "card": bool(uid)},
+        detail={"card": bool(uid)},  # a name is personal data and the audit log is append-only: it holds numbers only
         ip=ip,
     )
     db.commit()
@@ -146,16 +148,17 @@ def issue_card(db: Session, member_no: str, card_uid: str, *, actor: str, ip: st
     return member
 
 
-def search(db: Session, q: str, limit: int = 10) -> list[dict]:
-    """Members whose name or number contains `q` (case-insensitive), best matches first."""
+def search(db: Session, q: str, limit: int = 10, *, include_removed: bool = False) -> list[dict]:
+    """Members whose name or number contains `q` (case-insensitive), best matches first. Removed ones are left out."""
     q = q.strip().lower().replace("%", "").replace("_", "")  # no wildcards: they would match everyone
     if not q:
         return []
     like = f"%{q}%"
+    hide = () if include_removed else (Member.removed_at.is_(None),)
     rows = list(
         db.scalars(
             select(Member)
-            .where(or_(func.lower(Member.name).like(like), func.lower(Member.member_no).like(like)))
+            .where(or_(func.lower(Member.name).like(like), func.lower(Member.member_no).like(like)), *hide)
             .order_by(Member.name)
             .limit(limit)
         )
@@ -171,7 +174,7 @@ def search(db: Session, q: str, limit: int = 10) -> list[dict]:
         {
             "member_no": m.member_no,
             "name": m.name,
-            "status": m.status,
+            "status": member_status(m),
             "fines_cents": m.fines_cents,
             "card": cards.get(m.member_no),
         }

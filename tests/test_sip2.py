@@ -734,3 +734,25 @@ def test_a_renewal_the_ilms_does_not_recognise_is_still_refused(sip_client, lib,
     r = renew(sip_client, lib, "W6")
     assert r.status_code == 409 and r.json()["detail"]["code"] == "not_on_loan"
     assert len(sip_client.get("/api/circulation/loans", headers=lib).json()["loans"]) == 1  # nothing guessed
+
+
+def test_a_member_removed_while_the_sip2_ilms_is_lending_gets_the_book_taken_back(sip_client, lib, sip_sim):
+    """The ILMS really lent the book; the member was removed before it was recorded here: the ILMS must be undone."""
+    book(sip_client, lib, "W7")
+    inner = sip_client.app.state.ilms.inner
+    real = inner.checkout
+
+    def removed_meanwhile(txn_id, member, item, *, now):
+        answer = real(txn_id, member, item, now=now)
+        r = sip_client.post("/api/members/M0001/remove", headers=lib, json={"reason": "left"})
+        assert r.status_code == 200, r.text
+        return answer
+
+    inner.checkout = removed_meanwhile
+    try:
+        r = out(sip_client, lib, "M0001", "W7")
+    finally:
+        inner.checkout = real
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "member_removed", r.text
+    assert sip_sim.items["W7"].charged_to == "" and sip_sim.patrons["M0001"].charged == []  # taken back at the ILMS
+    assert sip_client.get("/api/circulation/loans", headers=lib).json()["loans"] == []

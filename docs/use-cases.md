@@ -38,6 +38,7 @@ tests tagged with the requirement (`docs/traceability.md` lists every test per r
 | UC-25 | Circulation through the SIP2 protocol | Desk clerk | FR03, AC03 | Circulation |
 | UC-26 | Correct a record; withdraw or write off a copy | Librarian | FR01 | Catalogue |
 | UC-27 | Hand a screen over to visitors; a public terminal | Any staff, Visitor | NFR02, FR02 | Menu, `/opac` |
+| UC-28 | See every patron; remove, restore or erase one | Librarian, Administrator | FR04, FR11 | Patrons |
 
 ---
 
@@ -347,3 +348,21 @@ the sign-out); a link from another site to `/opac` (nobody is signed out).
 - A hand-over posted from another site is refused.
 - On a kiosk host name only the catalogue, its search, static files and health checks answer; sign-in is impossible and any
   session sent is ignored; the staff host name is unaffected.
+
+## UC-28 See every patron; remove, restore or erase one
+**Actor:** Librarian (remove, restore), Administrator (also erase); a desk clerk can only look. **Flow:** open **Patrons**;
+search by name, number, e-mail or phone, or press *Blocked*, *Items out*, *Owe a fine* or *Removed*; **Remove** a member who
+has left (a reason is optional) and confirm; **Restore** brings a removed member back; **Erase details...** on a removed member
+clears their personal details after the member number is typed back.
+**Alternatives:** a member with items out or a fine owed (removal refused, saying what to do first); a removed member scanned
+at the desk (refused as removed); an erased member (cannot be restored: add them as a new member).
+
+**Acceptance criteria:**
+
+- Every member can be seen, a page at a time, with loans out, fines, masked card and contact; removed members only appear
+  under *Removed* (FR04). UAT-30.
+- Removing keeps the loans, fines and history, stops borrowing, switches the card off and cancels waiting reminders; it is
+  refused while items are out or a fine is owed. Restoring brings the member back as they were; the old card stays off.
+- Erasing clears the name, e-mail, phone, card numbers and reminder text, keeps the loan and fine history without a name, and is
+  refused unless the member was removed and the number was typed correctly; an erased member cannot be restored.
+- Every removal, restoration and erasure is audited by member number only (no name or contact detail).

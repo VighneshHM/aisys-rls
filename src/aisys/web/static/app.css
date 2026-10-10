@@ -77,6 +77,8 @@ code, .mono { font-family: var(--mono); font-size: .92em; }
 .demo h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 6px 12px 6px 8px; font: inherit; font-size: 13px; display: inline-flex; gap: 8px; align-items: center; }
+.chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .chip:hover { border-color: var(--accent); color: var(--ink); }
 .chip i { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-strong); }
 .chip.patron i { background: var(--warn-soft); color: var(--warn); }

@@ -52,6 +52,7 @@ Extra checks witnessed:
 | UAT-27 | Public catalogue hand-over from the menu; opening `/opac` keeps the session; kiosk host serves only the catalogue | ✓ | Pass | Development team | 2026-10-10 | D-055, DR-17 |
 | UAT-28 | Correct a record and withdraw a copy; refused loan; audit line; invalid edit refused | ✓ | Pass | Development team | 2026-10-10 | D-057, DR-19 |
 | UAT-29 | Read the gates now (simulator only); real-driver path by automated tests | ✓ | Pass | Development team | 2026-10-10 | D-056, DR-18 |
+| UAT-30 | Patrons: list, filters, remove (refused while owing), restore, erase with typed confirmation, clerk read-only, phone width | ✓ | Pass | Development team | 2026-10-10 | D-081 to D-084, DR-20 |
 | UAT-17 | Patron reminders | ✓ | Pass | Development team | see `uat.md` | |
 | UAT-12 | Labels | ✓ | Pass | Development team | see `uat.md` | |
 | UAT-03 | Public catalogue | ✓ | Pass | Development team | see `uat.md` | |

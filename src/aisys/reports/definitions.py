@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Select, case, func, or_, select
+from sqlalchemy import Select, and_, case, func, or_, select
 
 from aisys.models import (
     AuditEvent,
@@ -162,8 +162,15 @@ def tagged_items(ctx: Context, p: dict, limit: int, offset: int) -> Result:
 
 
 # ================================================================== 2. members
+def _member_state(status: str):
+    """The WHERE for a member status filter: removed members are stored as blocked, so the two must be told apart."""
+    if status == "removed":
+        return Member.removed_at.is_not(None)
+    return and_(Member.status == status, Member.removed_at.is_(None))
+
+
 def members(ctx: Context, p: dict, limit: int, offset: int) -> Result:
-    status = choice(p, "status", (("active", "Active"), ("blocked", "Blocked")))
+    status = choice(p, "status", (("active", "Active"), ("blocked", "Blocked"), ("removed", "Removed")))
     owes = choice(p, "owes", (("yes", "Owes something"), ("over", "Over the fine limit")))
     q = text(p, "q")
     now = datetime.now(UTC)
@@ -186,9 +193,7 @@ def members(ctx: Context, p: dict, limit: int, offset: int) -> Result:
         .limit(1)
         .scalar_subquery()
     )
-    conds = []
-    if status:
-        conds.append(Member.status == status)
+    conds = [_member_state(status)] if status else [Member.removed_at.is_(None)]  # removed ones only when asked for
     if owes == "yes":
         conds.append(Member.fines_cents > 0)
     if owes == "over":
@@ -204,7 +209,7 @@ def members(ctx: Context, p: dict, limit: int, offset: int) -> Result:
         {
             "member_no": m.member_no,
             "name": m.name,
-            "status": m.status.capitalize(),
+            "status": ("Removed" if m.removed_at is not None else m.status.capitalize()),
             "fines_cents": m.fines_cents,
             "open_loans": o,
             "overdue_loans": d,

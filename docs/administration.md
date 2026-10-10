@@ -45,7 +45,9 @@ also needs shell access to the server for updates and rollback, which are comman
 Page `/admin`, permission `admin.users` (administrator only).
 
 - **Staff list.** Shows role, active or deactivated, locked, and each staff card masked (for example `STA…N01`). Full card
-  numbers and password hashes are never returned.
+  numbers and password hashes are never returned. Search by name or username and filter by role or by status (active,
+  deactivated, locked out) to see everyone with a given role. A person is never deleted, only deactivated: the audit log and
+  the loan records name who acted.
 - **Add a staff member** (username, name, role, optional password) and **issue a card**. A staff card signs in; a patron card only
   identifies a member and can never sign in (enforced in the service and by a database constraint).
 - **Deactivate or activate** a person: takes effect at once and ends their open sessions. **Deactivate or reactivate** a card.
@@ -75,6 +77,29 @@ Limits: no password reset; no new permission types (a custom role combines the p
 users (deactivate instead, so history stays attributable).
 API: `GET /api/admin/people`, `PATCH /api/admin/users/{id}`, `PATCH /api/admin/cards/{id}`, `POST /api/admin/users`, `POST /api/admin/cards`,
 `GET /api/admin/roles`, `POST /api/admin/roles`, `PATCH /api/admin/roles/{name}`, `DELETE /api/admin/roles/{name}`.
+
+## 3a. Patrons (the Patrons page)
+
+Page `/members`; anyone with `member.read` can look (desk clerks too). **Blocking** needs `member.write`, **removing and restoring**
+needs `member.remove` (librarians and administrators) and **erasing** needs `member.erase` (administrators only).
+
+- **The list.** Every member, a page at a time: name, number, status, e-mail and phone, masked card, items out, fines and the day
+  they joined. Search by name, number, e-mail or phone; the buttons *Blocked*, *Items out*, *Owe a fine* and *Removed* filter
+  the list and show how many are in each. Removed members only appear under *Removed*.
+- **Remove** a member who has left (a reason is optional). Their loans, fines and history are kept; they can no longer borrow,
+  their card stops working, waiting reminders are cancelled and they leave the normal lists and search. It is **refused while
+  they still have items out or owe a fine**, and the message says what to do first (return the items; record the payment or
+  waive the fine).
+- **Restore** brings a removed member back as they were (active, or blocked if they were). Their old card stays off: issue a
+  new one on the Circulation page.
+- **Erase details** (administrators) is a second, irreversible step for a member who is already removed: it replaces the name
+  with "Removed member M0007", clears e-mail and phone, deletes their card numbers (so the numbers can be used again) and clears
+  the text of their reminder messages. The loan and fine history stays, without a name, so reports still add up. The member
+  number must be typed back to confirm, and an erased member cannot be restored: add them again as a new member.
+- **What is recorded.** Every removal, restoration and erasure goes to the audit log by member number, with who did it and the
+  reason; the log never holds a name, e-mail or phone. **Limits:** entries written before this page existed may still contain a
+  name (the log and the circulation history cannot be edited), and with a real ILMS the member also has to be removed there:
+  this application never changes the ILMS's records.
 
 ## 4. The audit log
 

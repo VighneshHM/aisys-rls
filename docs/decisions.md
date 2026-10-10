@@ -266,3 +266,34 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 * **NFR01:** the rule "never modify existing records" is about the integration with the institution's ILMS and its
   migrated data: the import still only inserts. A correction here is a deliberate, attributed change by a librarian,
   recorded with its old and new values.
+
+## DR-20 Patrons page: remove, restore and erase members
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner ("go" after the design in chat).
+* **Context:** members could only be added. There was no list of all members and no way to remove one; staff could be
+  seen on the Administration page but a library cannot keep every patron for ever (people leave, ask to be forgotten).
+* **Decision:** a **Patrons** page (`/members`, menu entry for anyone with `member.read`) lists every member with search,
+  filters (blocked, items out, owing, removed), loans, fines, masked card and contact. **Remove** (new permission
+  `member.remove`: librarians and administrators) keeps the member and all history, stops borrowing, switches the card
+  off and cancels waiting reminders; it is refused while items are out or a fine is owed. **Restore** brings them back as
+  they were (an old card stays off). **Erase** (new permission `member.erase`: administrators only) is a second,
+  irreversible step for an already removed member: it clears name, e-mail, phone, card numbers and the text of reminder
+  messages, and keeps loans, fines and counts so reports add up. It needs the member number typed back.
+* **Races:** the ILMS call in a check-out can take seconds, so the member is read again after it answers; if they were
+  removed meanwhile the ILMS loan is taken back and nothing is recorded (D-083). Removal claims the member in one atomic
+  update before it checks loans and fines, so it cannot miss a loan written at the same moment and two removers cannot
+  both succeed.
+* **How "removed" is stored:** the members table has a database rule that allows only `active` and `blocked`, and
+  rebuilding that table (loans, fines and events point at it) is not worth the risk (the same call as migration 0009).
+  A removed member has `removed_at` set and `status = blocked`, so every older code path refuses them as well;
+  `status_before_removal` lets a restore put them back as they were. Staff see "removed".
+* **Personal data in append-only records:** the audit log and the circulation history cannot be edited (database
+  triggers), so they must never hold a name. The audit log already held none of the contact details; this change also
+  stops `member.create` recording the name, and the circulation history now keeps the member number where a message
+  named the member (`service.event_text`). Entries written before this change may still hold a name; they cannot be
+  rewritten, which the security notes state.
+* **Alternatives:** deleting the member row (breaks the loan, fine and audit history and the foreign keys; rejected);
+  adding a `removed` status value (needs a table rebuild; rejected); removing with items out or fines owed "by force"
+  (loses track of items and money; rejected).
+* **With a real ILMS** the members live in the ILMS and this application holds a copy: removing or erasing here does not
+  touch the ILMS (and the reverse).

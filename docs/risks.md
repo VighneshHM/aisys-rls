@@ -36,6 +36,8 @@ was on 2026-10-09. Nothing was penetration tested or run against real hardware, 
 | R-26 | Dependency: `cryptography` (50.0.2) vulnerability (seven were found in 48.0.0, D-021) | dependency | Medium | Medium | Pinned at the fixed version; only in the `dev` extra and `requirements-dev.lock` (tests and signing), not shipped to the site; `pip-audit` | VighneshHM | Mitigated |
 | R-27 | Dependency: openpyxl (3.1.5) or the spreadsheet parser mishandles a hostile file | dependency | Low | Medium | Pinned; imported rows are validated and staged before any record is created; CSV formulas neutralised on export | VighneshHM | Mitigated |
 | R-28 | Dependency: uvicorn (0.54.0) or other runtime packages (Jinja2, python-multipart) vulnerable | dependency | Medium | Medium | Pinned; `pip-audit`; Dependabot; all 43 pinned packages in the licence inventory | VighneshHM | Mitigated |
+| R-29 | A member removed or erased here still exists in the ILMS (the two drift apart) | scope | Medium | Low | Documented in the administrator's guide; the connector never touches the ILMS member record; staff remove them in both places | VighneshHM | Open (documented) |
+| R-30 | Names written into the audit log or the circulation history before the Patrons page existed remain after an erase (both are append-only) | security | Low | Low | New entries hold member numbers only (`service.event_text`, no name in `member.create`); erase clears the member record, contact details, cards and reminder text; the limit is stated in the security notes | VighneshHM | Open (documented) |
 
 ## Dependencies
 

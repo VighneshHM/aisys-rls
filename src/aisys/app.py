@@ -33,6 +33,7 @@ from aisys.inventory_routes import router as inventory_router
 from aisys.labels_routes import router as labels_router
 from aisys.lifecycle_routes import router as updates_router
 from aisys.logging_setup import configure_logging
+from aisys.members_routes import router as members_router
 from aisys.migration_routes import router as migration_router
 from aisys.models import AppSetting
 from aisys.notifications import runner
@@ -125,6 +126,7 @@ def create_app(
     app.include_router(catalogue_router)
     app.include_router(rfid_router)
     app.include_router(circulation_router)
+    app.include_router(members_router)
     app.include_router(inventory_router)
     app.include_router(gate_router)
     app.include_router(notify_router)

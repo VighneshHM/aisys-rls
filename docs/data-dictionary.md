@@ -54,6 +54,8 @@ Each person has one role; a role is a set of permissions, and every endpoint nam
 | `catalogue.write` | Create and edit catalogue records | yes | yes |  |  |
 | `member.read` | View members | yes | yes | yes |  |
 | `member.write` | Create and edit members | yes | yes |  |  |
+| `member.remove` | Remove and restore members | yes | yes |  |  |
+| `member.erase` | Erase a removed member's personal details | yes |  |  |  |
 | `circulation.checkout` | Check items out | yes | yes | yes |  |
 | `circulation.checkin` | Check items in | yes | yes | yes |  |
 | `circulation.renew` | Renew loans | yes | yes | yes |  |
@@ -326,6 +328,11 @@ A library member. Patrons are identified by their card but are never users: they
 | `phone` | text(32) | yes | default `` |
 | `reminders_on` | yes/no | yes | default `True` |
 | `created_at` | datetime | yes |  |
+| `removed_at` | datetime | no |  |
+| `removed_by` | text(64) | yes | default `` |
+| `removed_reason` | text(200) | yes | default `` |
+| `status_before_removal` | text(10) | yes | default `` |
+| `erased_at` | datetime | no |  |
 
 Indexes: index `ix_members_name` on (name).
 

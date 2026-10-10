@@ -53,6 +53,8 @@ clarification log below the table. Design decisions with alternatives are in `do
 | A-43 | "D0 to D10" in SOP NFR09 names the working days of the stage plan (SOP section 9 labels its stages D0 to D8), not the deliverables D1 to D9 of section 7. The mapping of stages to actual dates is in `docs/project-management.md`. | own | NFR09. |
 | A-44 | A public terminal can be given its own host name (DNS or hosts file) for the library server; on it only the public catalogue is served (DR-17). A staff screen is handed over by signing out; the catalogue is linked from the sign-in page only. | confirmed | Project owner chose this on 2026-10-10 (C-11, C-12). |
 | A-45 | Gates are read by polling their driver; the loop inside the application and the `gate-poll` command are alternatives, never run together. | own | DR-18. |
+| A-46 | Removing or erasing a member here does not remove them from the ILMS: the members live there and this application holds a copy. Staff remove them in both places. | own | DR-20; `docs/administration.md`. |
+| A-47 | A removed member is kept as a row with `removed_at` set and `status = blocked`; the database rule on `status` is not widened. Names written into the audit log or circulation history before this change cannot be rewritten (they are append-only). | own | DR-20. |
 
 ## Clarification log
 
@@ -75,6 +77,7 @@ work: questions that only they can answer are marked **open - needs library staf
 | C-10 | The final coverage review found NCIP 2.0 still unbuilt. Is an NCIP 2.0 adapter needed, given SIP2 is implemented? | Project owner | 2026-10-09 | No: the requirement says SIP2/NCIP 2.0 and SIP2 is implemented, so NCIP is not needed | NCIP not built and not claimed; FR03 `done` through SIP2; A-41; DR-13; `docs/remaining-work.md` keeps NCIP as an extension |
 | C-11 | The first fix for D-052 signs staff out whenever `/opac` is loaded, with side effects (cross-site logout, lost desk tabs, revoked API tokens). Which approach? (1) explicit hand-over; (2) hand-over plus kiosk host names; (3) keep and document | Project owner | 2026-10-10 | (2) hand-over plus kiosk host names | DR-17, A-44, D-055 |
 | C-12 | With opening `/opac` no longer signing anyone out, should the public catalogue stay in the staff menu as a sign-out button, or be linked from the landing page only? | Project owner | 2026-10-10 | Landing page only: remove it from the staff menu | DR-17 updated; UC-27, UAT-27 |
+| C-13 | Patrons can only be added. Should there be a page listing every member, a way to remove one, and an erase step for data-protection requests? Who may remove? Refuse while items are out or a fine is owed, or force? | Project owner | 2026-10-10 | A Patrons page; remove = keep the history and switch the card off; restore; erase as a separate, administrator-only step; librarians and administrators may remove; refused while items are out or a fine is owed | DR-20, UC-28, UAT-30 |
 
 ### Open questions from the first draft, resolved or still open
 

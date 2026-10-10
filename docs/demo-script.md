@@ -70,7 +70,7 @@ The deck is `docs/presentation.html`: one self-contained file (no network), open
 6. **Security**: roles and permissions, signed packages, TLS, masked logs, hostile-input tests, dependency audit.
 7. **Offline lifecycle**: install, update with a rehearsal, rollback; the SBOM and licences.
 8. **Search and shelves**: full-text index kept current by triggers; the public catalogue; the virtual bookshelf.
-9. **Testing**: 782 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
+9. **Testing**: 820 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
 10. **What the testing found**: examples (the search that took 1.3 s, duplicate delivery, the restore race) and how they were fixed.
 11. **Known limits and production backlog**: `docs/remaining-work.md` (no real hardware, SIP2 tested only against a simulator and no NCIP, SQLite only, no pen test).
 12. **Questions and the live demonstration.**

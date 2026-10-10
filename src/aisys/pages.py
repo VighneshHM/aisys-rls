@@ -30,6 +30,7 @@ NAV = [
     ("dashboard", "Dashboard", "dash", "/dashboard", None, True),
     ("catalogue", "Catalogue", "book", "/catalogue", "catalogue.read", True),
     ("circulation", "Circulation", "swap", "/circulation", "circulation.checkout", True),
+    ("members", "Patrons", "users", "/members", "member.read", True),
     ("tagging", "RFID tagging", "tag", "/tagging", "rfid.tag", True),
     ("registry", "Tag registry", "list", "/tags", "catalogue.read", True),
     ("inventory", "Inventory", "scan", "/inventory", "inventory.run", True),
@@ -301,6 +302,26 @@ def circulation_page(
         can_renew="circulation.renew" in perms,
         can_block="member.write" in perms,
         protocol=request.app.state.ilms.protocol.upper(),  # what the connector really speaks
+    )
+
+
+@router.get("/members", response_class=HTMLResponse)
+def members_page(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+    principal: Principal | None = Depends(get_principal_optional),
+):
+    perms = principal.permissions if principal else frozenset()
+    return _gated_page(
+        request,
+        settings,
+        principal,
+        "member.read",
+        "members.html",
+        "members",
+        can_write="member.write" in perms,
+        can_remove="member.remove" in perms,
+        can_erase="member.erase" in perms,
     )
 
 
