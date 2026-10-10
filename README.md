@@ -11,7 +11,36 @@ and the signed offline install, update and rollback. NCIP 2.0 is not built (SIP2
 `docs/traceability.md` maps every requirement to its tests, `docs/assumptions.md` and `docs/decisions.md` record the decisions,
 and `docs/remaining-work.md` lists what is left for a live site.
 
-Contents: [Install at a library](#install-at-a-library-offline) · [Try it on one computer](#try-it-on-one-computer-windows-powershell) ·
+## Clone and test it (about 5 minutes, Windows, PowerShell)
+
+You need Windows, **Python 3.12 or newer** and Git. Nothing else, no internet after the download in step 2.
+
+```powershell
+git clone https://github.com/VighneshHM/aisys-rls.git
+cd aisys-rls
+python -m venv .venv
+.\.venv\Scripts\python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
+.\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
+.\.venv\Scripts\aisys seed-demo     # creates the database and loads the SYNTHETIC demo library
+.\.venv\Scripts\aisys run
+```
+
+Open **http://127.0.0.1:8000**. On the sign-in page choose a staff card: **Librarian** (`STAFFLIB0001`) to try the catalogue,
+circulation, tagging and data migration, or **Administrator** (`STAFFADMIN01`) for staff, roles, Settings, gate, backups and
+the audit log. The devices and library system are built-in simulators, so everything works with no hardware. API docs are at
+`/docs`. Stop the server with Ctrl+C. To start again from a clean demo, delete the `data` folder and run `seed-demo` again.
+
+Then try the ten acceptance scenarios below (AC01 to AC10), follow `docs/demo-script.md`, and run the automated tests:
+
+```powershell
+.\.venv\Scripts\python -m pytest -n auto     # the whole suite (about 835 tests, 2 to 3 minutes)
+.\.venv\Scripts\python scripts\lifecycle_demo.py   # real offline install, update and rollback, network blocked
+```
+
+Not Windows PowerShell? On Linux or macOS the same steps work with `.venv/bin/` in place of `.\.venv\Scripts\` (only Windows is
+verified, see `docs/deployment.md`).
+
+Contents: [Clone and test](#clone-and-test-it-about-5-minutes-windows-powershell) · [Install at a library](#install-at-a-library-offline) ·
 [Try each scenario](#try-the-spreadsheet-import-ac01) · [Features](#correct-a-record-withdraw-a-copy-fr01) ·
 [Configuration](#configuration) · [Develop](#develop) · [Layout](#layout) · [More documentation](#more-documentation)
 
@@ -81,19 +110,9 @@ Other commands: `manage.py status` (versions, licence, history), `manage.py reco
 `licence` and `build` make the key pair, a customer's licence and the signed package. See *Build a package* in `docs/deployment.md`.
 To watch the whole install, update and rollback with the network blocked, see [AC09](#try-offline-install-update-and-rollback-ac09).
 
-## Try it on one computer (Windows, PowerShell)
+## The demo library
 
-For evaluation and development. This runs from the source folder, not as an installed copy.
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
-.\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
-.\.venv\Scripts\aisys seed-demo     # migrates the DB and loads the SYNTHETIC demo library
-.\.venv\Scripts\aisys run           # http://127.0.0.1:8000  (API docs at /docs)
-```
-
-The demo library has 7 staff, 20 patrons in different situations, 259 books (191 imported from the sample spreadsheet
+`seed-demo` (see [Clone and test it](#clone-and-test-it-about-5-minutes-windows-powershell)) loads 7 staff, 20 patrons in different situations, 259 books (191 imported from the sample spreadsheet
 and tagged, 15 more left untagged) and about a hundred days of activity, so every menu has something in it: see
 `docs/demo-data.md`. `seed-demo --minimal` loads only the staff and patron cards with an empty catalogue, which is
 where the guided tour and the import below start from.
