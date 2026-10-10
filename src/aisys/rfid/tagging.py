@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 
 from sqlalchemy import case, exists, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -27,7 +26,7 @@ from aisys.models import BibRecord, Card, Item, Member, RfidTag, TagEvent
 from aisys.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
 from aisys.rfid.events import TagObserved, is_valid_tag_uid, normalize_tag_uid
 from aisys.rfid.registry import DeviceRegistry
-from aisys.timeutil import iso
+from aisys.timeutil import iso, utcnow
 
 log = logging.getLogger("aisys.rfid")
 BLOCKED_ITEM_STATUSES = {"lost", "withdrawn"}
@@ -356,7 +355,7 @@ def associate(
         ) from exc
 
     # 2) then the database, all-or-nothing
-    now = datetime.now(UTC)
+    now = utcnow()
     try:
         if old is not None:
             old.status, old.ended_at, old.security_armed = old_tag_fate, now, False
@@ -529,7 +528,7 @@ def end_tag(
     if state == "retired":
         raise TaggingError(409, "Tag is already retired")
     on = next((link for link in links if link.status == "active"), None)
-    now = datetime.now(UTC)
+    now = utcnow()
 
     if on is None:  # the tag is currently 'removed'
         if fate == "removed":

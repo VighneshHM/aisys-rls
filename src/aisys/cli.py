@@ -103,6 +103,23 @@ def seed_demo(settings: Settings) -> None:
         db.commit()
 
 
+def _seed_demo_command(args, settings: Settings) -> int:
+    from aisys.devtools import demo_seed
+
+    migrate.upgrade(settings.database_url)
+    if args.minimal:
+        seed_demo(settings)
+    elif demo_seed.catalogue_size(settings):
+        seed_demo(settings)  # never adds a second demo history to a catalogue that already has books
+        print("the catalogue already has items, so only the demo staff and patron cards were checked")
+    else:
+        print("replaying about a hundred days of demo library history (takes a minute)...")
+        counts = demo_seed.seed_full_demo(settings, quiet=args.quiet)
+        print("demo library loaded:", demo_seed.report(counts))
+    print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
+    return 0
+
+
 MIN_PASSWORD = 12
 MAX_PASSWORD = 256  # what the sign-in form accepts
 _USERNAME = re.compile(r"[a-z0-9._-]{3,32}")  # the same rule as the Administration page, lower case only
@@ -341,7 +358,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", help="path to config TOML")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate", help="apply database migrations")
-    sub.add_parser("seed-demo", help="load synthetic demo users and cards")
+    sd = sub.add_parser("seed-demo", help="load the synthetic demo library (staff, patrons, books, months of activity)")
+    sd.add_argument("--minimal", action="store_true", help="only the demo staff and patron cards (what the tests use)")
+    sd.add_argument("--quiet", action="store_true", help="do not list each step of the demo history")
     ca = sub.add_parser("create-admin", help="create the first administrator of a real site (username and password)")
     ca.add_argument("--username", required=True)
     ca.add_argument("--name", default="", help="the name shown on pages (default: the username)")
@@ -381,9 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         migrate.upgrade(settings.database_url)
         print("database is at head:", migrate.head_revision())
     elif args.cmd == "seed-demo":
-        migrate.upgrade(settings.database_url)
-        seed_demo(settings)
-        print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
+        return _seed_demo_command(args, settings)
     elif args.cmd == "create-admin":
         return _create_admin_command(args, settings)
     elif args.cmd == "notify-dispatch":

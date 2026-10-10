@@ -28,7 +28,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 * **CI**: GitHub-hosted Windows runners (`windows-latest`: Python 3.12 and 3.13; `windows-2022`: Python 3.12).
 * **Data**: synthetic only. Tests build their own data; the sample spreadsheets (`samples/`, 200 and 20,000 rows, with a manifest of
   the expected valid, invalid and duplicate counts) come from a seeded generator, so results repeat. Demo people and cards come
-  from `seed-demo`.
+  from `seed-demo --minimal`; the full demo library (`seed-demo`, `docs/demo-data.md`) has its own tests.
 * **Isolation**: every test gets a fresh temporary database and backup folder (`tests/conftest.py`); tests never touch
   `data/`.
 
@@ -62,8 +62,9 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_admin.py` | 26 | FR11: audit log, staff and cards, lock-out rules, custom roles, no granting beyond your own rights |
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
 | `test_search_shelves.py` | 73 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing, public search counts and pages every match |
-| `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
+| `test_acquisitions_serials_labels.py` | 63 | FR01/FR04: orders, serials, barcodes and labels, recent label print jobs, card printing |
 | `test_member_admin.py` | 36 | FR04/FR11: the Patrons page: list, search, filters, remove (refused with items out or a fine owed), restore, erase, permissions, no names in the append-only records, the migration |
+| `test_demo_seed.py` | 24 | D3/D9: the full demo library: the numbers asked for (7 staff, 20 patrons, 250-300 books, the 200-row import all tagged, a few untagged), patrons in every situation with past and current loans, every menu has data, every page opens, only into an empty catalogue, `--minimal` |
 | `test_opac_session.py` | 22 | NFR02/FR02: not in the staff menu, reached from the sign-in page; the warning's sign-out (POST, audited, cross-site refused); opening the public catalogue signs nobody out; kiosk host names; no cached pages; scrollable menu that remembers its position |
 | `test_catalogue_edit.py` | 11 | FR01: corrections and copy status with the importer's rules, on-loan guard, shared-record count, audit trail, no deletes, edits that would lose a value refused |
 | `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
@@ -72,7 +73,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_security_ops.py`, `test_config.py` | 13, 9 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration, NUL text and loose numbers refused |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 835 test cases (some are parametrised).
+Total: 860 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

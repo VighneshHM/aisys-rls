@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
@@ -23,11 +23,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from aisys import timeutil
 from aisys.db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(UTC)
+    return timeutil.utcnow()
 
 
 role_permissions = Table(

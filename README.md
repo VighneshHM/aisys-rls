@@ -51,8 +51,8 @@ to a folder, for example `C:\aisys-package`.
    python C:\aisys\manage.py create-admin --username site.admin --name "Site Admin"
    ```
 
-   Sign in on the sign-in page with that username and password. (`--seed-demo` at install loads synthetic demo users and a
-   published demo password: for a trial or training copy only, never live data.)
+   Sign in on the sign-in page with that username and password. (`--seed-demo` at install loads the synthetic demo library
+   and a published demo password: for a trial or training copy only, never live data.)
 6. **Set up.** The administrator adds staff and cards on **Administration**, then loads the catalogue with
    **Data migration** (`docs/migration.md`) and tags items (`docs/rfid.md`). Back up from **Backups** and copy `data\backups\`
    off the server (`docs/backup-restore.md`).
@@ -89,11 +89,17 @@ For evaluation and development. This runs from the source folder, not as an inst
 python -m venv .venv
 .\.venv\Scripts\python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
 .\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
-.\.venv\Scripts\aisys seed-demo     # migrates the DB and loads SYNTHETIC users/cards
+.\.venv\Scripts\aisys seed-demo     # migrates the DB and loads the SYNTHETIC demo library
 .\.venv\Scripts\aisys run           # http://127.0.0.1:8000  (API docs at /docs)
 ```
 
-Demo staff card UIDs (synthetic): `STAFFADMIN01`, `STAFFLIB0001`, `STAFFCLERK01`, `STAFFAUDIT01`.
+The demo library has 7 staff, 20 patrons in different situations, 259 books (191 imported from the sample spreadsheet
+and tagged, 15 more left untagged) and about a hundred days of activity, so every menu has something in it: see
+`docs/demo-data.md`. `seed-demo --minimal` loads only the staff and patron cards with an empty catalogue, which is
+where the guided tour and the import below start from.
+
+Demo staff card UIDs (synthetic), one of each role on the sign-in page: `STAFFADMIN01`, `STAFFLIB0001`, `STAFFCLERK01`,
+`STAFFAUDIT01`; the other staff (`STAFFLIB0002`, `STAFFCLERK02`, `STAFFCLERK03`) can be typed in the card box.
 Patron card `PATRON000001` is rejected at login by design. Demo admin password: see `src/aisys/cli.py`.
 `docs/demo-script.md` is a guided tour.
 

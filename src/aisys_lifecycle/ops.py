@@ -407,7 +407,8 @@ def install(
             if proc.returncode != 0:
                 raise LifecycleError("Preparing the database failed: " + _tail(proc))
             if seed_demo:
-                proc = run_release(root, b.version, ["seed-demo"])
+                log("loading the demo library (staff, patrons, books and months of activity; about a minute)")
+                proc = run_release(root, b.version, ["seed-demo", "--quiet"])
                 if proc.returncode != 0:
                     raise LifecycleError("Loading the demo data failed: " + _tail(proc))
             log("starting it once to prove it works")

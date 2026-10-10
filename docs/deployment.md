@@ -145,7 +145,7 @@ python D:\aisys\manage.py create-admin --username site.admin --name "Site Admin"
 ```
 
 It is refused for a short password, the demo password, a bad or taken username, and is audited (`admin.bootstrap`). Further
-staff are added on the **Administration** page. `--seed-demo` instead loads synthetic users and a published demo password: for
+staff are added on the **Administration** page. `--seed-demo` instead loads the synthetic demo library (`docs/demo-data.md`) and a published demo password: for
 trial and training copies only.
 
 The installation folder is plain and visible:

@@ -15,7 +15,7 @@ import hashlib
 import io
 from collections import Counter
 from collections.abc import Iterator
-from datetime import UTC, date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Any, cast
 
@@ -28,6 +28,7 @@ from aisys.config import Settings
 from aisys.migration import mapping as mapping_mod
 from aisys.migration import parsing, validation
 from aisys.models import BibRecord, Item, MigrationBatch, MigrationRow
+from aisys.timeutil import utcnow
 
 CHUNK = 1000
 
@@ -366,7 +367,7 @@ def commit_batch(db: Session, settings: Settings, batch: MigrationBatch, *, acto
             key_to_bib.update(
                 dict(db.execute(select(BibRecord.dedupe_key, BibRecord.id).where(BibRecord.dedupe_key.in_(part))).all())
             )
-        now = datetime.now(UTC)
+        now = utcnow()
         new_bibs, seen = [], set(key_to_bib)
         for r in rows:
             m = r.mapped
@@ -519,7 +520,7 @@ def rollback_batch(db: Session, batch: MigrationBatch, *, actor: str, ip: str = 
             "restored_to_pre_migration_counts": _count(db, Item) == rec["items_before"],
         }
         batch.summary = {**batch.summary, "rollback": result}
-        batch.status, batch.rolled_back_at = "rolled_back", datetime.now(UTC)
+        batch.status, batch.rolled_back_at = "rolled_back", utcnow()
         audit.record(
             db,
             actor=actor,

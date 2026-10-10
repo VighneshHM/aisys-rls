@@ -311,3 +311,23 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   log's name for the application), and must be free; control characters are removed from the shown name. The event `admin.bootstrap` is audited. Further staff are added on the Administration page.
 * **Alternatives:** a password option on the command line (leaks); generating a random password and printing it (easy to lose,
   ends up in logs); a first-visit set-up page (an unauthenticated route that creates an administrator is an attack surface).
+
+## DR-22 The demo library is replayed through the API on a moved clock
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner (asked for a demo with every menu filled).
+* **Context:** `seed-demo` loaded four staff and six patrons and nothing else, so most pages were empty until someone worked
+  through the tour. Testers need a library with history: patrons who borrowed and returned weeks ago, overdue loans, fines,
+  passages, sweeps, orders and serials in every state, an audit trail by several people.
+* **Decision:** `aisys.devtools.demo_seed` builds that library by calling the application's own HTTP API in-process, signed
+  in as the member of staff who would act, so every record, fine, message and audit line is what the screens produce, never
+  rows written by hand. To give history real dates, the application's single clock (`timeutil.utcnow`, used by
+  `models.utcnow`, the readers' events and `library_today`) can be moved by `timeutil.clock_at(moment)`; the seed replays
+  each step oldest first at its own moment. Only the seed command moves it, in its own process, before any server starts;
+  session expiry keeps reading the real time. The seeding run always uses the simulated ILMS, devices and message
+  providers. It only goes into an empty catalogue. `seed-demo --minimal` keeps the old small seed, which the automated tests
+  and the scripted tours (`demo-script.md`, `uat.md`) start from.
+* **Alternatives:** SQL inserts with chosen dates (they would bypass the rules and the audit trail and drift from the code);
+  updating timestamps afterwards (the audit log and circulation history are append-only by design); a clock argument on
+  every service function (a large change for one command).
+* **Consequence:** `docs/demo-data.md` lists what is in it; `tests/test_demo_seed.py` checks the numbers and that every menu
+  has data.

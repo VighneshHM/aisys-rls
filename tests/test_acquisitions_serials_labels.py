@@ -426,6 +426,21 @@ def test_a_print_job_is_queued_for_the_label_printer(client, lib):
         assert client.post("/api/labels/print", json=bad, headers=lib).status_code == 422, bad
 
 
+def test_the_labels_page_lists_recent_print_jobs_only(client, lib):
+    make_item(client, lib, "PJ2", "Print Two", call_number="QA 2", location="Print/2")
+    client.post(
+        "/api/labels/print", json={"kind": "barcode", "printer": "label-printer", "location": "Print/2"}, headers=lib
+    )
+    with client.app.state.session_factory() as db:  # another kind of printout (a gate alert slip) is not a label job
+        from aisys.notifications import queue
+
+        queue.enqueue(db, channel="print", recipient="front-desk", subject="Gate alarm", body="slip")
+        db.commit()
+    [job] = client.get("/api/labels/jobs", headers=lib).json()["jobs"]
+    assert job["what"] == "1 barcode label(s)" and job["printer"] == "label-printer" and job["status"] == "queued"
+    assert client.get("/api/labels/jobs", headers=login_card(client, "STAFFCLERK01")).status_code == 403
+
+
 def test_labels_need_catalogue_write(client):
     clerk = login_card(client, "STAFFCLERK01")
     assert client.get("/api/labels/items", params={"location": "x"}, headers=clerk).status_code == 403

@@ -47,6 +47,12 @@ class PrintIn(BaseModel):
     location: str = Field(default="", max_length=100)
 
 
+@router.get("/jobs")
+def jobs(_: Principal = CanLabel, db: Session = Depends(get_db)):
+    """The latest label print jobs and whether each reached its printer."""
+    return {"jobs": service.recent_jobs(db)}
+
+
 @router.post("/print")
 def print_job(body: PrintIn, request: Request, principal: Principal = CanLabel, db: Session = Depends(get_db)):
     """Queue the labels as a print job for a label printer (delivered like any queued message)."""
