@@ -111,6 +111,14 @@ def list_sessions(db: Session, limit: int = 20) -> list[dict]:
 
 
 # ------------------------------------------------------------------ sweeping
+# a copy staff had written off, found on the shelf, is still "found" but must never pass silently (D-076)
+FOUND_NOTES = {
+    "lost": "Recorded as lost but found on the shelf: set it back to available",
+    "withdrawn": "Withdrawn but still on the shelf: take it off",
+    "damaged": "Recorded as damaged: check whether it has been repaired",
+}
+
+
 def _classify(db: Session, session: InventorySession, uid: str) -> tuple[str, Item | None, str]:
     """(result, item, note) for one tag."""
     links = tag_links(db, uid)
@@ -128,7 +136,7 @@ def _classify(db: Session, session: InventorySession, uid: str) -> tuple[str, It
         return "misplaced", item, f"Belongs in {item.location or 'no recorded location'}"
     if item.status == "on_loan":
         return "shelved_on_loan", item, "Recorded as on loan but found on the shelf: check it in"
-    return "found", item, ""
+    return "found", item, FOUND_NOTES.get(item.status, "")
 
 
 def scan(db: Session, registry: DeviceRegistry, session_id: int, *, actor: str) -> dict:
@@ -151,13 +159,14 @@ def scan(db: Session, registry: DeviceRegistry, session_id: int, *, actor: str) 
     now, news = utcnow(), []
     for uid, n in reads.items():
         result, item, note = _classify(db, session, uid)
+        signal = "warning" if result == "found" and note else SIGNAL[result]  # a written-off copy needs a look
         row = existing.get(uid)
-        changed = row is None or row.result != result
+        changed = row is None or row.result != result or row.note != note
         if row is None:
             row = InventoryScan(session_id=session.id, tag_uid=uid, first_seen=now, reads=0)
             db.add(row)
         row.item_id = item.id if item else None
-        row.result, row.signal, row.note = result, SIGNAL[result], note
+        row.result, row.signal, row.note = result, signal, note
         row.home_location = item.location if item else ""
         row.reads += n
         row.last_seen = now
@@ -168,14 +177,14 @@ def scan(db: Session, registry: DeviceRegistry, session_id: int, *, actor: str) 
                     "accession_no": item.accession_no if item else None,
                     "title": item.bib.title if item else None,
                     "result": result,
-                    "signal": SIGNAL[result],
+                    "signal": signal,
                     "note": note,
                 }
             )
             try:  # the confirmation a person would hear and see; a dead buzzer must never lose the scan
-                handheld.indicate(SIGNAL[result])
+                handheld.indicate(signal)
             except DeviceError:
-                log.warning("could not signal '%s' on %s", SIGNAL[result], session.handheld_id)
+                log.warning("could not signal '%s' on %s", signal, session.handheld_id)
     session.sweeps += 1
     db.commit()
     total, distinct = sum(reads.values()), len(reads)

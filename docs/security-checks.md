@@ -59,6 +59,11 @@ What was checked, how, and what is left. Each row can be re-run.
   the health checks exist, sign-in is impossible, and any cookie or token sent is removed before the request is handled.
 * The public catalogue shows no accession number, barcode, tag, member, loan or due date (`test_search_shelves`).
 * The staff list shows staff card numbers masked.
+* Nobody can grant beyond their own rights: `admin.users` alone cannot create an administrator, widen a role or touch
+  the account or cards of someone who holds more (D-071, `test_managing_staff_never_hands_out_more_than_you_hold`).
+* A NUL character in any JSON body is refused, and money and quantity fields take only real whole numbers (D-079,
+  D-080). On 2026-10-10 an automated probe sent about 3,770 hostile requests to 50 changing endpoints and every
+  route was tried with no session, each built-in role and 20 single-permission roles; the findings are D-071 to D-080.
 
 ## Integrity and supply chain
 
@@ -82,7 +87,7 @@ twice; two scanners never queue a reminder twice; a restore under four clients' 
 
 * **No content-security-policy header**, because the pages use inline scripts; the other headers and the "everything is text"
   rule are the protection today.
-* **No penetration test** and no fuzzing beyond the cases above.
+* **No penetration test** by an outside party, and no fuzzing beyond the cases above.
 * **The credential provider is a mock**; real smart-card challenge-response is a future driver (the interface already carries the
   `proof` field). Assumption A-09.
 * **TLS in front of the application is documented, not tested here** (the built-in TLS is tested).

@@ -15,7 +15,7 @@ from aisys.circulation.service import CircError, resolve_item
 from aisys.config import Settings
 from aisys.deps import Principal, client_ip, get_db, get_settings, require
 from aisys.gate import service
-from aisys.models import RfidTag
+from aisys.models import Notification, RfidTag
 from aisys.notifications import prefs, queue, reminders
 from aisys.notifications.providers import CHANNELS, MockProvider, NotificationProvider, address_hint
 from aisys.rfid.mock import MockCamera, MockGate
@@ -223,6 +223,8 @@ def run_reminders(
 
 @notify_router.post("/{notification_id}/retry")
 def retry(notification_id: int, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)):
+    if db.get(Notification, notification_id) is None:  # D-078: was "only a failed notification can be retried"
+        raise HTTPException(404, detail={"message": "No such notification", "problems": []})
     row = queue.retry(db, notification_id)
     if row is None:
         raise HTTPException(409, detail={"message": "Only a failed notification can be retried", "problems": []})

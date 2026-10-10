@@ -240,6 +240,8 @@ def test_rejects_bad_files(client, lib):
     assert upload(client, lib, b"not a zip", "broken.xlsx").status_code == 422
     assert client.post("/api/migrations", headers=lib, files={"file": ("a.csv", b"a,b\n1,2", "text/csv")},
                        data={"mapping": "[1,2]"}).status_code == 422  # fmt: skip
+    huge = upload(client, lib, b"title,accession_no\n" + b"x" * 200_000 + b",A\n")  # one cell past csv's limit (D-072)
+    assert huge.status_code == 422 and "cannot be read" in huge.text
 
 
 @pytest.mark.req("FR10")

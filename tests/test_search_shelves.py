@@ -366,6 +366,25 @@ def test_the_opac_wants_a_real_search(client, q):
     assert public(client).get("/api/opac/search", params={"q": q}).status_code == 422
 
 
+def test_the_opac_count_and_paging_cover_every_match(client, lib, monkeypatch):
+    """D-074: the search read only the first 200 copies, so total stopped at 200 and later pages were empty."""
+    from aisys import opac_routes
+
+    opac_routes._hits.clear()
+    for i in range(230):
+        add(client, lib, f"CW{i:03d}", f"Common Word {i:03d}")
+    for i in range(30):  # hidden copies must not use up the room the visible ones need
+        add(client, lib, f"CH{i:03d}", f"Common Word hidden {i:03d}", status="withdrawn")
+    body = public(client).get("/api/opac/search", params={"q": "common word", "limit": 50, "offset": 200}).json()
+    assert body["total"] == 230 and body["complete"] is True and len(body["results"]) == 30
+    monkeypatch.setattr(opac_routes, "MAX_COPIES", 100)
+    capped = public(client).get("/api/opac/search", params={"q": "common word"}).json()
+    assert capped["complete"] is False and capped["total"] == 100  # says it is not the whole answer
+    long_q = public(client).get("/api/opac/search", params={"q": "x" * 101})
+    assert long_q.status_code == 422 and "at most 100" in long_q.text  # D-075, not "at least 2"
+    opac_routes._hits.clear()
+
+
 def test_the_opac_limits_how_fast_one_visitor_can_search(client, lib, monkeypatch):
     from aisys import opac_routes
 

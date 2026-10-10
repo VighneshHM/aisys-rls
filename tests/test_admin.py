@@ -329,6 +329,47 @@ def test_an_administrator_cannot_take_admin_users_from_their_own_role(client, ad
     )
 
 
+@pytest.mark.req("NFR02")
+def test_managing_staff_never_hands_out_more_than_you_hold(client, admin):
+    """D-071: a role with only admin.users could make a full administrator and sign in as them."""
+    client.post("/api/admin/roles", json={"name": "user_manager", "permissions": ["admin.users"]}, headers=admin)
+    client.post(
+        "/api/admin/users", json={"username": "um1", "display_name": "UM", "role": "user_manager"}, headers=admin
+    )
+    client.post("/api/admin/cards", json={"uid": "USERMGR001", "kind": "staff", "username": "um1"}, headers=admin)
+    um = login_card(client, "USERMGR001")
+    ids = {u: p["id"] for u, p in people(client, admin).items()}
+
+    def refused(r):
+        return r.status_code == 403 and "rights you do not hold" in r.text
+
+    shadow = {"username": "shadow", "display_name": "S", "role": "admin"}
+    assert refused(client.post("/api/admin/users", json=shadow, headers=um))
+    assert refused(
+        client.post("/api/admin/roles", json={"name": "superish", "permissions": ["admin.config"]}, headers=um)
+    )
+    grow = {"permissions": ["admin.users", "admin.config"]}
+    assert refused(client.patch("/api/admin/roles/user_manager", json=grow, headers=um))
+    assert refused(client.patch(f"/api/admin/users/{ids['clerk']}", json={"role": "admin"}, headers=um))
+    assert refused(client.patch(f"/api/admin/users/{ids['admin']}", json={"active": False}, headers=um))
+    assert refused(
+        client.post("/api/admin/cards", json={"uid": "SHADOW0001", "kind": "staff", "username": "admin"}, headers=um)
+    )
+    admin_card = next(c for c in people(client, admin)["admin"]["cards"])
+    assert refused(client.patch(f"/api/admin/cards/{admin_card['id']}", json={"active": False}, headers=um))
+    # within its own rights it still works: a peer with the same role, and its own card
+    peer = {"username": "um2", "display_name": "UM2", "role": "user_manager"}
+    assert client.post("/api/admin/users", json=peer, headers=um).status_code == 201
+    assert (
+        client.post(
+            "/api/admin/cards", json={"uid": "USERMGR002", "kind": "staff", "username": "um2"}, headers=um
+        ).status_code
+        == 201
+    )
+    denied = client.get("/api/audit/events?action=authz.denied", headers=admin).json()["events"]
+    assert any(e["detail"].get("beyond_own_rights") for e in denied)
+
+
 def test_role_changes_are_audited_and_only_for_administrators(client, admin, aud, clerk):
     for h in (aud, clerk):
         assert client.get("/api/admin/roles", headers=h).status_code == 403

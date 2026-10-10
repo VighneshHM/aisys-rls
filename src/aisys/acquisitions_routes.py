@@ -35,8 +35,8 @@ class LineIn(BaseModel):
     isbn: str | None = Field(default=None, max_length=30)
     publisher: str = Field(default="", max_length=300)
     pub_year: int | None = None
-    quantity: int = 1
-    unit_price_cents: int = 0
+    quantity: int = Field(default=1, strict=True)  # true or "2" is not a quantity (D-080)
+    unit_price_cents: int = Field(default=0, strict=True)
     location: str = Field(default="", max_length=100)
 
 
@@ -47,8 +47,8 @@ class OrderIn(BaseModel):
 
 
 class ReceiptIn(BaseModel):
-    line_id: int
-    quantity: int
+    line_id: int = Field(strict=True)
+    quantity: int = Field(strict=True)
 
 
 class ReceiveIn(BaseModel):
@@ -147,11 +147,11 @@ class SerialIn(BaseModel):
     supplier: str = Field(default="", max_length=200)
     location: str = Field(default="", max_length=100)
     first_expected_on: date
-    issues_ahead: int = 6
+    issues_ahead: int = Field(default=6, strict=True)
 
 
 class ExtendIn(BaseModel):
-    count: int = 6
+    count: int = Field(default=6, strict=True)
 
 
 class ActiveIn(BaseModel):

@@ -83,6 +83,10 @@ def test_receiving_is_all_or_nothing(client, lib):
         headers=lib,
     )
     assert over.status_code == 422 and "still to come" in over.json()["detail"]["message"]
+    negative = client.post(
+        f"/api/acquisitions/{o['id']}/receive", json={"receipts": [{"line_id": ids[0], "quantity": -1}]}, headers=lib
+    )
+    assert negative.status_code == 422 and "whole number from 1" in negative.text  # D-078
     assert client.get("/api/catalogue/items", params={"q": "good book"}, headers=lib).json()["total"] == 0, (
         "nothing was booked in"
     )
@@ -236,15 +240,19 @@ def test_schedules_follow_the_frequency(freq, first, expected):
     assert labels_ == expected
 
 
-def test_month_end_dates_do_not_drift():
-    d = date(2026, 1, 31)
-    seen = []
-    for _ in range(4):
-        seen.append(d)
-        d = ser.next_date(d, "monthly")
-    assert seen[1] == date(2026, 2, 28) and seen[2] == date(2026, 3, 28), (
-        "clamped, as the schedule steps month by month"
+def test_month_end_dates_do_not_drift(client, lib):
+    """UC-14 (D-073): a schedule anchored on the 31st keeps to each month's last day, also when it is extended."""
+    want = ["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"]
+    assert [ser.nth_date(date(2026, 1, 31), "monthly", n).isoformat() for n in range(4)] == want
+    s = new_serial(client, lib, first_expected_on="2026-01-31", issues_ahead=2)
+    assert [i["expected_on"] for i in s["issues"]] == want[:2]
+    more = client.post(f"/api/serials/{s['id']}/extend", json={"count": 2}, headers=lib)
+    assert more.status_code == 200, more.text
+    assert [i["expected_on"] for i in more.json()["issues"]] == want
+    q = new_serial(
+        client, lib, title="Quarterly", frequency="quarterly", first_expected_on="2026-01-31", issues_ahead=3
     )
+    assert [i["expected_on"] for i in q["issues"]] == ["2026-01-31", "2026-04-30", "2026-07-31"]
 
 
 def test_a_subscription_is_scheduled_and_issues_are_received(client, lib):
@@ -388,6 +396,8 @@ def test_labels_by_item_number_and_limits(client, lib):
         == 422
     )
     assert client.get("/api/labels/items", params={"location": "Nowhere"}, headers=lib).json()["labels"] == []
+    unknown = client.get("/api/labels/items", params={"ids": f"{a['id']},99999"}, headers=lib)
+    assert unknown.status_code == 404 and "99999" in unknown.text  # D-078: not a quietly shorter job
 
 
 def test_an_unprintable_barcode_falls_back_to_the_accession_number():

@@ -63,6 +63,9 @@ Page `/admin`, permission `admin.users` (administrator only).
 Safety rules the page enforces (and the audit log records):
 
 - You cannot deactivate your own account or change your own role, and you cannot take `admin.users` away from your own role.
+- You cannot hand out more than you hold: a person with `admin.users` but not, say, `admin.config` cannot give anyone a
+  role that has it, create or widen a custom role with it, or change the account, role or cards of someone who holds
+  it. The refusal is audited as `authz.denied` with the permissions concerned (D-071).
 - The last active administrator cannot be deactivated or demoted, so the library cannot lock itself out.
 - A role that someone holds cannot be removed; built-in roles cannot be changed or removed.
 - Every change is audited with who, what, and the old and new role; role changes as `admin.role.create`, `admin.role.update`

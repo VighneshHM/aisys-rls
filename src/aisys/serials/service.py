@@ -47,10 +47,27 @@ def add_months(day: date, months: int) -> date:
     return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
 
 
+MONTHS = {"monthly": 1, "quarterly": 3, "yearly": 12}
+
+
 def next_date(day: date, frequency: str) -> date:
     if frequency == "weekly":
         return day + timedelta(days=7)
-    return add_months(day, {"monthly": 1, "quarterly": 3, "yearly": 12}[frequency])
+    return add_months(day, MONTHS[frequency])
+
+
+def nth_date(anchor: date, frequency: str, n: int) -> date:
+    """The n-th issue date counted from the first one, never from the previous (already shortened) date, so a
+    schedule anchored on the 31st stays on the last day of each month instead of drifting to the 28th (D-073)."""
+    if frequency == "weekly":
+        return anchor + timedelta(days=7 * n)
+    return add_months(anchor, MONTHS[frequency] * n)
+
+
+def steps_between(anchor: date, day: date, frequency: str) -> int:
+    if frequency == "weekly":
+        return (day - anchor).days // 7
+    return ((day.year - anchor.year) * 12 + day.month - anchor.month) // MONTHS[frequency]
 
 
 def label_for(day: date, frequency: str) -> str:
@@ -114,15 +131,14 @@ def list_titles(db: Session) -> list[dict]:
     return [title_out(s) for s in db.scalars(select(SerialTitle).order_by(SerialTitle.title))]
 
 
-def _schedule(s: SerialTitle, start: date, count: int) -> None:
-    day = start
+def _schedule(s: SerialTitle, anchor: date, first: int, count: int) -> None:
     have = {i.label for i in s.issues}
-    for _ in range(count):
+    for n in range(first, first + count):
+        day = nth_date(anchor, s.frequency, n)
         label = label_for(day, s.frequency)
         if label not in have:
             s.issues.append(SerialIssue(label=label, expected_on=day))
             have.add(label)
-        day = next_date(day, s.frequency)
 
 
 def create_title(
@@ -156,7 +172,7 @@ def create_title(
         title=title, issn=issn, frequency=frequency, supplier=" ".join((supplier or "").split())[:200],
         location=" ".join((location or "").split())[:100],
     )  # fmt: skip
-    _schedule(s, first_expected_on, issues_ahead)
+    _schedule(s, first_expected_on, 0, issues_ahead)
     db.add(s)
     db.flush()
     audit.record(
@@ -179,7 +195,8 @@ def extend(db: Session, serial_id: int, count: int, *, actor: str, ip: str = "")
     last = max((i.expected_on for i in s.issues), default=None)
     if last is None:
         raise SerialError(409, "This subscription has no issues to continue from")
-    _schedule(s, next_date(last, s.frequency), count)
+    anchor = min(i.expected_on for i in s.issues)
+    _schedule(s, anchor, steps_between(anchor, last, s.frequency) + 1, count)
     audit.record(
         db, actor=actor, action="serial.extend", entity="serial", entity_id=s.id, detail={"count": count}, ip=ip
     )

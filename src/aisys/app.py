@@ -153,6 +153,44 @@ def create_app(
         raise exc
 
     @app.middleware("http")
+    async def no_nul_in_json(request: Request, call_next):
+        """A NUL character is never meaningful text: stored, it breaks CSV exports and the tools that read them (D-079).
+        Refused once, here, for every JSON body, rather than in each of the many text fields."""
+        if request.method in ("POST", "PUT", "PATCH") and "json" in request.headers.get("content-type", ""):
+            body = await request.body()
+            if b"\x00" in body or b"\\u0000" in body.lower():
+                return JSONResponse(
+                    {"detail": {"message": "Text may not contain a NUL character (\\u0000)", "problems": []}},
+                    status_code=422,
+                )
+        return await call_next(request)
+
+    kiosk_hosts = frozenset(settings.opac_kiosk_hosts)
+
+    @app.middleware("http")
+    async def kiosk_host(request: Request, call_next):
+        """A public terminal reaches the system by a kiosk host name ([opac] kiosk_hosts). There, only the public
+        catalogue exists: every staff page and API answers "not found", no sign-in is possible, and any session cookie
+        or token the browser sends is dropped before the request is handled, so a staff session can never be used
+        or shown there. Staff use the normal host name, so their sessions are never touched by a visitor's page."""
+        # registered first, so the security-header and maintenance middlewares wrap its own answers too (D-064);
+        # a trailing dot ("opac.library.local.") names the same host and must not slip past the check
+        if not kiosk_hosts or (request.url.hostname or "").lower().rstrip(".") not in kiosk_hosts:
+            return await call_next(request)
+        path = request.url.path
+        if path == "/":
+            return RedirectResponse("/opac", status_code=303)
+        if not (path == "/opac" or path.startswith(("/api/opac/", "/static/")) or path in ("/health", "/health/ready")):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        request.scope["headers"] = [
+            (k, v) for k, v in request.scope["headers"] if k not in (b"cookie", b"authorization")
+        ]
+        response = await call_next(request)
+        if "set-cookie" in response.headers:
+            del response.headers["set-cookie"]
+        return response
+
+    @app.middleware("http")
     async def safe_headers(request: Request, call_next):
         """Headers every response carries: no content sniffing, no framing, no referrer leaks; HSTS once on HTTPS."""
         response = await call_next(request)
@@ -183,29 +221,6 @@ def create_app(
                 headers={"Retry-After": "5"},
             )
         return await call_next(request)
-
-    kiosk_hosts = frozenset(settings.opac_kiosk_hosts)
-
-    @app.middleware("http")
-    async def kiosk_host(request: Request, call_next):
-        """A public terminal reaches the system by a kiosk host name ([opac] kiosk_hosts). There, only the public
-        catalogue exists: every staff page and API answers "not found", no sign-in is possible, and any session cookie
-        or token the browser sends is dropped before the request is handled, so a staff session can never be used
-        or shown there. Staff use the normal host name, so their sessions are never touched by a visitor's page."""
-        if not kiosk_hosts or (request.url.hostname or "").lower() not in kiosk_hosts:
-            return await call_next(request)
-        path = request.url.path
-        if path == "/":
-            return RedirectResponse("/opac", status_code=303)
-        if not (path == "/opac" or path.startswith(("/api/opac/", "/static/")) or path in ("/health", "/health/ready")):
-            return JSONResponse({"detail": "Not found"}, status_code=404)
-        request.scope["headers"] = [
-            (k, v) for k, v in request.scope["headers"] if k not in (b"cookie", b"authorization")
-        ]
-        response = await call_next(request)
-        if "set-cookie" in response.headers:
-            del response.headers["set-cookie"]
-        return response
 
     app.mount(
         "/static", RevalidatingStaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static"

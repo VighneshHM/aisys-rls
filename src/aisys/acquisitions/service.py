@@ -238,7 +238,9 @@ def receive(db: Session, order_id: int, receipts: list[dict], *, actor: str, ip:
         if line is None or r.get("line_id") in seen:
             raise AcquisitionError(422, "A line is unknown or listed twice")
         seen.add(line.id)
-        if not isinstance(qty, int) or isinstance(qty, bool) or not 1 <= qty <= line.quantity - line.received:
+        if not isinstance(qty, int) or isinstance(qty, bool) or qty < 1:  # D-078: was "only N still to come"
+            raise AcquisitionError(422, f"'{line.title}': the quantity received must be a whole number from 1")
+        if qty > line.quantity - line.received:
             raise AcquisitionError(422, f"'{line.title}': only {line.quantity - line.received} still to come")
         plan.append((line, qty))
     created: list[dict] = []

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import threading
 
@@ -209,8 +210,8 @@ def _gate_command(args, settings: Settings) -> int:
         result = one_pass()
         print("gates:", result)
         return 1 if any(not g["ok"] for g in result["gates"].values()) else 0
-    if args.every < 0.5:
-        print("error: --every must be at least 0.5 seconds")
+    if not math.isfinite(args.every) or not 0.5 <= args.every <= 3600:
+        print("error: --every must be a number of seconds from 0.5 to 3600")
         return 2
     print(f"reading the gates every {args.every:g} s (Ctrl+C to stop)")
     loop = runner.Loop(one_pass, args.every, name="aisys-gate").start()

@@ -263,6 +263,13 @@ sign-in is impossible, and any cookie or token the browser sends is ignored. Sta
 visitor's page can never sign them out. On a shared staff screen, sign out and choose the public catalogue on the
 sign-in page (DR-17).
 
+The kiosk is chosen by the host name the browser asks for, matched exactly (letters in any case, a trailing dot
+allowed). Any other name or address for the same server, such as the server's IP address or its staff name, gets
+the staff site. So lock the terminal itself to the kiosk name: run the browser in its kiosk mode (for example
+`msedge --kiosk https://opac.library.local/ --edge-kiosk-type=public-browsing`) with the address bar hidden, and, where
+the network allows it, let the terminal's network segment reach the server only through the proxy that serves the
+kiosk name.
+
 ## Running in production: service, scheduled jobs, TLS
 
 Background work inside the application: the message loop (`[notifications] auto_dispatch_seconds`) and the gate loop
@@ -295,7 +302,11 @@ library.example.org {
 }
 ```
 
-For nginx use `proxy_pass http://127.0.0.1:8000;` and pass `X-Forwarded-For` and `X-Forwarded-Proto`. In production
+For nginx use `proxy_pass http://127.0.0.1:8000;`, `proxy_set_header Host $host;` and pass `X-Forwarded-For` and
+`X-Forwarded-Proto`. The original `Host` header must reach the application (Caddy passes it by default): the kiosk host
+names in `[opac] kiosk_hosts` and the hand-over's Origin check both compare against it, so a proxy that rewrites it to
+`127.0.0.1:8000` turns every request into a kiosk request (when `127.0.0.1` is listed) or lets a kiosk name reach staff
+pages (D-070). In production
 (`AISYS_ENV=production`) session cookies are `Secure`, `HttpOnly` and `SameSite=Lax`, and the application refuses to start
 without a 32-character `AISYS_SECRET_KEY` (the installer generates one into `config/secret.key`). Uvicorn trusts forwarded
 headers only from `127.0.0.1`, so with a proxy on the same machine the audit log shows the real client address. Keep the

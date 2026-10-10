@@ -17,8 +17,8 @@
   {% endif %}
   <form id="form" role="search" class="panel" style="padding:16px">
     <label for="q" style="font-weight:600">Search by title, author, subject word, publisher or ISBN</label>
-    <div style="display:flex;gap:8px;margin-top:8px">
-      <input id="q" type="search" autocomplete="off" spellcheck="false" maxlength="100" placeholder="e.g. lighthouse, Solheim, 9780001000014" style="flex:1" autofocus>
+    <div class="toolbar" style="margin:8px 0 0;flex-wrap:nowrap">
+      <input id="q" type="search" autocomplete="off" spellcheck="false" maxlength="100" placeholder="e.g. lighthouse, Solheim, 9780001000014" style="flex:1;min-width:0" autofocus>
       <button class="btn" type="submit">Search</button>
     </div>
     <div id="notice" class="notice" role="alert" style="margin-top:10px"></div>
@@ -43,7 +43,7 @@
       const d = await api("/api/opac/search?q=" + encodeURIComponent(q));
       if (mine !== seq) return;  // a newer search is already on its way
       history.replaceState(null, "", "?q=" + encodeURIComponent(q));
-      fill($("results"), h("p", {class: "sub", style: "margin:0 0 10px"}, d.total + (d.total === 1 ? " book" : " books") + " found"),
+      fill($("results"), h("p", {class: "sub", style: "margin:0 0 10px"}, (d.complete === false ? "More than " : "") + d.total + (d.total === 1 ? " book" : " books") + " found"),
         d.results.length ? d.results.map(card) : h("div", {class: "empty"}, "Nothing matches “" + q + "”. Try fewer or shorter words."));
     } catch (e) { say("notice", e.status === 429 ? "warn" : "bad", e.message); }
   }
@@ -53,7 +53,7 @@
       h("div", {style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"}, h("b", {style: "font-size:17px"}, b.title),
         b.available ? h("span", {class: "badge good"}, b.available + " available") : h("span", {class: "badge warn"}, "None available now")),
       h("div", {class: "sub"}, [b.author, b.publisher, b.year, b.isbn ? "ISBN " + b.isbn : ""].filter(Boolean).join(" · ")),
-      h("table", {style: "margin-top:8px"}, h("tbody", {}, b.copies.map(c => h("tr", {},
+      h("table", {class: "copies", style: "margin-top:8px"}, h("tbody", {}, b.copies.map(c => h("tr", {},
         h("td", {}, c.availability), h("td", {}, c.shelf ? "Shelf " + c.shelf : "—"), h("td", {class: "mono"}, c.call_number || ""),
         h("td", {}, c.shelf ? h("button", {class: "btn ghost small", type: "button", onclick: () => showShelf(c.shelf, b.title)}, "Show the shelf") : null)))))));
 

@@ -212,10 +212,13 @@ def update_item(
     if merged["status"] == "on_loan":  # loans are circulation's business; validate the rest of the record as usual
         merged["status"] = "available"
     res = validation.validate_row(merged)
-    if not res.ok:
-        raise CatalogueError(
-            422, "The item has problems; nothing was saved", [i.as_dict() for i in res.issues if i.severity == "error"]
-        )
+    # The importer only warns about a bad year or an unknown item type and stores a fallback; a person correcting a
+    # record must not lose a value silently, so a warning on a field they changed is refused here (D-063).
+    problems = [i.as_dict() for i in res.issues if i.severity == "error" or (i.field in wanted and i.field != "status")]
+    if problems:
+        for p in problems:
+            p["severity"] = "error"
+        raise CatalogueError(422, "The item has problems; nothing was saved", problems)
     c = res.clean
     if c["barcode"] and (c["barcode"] or "").lower() != (item.barcode or "").lower():
         clash = db.scalar(select(Item).where(func.lower(Item.barcode) == c["barcode"].lower(), Item.id != item.id))
@@ -286,7 +289,14 @@ def _like(q: str) -> str:
 
 
 def search(
-    db: Session, q: str = "", *, tagged: bool | None = None, status: str | None = None, limit: int = 25, offset: int = 0
+    db: Session,
+    q: str = "",
+    *,
+    tagged: bool | None = None,
+    status: str | None = None,
+    hide_statuses: tuple[str, ...] = (),
+    limit: int = 25,
+    offset: int = 0,
 ) -> tuple[int, list[tuple[Item, RfidTag | None]], dict[int, str]]:
     """Locate items by title, author, ISBN, publisher, accession no., barcode, call number or tag UID.
 
@@ -336,6 +346,8 @@ def search(
         stmt = stmt.where(RfidTag.id.is_(None))
     if status:
         stmt = stmt.where(Item.status == status)
+    if hide_statuses:
+        stmt = stmt.where(Item.status.not_in(hide_statuses))
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
     order = (
         [func.coalesce(ranked.c.rank, 0.0), BibRecord.title, Item.accession_no]

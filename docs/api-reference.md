@@ -85,10 +85,10 @@ The interactive version (with request and response shapes) is served by the appl
 |---|---|---|---|
 | POST | `/api/circulation/checkin` | `circulation.checkin` |  |
 | POST | `/api/circulation/checkout` | `circulation.checkout` |  |
-| GET | `/api/circulation/due` | any signed-in user |  |
-| GET | `/api/circulation/events` | any signed-in user |  |
-| GET | `/api/circulation/items/resolve` | any signed-in user | Name an item by accession no., barcode or tag UID and see whether it is on loan. |
-| GET | `/api/circulation/loans` | any signed-in user |  |
+| GET | `/api/circulation/due` | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` |  |
+| GET | `/api/circulation/events` | any of `member.read` / `audit.read` / `circulation.checkout` / `circulation.checkin` / `circulation.renew` |  |
+| GET | `/api/circulation/items/resolve` | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` | Name an item by accession no., barcode or tag UID and see whether it is on loan. |
+| GET | `/api/circulation/loans` | any of `member.read` / `audit.read` / `circulation.checkout` / `circulation.checkin` / `circulation.renew` |  |
 | GET | `/api/circulation/members` | `member.read` | Find a member by name or number (for a patron who has no card with them). |
 | POST | `/api/circulation/members` | `member.write` |  |
 | POST | `/api/circulation/members/identify` | `member.read` | A patron card scan: shows the member. It does not log anyone in and changes no session. |
@@ -102,12 +102,12 @@ The interactive version (with request and response shapes) is served by the appl
 | GET | `/api/circulation/members/{member_no}/fines` | `member.read` | The fine ledger of one member, newest first, and the balance it adds up to. |
 | POST | `/api/circulation/members/{member_no}/fines/payment` | `member.write` |  |
 | POST | `/api/circulation/members/{member_no}/fines/waiver` | `member.write` |  |
-| DELETE | `/api/circulation/mock/ilms/fail` (dev only) | any signed-in user | Forget any simulated failures still waiting. |
-| GET | `/api/circulation/mock/ilms/fail` (dev only) | any signed-in user |  |
-| POST | `/api/circulation/mock/ilms/fail` (dev only) | any signed-in user | Make the mock library system fail its next requests (timeout, error or lost_reply) to see the retry logic. |
-| POST | `/api/circulation/mock/loans/{loan_id}/due` (dev only) | any signed-in user | Demo only: make an open loan fall due N days from today (0 = today, 1 = tomorrow), to try the reminders. |
-| GET | `/api/circulation/mock/patron-cards` (dev only) | any signed-in user |  |
-| POST | `/api/circulation/mock/present` (dev only) | any signed-in user | Hold the item's tag up to the simulated reader, as staff would with the book in hand. |
+| DELETE | `/api/circulation/mock/ilms/fail` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` | Forget any simulated failures still waiting. |
+| GET | `/api/circulation/mock/ilms/fail` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` |  |
+| POST | `/api/circulation/mock/ilms/fail` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` | Make the mock library system fail its next requests (timeout, error or lost_reply) to see the retry logic. |
+| POST | `/api/circulation/mock/loans/{loan_id}/due` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` | Demo only: make an open loan fall due N days from today (0 = today, 1 = tomorrow), to try the reminders. |
+| GET | `/api/circulation/mock/patron-cards` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` |  |
+| POST | `/api/circulation/mock/present` (dev only) | any of `circulation.checkout` / `circulation.checkin` / `circulation.renew` | Hold the item's tag up to the simulated reader, as staff would with the book in hand. |
 | POST | `/api/circulation/renew` | `circulation.renew` |  |
 
 ## gate

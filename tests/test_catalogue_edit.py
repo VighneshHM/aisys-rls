@@ -55,6 +55,16 @@ def test_the_same_rules_as_a_new_item_apply(client, lib):
     assert patch(client, lib, 999999, title="x").status_code == 404
 
 
+def test_an_edit_that_would_be_quietly_dropped_is_refused(client, lib):
+    it = make(client, lib, "ED-14", pub_year="1999")
+    for body in ({"pub_year": "19x9"}, {"pub_year": "2999"}, {"item_type": "spaceship"}):
+        r = patch(client, lib, it["id"], **body)
+        assert r.status_code == 422, body  # D-063: on import a warning, on an edit the typed value would be lost
+        assert next(iter(body)) in r.text
+    after = client.get(f"/api/catalogue/items/{it['id']}", headers=lib).json()
+    assert after["pub_year"] == 1999 and after["item_type"] == "book", "nothing was saved"
+
+
 def test_status_changes_and_their_reason_are_recorded(client, lib, admin):
     it = make(client, lib, "ED-5")
     for status in ("damaged", "lost", "withdrawn", "available"):

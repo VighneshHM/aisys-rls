@@ -195,6 +195,19 @@ def test_the_staff_host_is_unchanged_when_kiosk_hosts_are_set(kiosk):
     assert kiosk.post("/api/auth/card-login", json={"uid": "STAFFLIB0001"}).status_code == 200
 
 
+def test_a_kiosk_host_with_a_trailing_dot_or_capitals_is_still_the_kiosk(kiosk):
+    for host in (KIOSK + ".", KIOSK.upper()):
+        r = kiosk.get("/dashboard", headers={"host": host}, follow_redirects=False)
+        assert r.status_code == 404, host  # D-064: "opac.library.local." must not reach staff pages
+
+
+def test_kiosk_answers_carry_the_safe_headers(kiosk):
+    for path in ("/opac", "/dashboard", "/"):
+        r = on_kiosk(kiosk, "GET", path)
+        assert r.headers.get("x-content-type-options") == "nosniff", path
+        assert r.headers.get("x-frame-options") == "DENY" and r.headers.get("referrer-policy"), path
+
+
 def test_kiosk_host_names_are_checked(tmp_path):
     cfg = tmp_path / "k.toml"
     for bad in ('"http://opac.local"', '"opac.local:8000"', '["bad host"]', "42"):

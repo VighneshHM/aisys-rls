@@ -65,6 +65,30 @@ def get_principal(principal: Principal | None = Depends(get_principal_optional))
     return principal
 
 
+def within_own_rights(db: Session, request: Request, principal: Principal, codes, what: str) -> None:
+    """403 (audited) when an action would hand out, or reach, rights the acting person does not hold themselves.
+
+    Holding ``admin.users`` lets someone manage staff, but never give anyone (themselves included, through a second
+    account or a custom role) more than they have, nor change the account, cards or role of someone who has more
+    (D-071).
+    """
+    beyond = sorted(set(codes) - principal.permissions)
+    if not beyond:
+        return
+    audit.record(
+        db,
+        actor=principal.user.username,
+        action="authz.denied",
+        outcome="denied",
+        detail={"beyond_own_rights": beyond, "what": what, "path": request.url.path},
+        ip=client_ip(request),
+    )
+    db.commit()
+    raise HTTPException(
+        status_code=403, detail=f"You cannot {what}: it needs rights you do not hold ({', '.join(beyond)})"
+    )
+
+
 def require(permission: str) -> Callable[..., Principal]:
     """Dependency factory: 401 if not logged in, 403 (and an audit record) if the role lacks the permission."""
 

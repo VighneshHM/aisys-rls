@@ -166,7 +166,9 @@ def main() -> None:
     ap.add_argument("--wheels-from", type=Path)
     ap.add_argument("--work", type=Path)
     a = ap.parse_args()
-    work = a.work or Path(tempfile.mkdtemp(prefix="aisys-demo-"))
+    work = (a.work or Path(tempfile.mkdtemp(prefix="aisys-demo-"))).resolve()  # steps run in it, so no relative paths
+    if a.wheels_from:
+        a.wheels_from = a.wheels_from.resolve()
     work.mkdir(parents=True, exist_ok=True)
     WORK[0] = work
     wf = ["--wheels-from", str(a.wheels_from)] if a.wheels_from else []

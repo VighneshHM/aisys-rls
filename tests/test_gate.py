@@ -265,6 +265,7 @@ def test_a_message_is_marked_failed_after_the_attempt_limit_and_can_be_retried(c
     assert row["attempts"] == 3 and "timed out" in row["last_error"]
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 200
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 409  # no longer failed
+    assert client.post("/api/notifications/99999/retry", headers=admin_h).status_code == 404  # D-078
     assert client.post("/api/notifications/dispatch", headers=admin_h).json()["sent"] == 1
     # every one of these hand-run administrative actions is in the audit log (SOP section 10)
     log = client.get("/api/audit/events?action=notification.&limit=50", headers=admin_h).json()["events"]
@@ -536,3 +537,45 @@ def test_the_command_line_reads_the_gates(tmp_path, capsys):
     assert cli_main(["--config", str(cfg), "gate-poll"]) == 0  # only the simulator gate is configured: nothing to read
     assert "'events': 0" in capsys.readouterr().out
     assert cli_main(["--config", str(cfg), "gate-poll", "--every", "0.1"]) == 2
+
+
+@pytest.mark.req("FR07")
+def test_a_driver_that_raises_anything_is_reported_and_the_other_gates_are_still_read(vendor_gate, settings):
+    two = replace(
+        vendor_settings(settings),
+        devices=(*vendor_settings(settings).devices, DeviceConfig("gate-10", kind="gate", driver="vendorgate")),
+    )
+    with _client(two) as c:
+        lib_h = login_card(c, "STAFFLIB0001")
+
+        def broken():
+            raise RuntimeError("vendor SDK crashed")
+
+        c.app.state.devices.get("gate-9", "gate").poll = broken  # not a DeviceError: a vendor bug (D-062)
+        c.app.state.devices.get("gate-10", "gate").walk_through([("E2801160600002AB12CD3401", True)])
+        result = c.post("/api/gate/poll", headers=lib_h).json()
+        assert result["gates"]["gate-9"] == {"ok": False, "error": "Gate error: vendor SDK crashed"}
+        assert result["gates"]["gate-10"] == {"ok": True, "events": 1, "alarms": 1}
+
+
+@pytest.mark.req("AC06", "NFR06")
+def test_a_camera_that_raises_anything_still_records_the_alarm(client, lib):
+    from aisys.gate.service import pick_camera
+
+    tagged(client, lib, "C2")
+    camera = pick_camera(client.app.state.devices)
+
+    def broken(caption):
+        raise OSError("lens unplugged")
+
+    camera.capture = broken  # not a DeviceError (D-062)
+    [ev] = walk(client, lib, ["C2"])
+    assert ev["alarm"] and ev["has_image"] is False and "lens unplugged" in ev["image_error"]
+
+
+@pytest.mark.req("FR07")
+def test_the_command_line_refuses_a_poll_interval_that_is_not_a_number(tmp_path):
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(f'[database]\nurl = "sqlite:///{(tmp_path / "g.db").as_posix()}"\n', encoding="utf-8")
+    for bad in ("nan", "inf", "-inf"):
+        assert cli_main(["--config", str(cfg), "gate-poll", f"--every={bad}"]) == 2, bad

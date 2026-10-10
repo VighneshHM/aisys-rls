@@ -126,11 +126,16 @@ def roles_matrix() -> list[str]:
 
 
 def _permissions(dependant) -> list[str]:
+    """Who may call a route, as rendered text: `require()` sets ``permission``; a check that accepts any of several
+    permissions sets ``any_of`` (D-077: those routes were listed as open to any signed-in user)."""
     found = []
     for dep in dependant.dependencies:
         perm = getattr(dep.call, "permission", None)
         if perm:
-            found.append(perm)
+            found.append(f"`{perm}`")
+        any_of = getattr(dep.call, "any_of", None)
+        if any_of:
+            found.append("any of " + " / ".join(f"`{p}`" for p in any_of))
         found += _permissions(dep)
     return found
 
@@ -161,9 +166,7 @@ def api_reference() -> str:
             if not isinstance(route, APIRoute) or not route.path.startswith(("/api", "/health")):
                 continue
             perms = sorted(set(_permissions(route.dependant)))
-            who = ", ".join(f"`{p}`" for p in perms) or (
-                "any signed-in user" if _needs_login(route.dependant) else "public"
-            )
+            who = ", ".join(perms) or ("any signed-in user" if _needs_login(route.dependant) else "public")
             purpose = inspect.getdoc(route.endpoint) or ""
             purpose = purpose.split("\n\n")[0].replace("\n", " ")[:160]
             tag = (route.tags or ["other"])[0]
