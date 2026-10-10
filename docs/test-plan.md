@@ -64,7 +64,8 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_search_shelves.py` | 73 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing, public search counts and pages every match |
 | `test_acquisitions_serials_labels.py` | 63 | FR01/FR04: orders, serials, barcodes and labels, recent label print jobs, card printing |
 | `test_member_admin.py` | 36 | FR04/FR11: the Patrons page: list, search, filters, remove (refused with items out or a fine owed), restore, erase, permissions, no names in the append-only records, the migration |
-| `test_demo_seed.py` | 24 | D3/D9: the full demo library: the numbers asked for (7 staff, 20 patrons, 250-300 books, the 200-row import all tagged, a few untagged), patrons in every situation with past and current loans, every menu has data, every page opens, only into an empty catalogue, `--minimal` |
+| `test_dashboard_counts.py` | 3 | AC08/FR04: the dashboard count tiles (patrons, blocked, owing, items out, untagged, gate, messages) per role |
+| `test_demo_seed.py` | 25 | D3/D9: the full demo library: the numbers asked for (7 staff, 20 patrons, 250-300 books, the 200-row import all tagged, a few untagged), patrons in every situation with past and current loans, every menu has data, every page opens, only into an empty catalogue, `--minimal` |
 | `test_opac_session.py` | 22 | NFR02/FR02: not in the staff menu, reached from the sign-in page; the warning's sign-out (POST, audited, cross-site refused); opening the public catalogue signs nobody out; kiosk host names; no cached pages; scrollable menu that remembers its position |
 | `test_catalogue_edit.py` | 11 | FR01: corrections and copy status with the importer's rules, on-loan guard, shared-record count, audit trail, no deletes, edits that would lose a value refused |
 | `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
@@ -73,7 +74,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_security_ops.py`, `test_config.py` | 13, 9 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration, NUL text and loose numbers refused |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 860 test cases (some are parametrised).
+Total: 864 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

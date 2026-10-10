@@ -142,8 +142,22 @@ def test_it_goes_only_into_an_empty_catalogue(demo, capsys, tmp_path):
         demo_seed.seed_full_demo(settings, quiet=True)
     cfg = tmp_path / "c.toml"
     cfg.write_text(f'[database]\nurl = "{settings.database_url}"\n', encoding="utf-8")
-    assert cli_main(["--config", str(cfg), "seed-demo"]) == 0
-    assert "already has items" in capsys.readouterr().out
+    assert cli_main(["--config", str(cfg), "seed-demo"]) == 1  # it must not look like success
+    assert "NOT LOADED" in capsys.readouterr().err
+    assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
+
+
+def test_reset_replaces_an_old_database_and_keeps_a_copy(tmp_path, capsys):
+    from aisys.config import load_settings
+
+    cfg = tmp_path / "c.toml"
+    db = tmp_path / "old.db"
+    cfg.write_text(f'[database]\nurl = "sqlite:///{db.as_posix()}"\n', encoding="utf-8")
+    assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
+    assert cli_main(["--config", str(cfg), "seed-demo", "--quiet", "--reset"]) == 0
+    capsys.readouterr()
+    assert demo_seed.catalogue_size(load_settings(cfg)) >= 250
+    assert len(list(tmp_path.glob("old.db.before-reset-*"))) == 1
 
 
 def test_the_minimal_seed_is_what_the_tests_use(tmp_path, capsys):

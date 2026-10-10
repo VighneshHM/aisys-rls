@@ -7,11 +7,13 @@ activity, so every page of the staff menu has something to look at and test. Eve
 | Command | What you get | Use it for |
 |---|---|---|
 | `seed-demo` | the full demo library described below (about 15 seconds) | trying the system, training, exploratory testing |
+| `seed-demo --reset` | the full demo library, replacing the current database (a copy of the old one is kept) | starting again, or an old database that has only a few books |
 | `seed-demo --minimal` | only the 4 staff and 6 patrons of the sign-in page, an empty catalogue | the scripted tours (`demo-script.md`, `uat.md`), which import and tag the sample file themselves |
 | `install.py ... --seed-demo` | the full demo library, in an installed copy | a trial or training install, never live data |
 
-The full library only goes into an **empty catalogue**: run on a database that already has books, `seed-demo` only checks
-the staff and patron cards and says so. To start again, delete `data/aisys.db` (or restore a backup) and run it again.
+The full library only goes into an **empty catalogue**: run on a database that already has books, `seed-demo` loads
+nothing, only checks the staff and patron cards, says **NOT LOADED** and exits with an error. To replace the database with a
+fresh demo library run `seed-demo --reset`: the old database file is kept beside it as `aisys.db.before-reset-<time>`.
 
 ## How it is built
 

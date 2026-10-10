@@ -101,17 +101,52 @@ def seed_demo(settings: Settings) -> None:
                     db.add(NotificationPref(user_id=alert_user.id, channel=channel, address=address))
         audit.record(db, actor="system", action="seed.demo", detail={"users": len(DEMO_USERS)})
         db.commit()
+    engine.dispose()  # let go of the database file (a --reset in the same process, or on Windows, needs it free)
+
+
+def _reset_database(settings: Settings) -> str:
+    """Keep a copy of the SQLite file and remove it (and its journal files) so the demo starts from nothing."""
+    import datetime
+    import shutil
+    from pathlib import Path
+
+    from aisys import backup
+
+    live = backup.sqlite_file(settings.database_url)
+    if not live.exists():
+        return ""
+    kept = live.with_name(f"{live.name}.before-reset-{datetime.datetime.now():%Y%m%d-%H%M%S}")
+    shutil.copyfile(live, kept)
+    try:
+        for suffix in ("", "-wal", "-shm"):
+            live.with_name(live.name + suffix).unlink(missing_ok=True)
+    except PermissionError as exc:
+        kept_path = Path(kept)
+        kept_path.unlink(missing_ok=True)
+        raise SystemExit(
+            "error: the database is in use: stop the application (and anything else using it), then run again"
+        ) from exc
+    return str(kept)
 
 
 def _seed_demo_command(args, settings: Settings) -> int:
     from aisys.devtools import demo_seed
 
+    if args.reset:
+        kept = _reset_database(settings)
+        print(f"started again from an empty database; the old one is kept as {kept}" if kept else "no old database")
     migrate.upgrade(settings.database_url)
     if args.minimal:
         seed_demo(settings)
     elif demo_seed.catalogue_size(settings):
         seed_demo(settings)  # never adds a second demo history to a catalogue that already has books
-        print("the catalogue already has items, so only the demo staff and patron cards were checked")
+        print(
+            "NOT LOADED: this database already has books, so the demo library was not added.\n"
+            "To replace it with a fresh demo library run:  aisys seed-demo --reset\n"
+            "(the old database is kept beside it as a .before-reset copy)",
+            file=sys.stderr,
+        )
+        return 1
     else:
         print("replaying about a hundred days of demo library history (takes a minute)...")
         counts = demo_seed.seed_full_demo(settings, quiet=args.quiet)
@@ -360,6 +395,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("migrate", help="apply database migrations")
     sd = sub.add_parser("seed-demo", help="load the synthetic demo library (staff, patrons, books, months of activity)")
     sd.add_argument("--minimal", action="store_true", help="only the demo staff and patron cards (what the tests use)")
+    sd.add_argument(
+        "--reset", action="store_true", help="replace the database with a fresh demo library (the old one is kept)"
+    )
     sd.add_argument("--quiet", action="store_true", help="do not list each step of the demo history")
     ca = sub.add_parser("create-admin", help="create the first administrator of a real site (username and password)")
     ca.add_argument("--username", required=True)

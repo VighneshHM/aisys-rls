@@ -13,27 +13,52 @@ and `docs/remaining-work.md` lists what is left for a live site.
 
 ## Clone and test it (about 5 minutes, Windows, PowerShell)
 
-You need Windows, **Python 3.12 or newer** and Git. Nothing else, no internet after the download in step 2.
+For reviewers and anyone who wants to see it working. You need Windows, **Python 3.12 or newer** and Git. Only step 2 needs the
+internet (to download the packages); nothing after it does.
+
+**1. Get the code**
 
 ```powershell
 git clone https://github.com/VighneshHM/aisys-rls.git
 cd aisys-rls
+```
+
+**2. Install it** (a private environment inside the folder; nothing is installed system-wide)
+
+```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
 .\.venv\Scripts\python -m pip install -e . --no-deps --no-build-isolation
-.\.venv\Scripts\aisys seed-demo     # creates the database and loads the SYNTHETIC demo library
+```
+
+**3. Load the demo library** (`seed-demo`, about 15 seconds). Do this before the first start, or every menu is empty.
+
+```powershell
+.\.venv\Scripts\aisys seed-demo
+```
+
+It creates the database and fills it with **synthetic** data only: 259 books (241 tagged, 18 left untagged on purpose),
+20 patrons in different situations with past and current loans, 7 staff (1 administrator, 2 librarians, 3 circulation clerks,
+1 auditor), and about a hundred days of activity, so every menu in the side bar has something in it (`docs/demo-data.md`). It
+ends with a line like `demo library loaded: items 259, untagged 18, patrons 20, ...`. If it says **NOT LOADED**, the
+database already had books from an earlier try: run `.\.venv\Scripts\aisys seed-demo --reset` to start again (the old
+database is kept beside it as a copy). Use `--reset` whenever you want a clean demo.
+
+**4. Start it**
+
+```powershell
 .\.venv\Scripts\aisys run
 ```
 
 Open **http://127.0.0.1:8000**. On the sign-in page choose a staff card: **Librarian** (`STAFFLIB0001`) to try the catalogue,
 circulation, tagging and data migration, or **Administrator** (`STAFFADMIN01`) for staff, roles, Settings, gate, backups and
 the audit log. The devices and library system are built-in simulators, so everything works with no hardware. API docs are at
-`/docs`. Stop the server with Ctrl+C. To start again from a clean demo, delete the `data` folder and run `seed-demo` again.
+`/docs`. Stop the server with Ctrl+C.
 
 Then try the ten acceptance scenarios below (AC01 to AC10), follow `docs/demo-script.md`, and run the automated tests:
 
 ```powershell
-.\.venv\Scripts\python -m pytest -n auto     # the whole suite (about 835 tests, 2 to 3 minutes)
+.\.venv\Scripts\python -m pytest -n auto     # the whole suite (about 865 tests, 2 to 3 minutes)
 .\.venv\Scripts\python scripts\lifecycle_demo.py   # real offline install, update and rollback, network blocked
 ```
 

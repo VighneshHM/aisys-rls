@@ -19,7 +19,7 @@ from aisys.cli import DEMO_MEMBERS, DEMO_USERS
 from aisys.config import Settings
 from aisys.deps import COOKIE_NAME, Principal, client_ip, get_db, get_principal_optional, get_settings
 from aisys.migration.mapping import FIELDS, REQUIRED
-from aisys.models import AuditEvent, AuthSession, Card, Item, Loan, RfidTag, User
+from aisys.models import AuditEvent, AuthSession, Card, GateEvent, Item, Loan, Member, Notification, RfidTag, User
 from aisys.routes import STARTED_AT
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
@@ -176,6 +176,46 @@ def dashboard(
                 "value": db.scalar(select(func.count(Loan.id)).where(Loan.returned_at.is_(None))),
             },
             {"icon": "pulse", "label": "Overdue loans", "value": db.scalar(overdue)},
+            {
+                "icon": "scan",
+                "label": "Items without a tag",
+                "value": (db.scalar(select(func.count(Item.id))) or 0) - (db.scalar(tagged) or 0),
+            },
+        ]
+
+    if "member.read" in perms:
+        here = Member.removed_at.is_(None)  # a removed patron is not counted among the library's patrons
+        stats += [
+            {"icon": "users", "label": "Patrons", "value": db.scalar(select(func.count(Member.id)).where(here))},
+            {
+                "icon": "alert",
+                "label": "Patrons blocked",
+                "value": db.scalar(select(func.count(Member.id)).where(here, Member.status == "blocked")),
+            },
+            {
+                "icon": "card",
+                "label": "Patrons owing fines",
+                "value": db.scalar(select(func.count(Member.id)).where(here, Member.fines_cents > 0)),
+            },
+            {
+                "icon": "swap",
+                "label": "Patrons with items out",
+                "value": db.scalar(select(func.count(func.distinct(Loan.member_id))).where(Loan.returned_at.is_(None))),
+            },
+        ]
+
+    if "gate.view" in perms:
+        stats += [
+            {
+                "icon": "gate",
+                "label": "Gate alarms (24 h)",
+                "value": db.scalar(select(func.count(GateEvent.id)).where(GateEvent.alarm, GateEvent.ts >= since)),
+            },
+            {
+                "icon": "radio",
+                "label": "Messages waiting to send",
+                "value": db.scalar(select(func.count(Notification.id)).where(Notification.status == "queued")),
+            },
         ]
 
     recent = None
