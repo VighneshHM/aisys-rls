@@ -12,7 +12,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 
 | Type (NFR05) | What is tested | How | Evidence |
 |---|---|---|---|
-| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 28 test files; list below |
+| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 29 test files; list below |
 | Integration | routes + services + database + mock devices together; the connector with retries and timeouts; delivery through provider adapters; a real HTTPS server; a real background loop; real subprocess installs and updates | pytest (some tests start a real server, a real `uvicorn`, or a real virtual environment) | `test_gate`, `test_circulation`, `test_security_ops`, `test_lifecycle`, `test_reminders` |
 | Migration | 200- and 20,000-row files, duplicates, invalid rows, reconciliation, rollback, restore after a failed import | pytest with generated synthetic files | `test_migration`, `test_backup` |
 | Performance | search, reports, import, backup, restore, reminders and concurrent desks with 20,000 items | `scripts/perf_report.py` | `docs/performance-results.md` |
@@ -56,6 +56,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_inventory.py` | 11 | AC05/FR06: sweeps, signals, missing and misplaced, closing |
 | `test_gate.py` | 32 | AC06/FR07/FR09: alarms, offline behaviour, duplicates, CCTV, queued delivery, retries, the production gate loop, `gate-poll`, audited notification actions, a driver or camera that fails in any way |
 | `test_reports.py` | 18 | AC08/FR08: reports, filters, dashboards, CSV, hostile input, scale |
+| `test_create_admin.py` | 15 | NFR04: the first administrator of a real install (sign-in, audit, weak password, bad or taken name, no prompt without a terminal) |
 | `test_backup.py` | 25 | AC10/NFR01: backups, proof, restore, busy database, maintenance mode, hostile names |
 | `test_lifecycle.py`, `test_lifecycle_api.py` | 49, 12 | AC09/FR12: signatures, tampering, install, update, failure paths, rollback, recovery |
 | `test_admin.py` | 26 | FR11: audit log, staff and cards, lock-out rules, custom roles, no granting beyond your own rights |
@@ -71,7 +72,7 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | `test_security_ops.py`, `test_config.py` | 13, 9 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration, NUL text and loose numbers refused |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 820 test cases (some are parametrised).
+Total: 835 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

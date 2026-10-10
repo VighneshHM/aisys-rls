@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
+import os
 import subprocess  # noqa: S404
 import sys
 from pathlib import Path
@@ -60,6 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     v = sub.add_parser("verify", help="check a package without installing it")
     v.add_argument("bundle")
     sub.add_parser("doctor", help="check this computer and the installation (environment checklist)")
+    ca = sub.add_parser("create-admin", help="create the first administrator (asks for the password)")
+    ca.add_argument("--username", required=True)
+    ca.add_argument("--name", default="", help="the name shown on pages")
     sub.add_parser("recover", help="finish or undo an interrupted update")
     sub.add_parser("prune", help="delete releases older than the previous one")
     sub.add_parser("run", help="start the application")
@@ -110,6 +115,21 @@ def main(argv: list[str] | None = None) -> int:
                 raise LifecycleError("Nothing is installed here yet. Run install first.")
             proc = ops.run_release(root, state["current"], ["doctor"])
             print(proc.stdout.rstrip())
+            return proc.returncode
+        elif args.cmd == "create-admin":
+            state = ops.read_state(root)
+            if not state["current"]:
+                raise LifecycleError("Nothing is installed here yet. Run install first.")
+            password = os.environ.get("AISYS_ADMIN_PASSWORD", "")
+            if not password:
+                password = getpass.getpass("Password: ")
+                if getpass.getpass("Password again: ") != password:
+                    raise LifecycleError("The two passwords differ")
+            cmd = ["create-admin", "--username", args.username, "--name", args.name]
+            proc = ops.run_release(root, state["current"], cmd, env=ops.app_env(root, AISYS_ADMIN_PASSWORD=password))
+            print((proc.stdout or "").rstrip())
+            if proc.returncode:
+                print((proc.stderr or "").rstrip(), file=sys.stderr)
             return proc.returncode
         elif args.cmd == "recover":
             ops.recover(root)

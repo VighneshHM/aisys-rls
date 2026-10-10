@@ -1,9 +1,12 @@
-"""Command line: `aisys migrate | seed-demo | run | version`."""
+"""Command line: `aisys migrate | seed-demo | create-admin | run | version`."""
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import math
+import os
+import re
 import sys
 import threading
 
@@ -98,6 +101,57 @@ def seed_demo(settings: Settings) -> None:
                     db.add(NotificationPref(user_id=alert_user.id, channel=channel, address=address))
         audit.record(db, actor="system", action="seed.demo", detail={"users": len(DEMO_USERS)})
         db.commit()
+
+
+MIN_PASSWORD = 12
+MAX_PASSWORD = 256  # what the sign-in form accepts
+_USERNAME = re.compile(r"[a-z0-9._-]{3,32}")  # the same rule as the Administration page, lower case only
+_RESERVED = {"system", "root"}  # "system" is the actor the audit log uses for the application itself
+
+
+def create_admin(settings: Settings, username: str, display_name: str, password: str) -> None:
+    """Create the first administrator of a real site. Refuses a weak password, a bad name or a name already taken."""
+    if not _USERNAME.fullmatch(username) or username in _RESERVED:
+        raise ValueError(
+            "The username must be 3 to 32 lower-case letters, digits, dots, dashes or underscores (not 'system')"
+        )
+    if len(password.strip()) < MIN_PASSWORD or len(password) > MAX_PASSWORD:
+        raise ValueError(f"The password must be {MIN_PASSWORD} to {MAX_PASSWORD} characters, not only spaces")
+    if password == DEMO_PASSWORD or password.lower() == username.lower():
+        raise ValueError("Choose a different password (not the demo password and not the username)")
+    name = " ".join("".join(ch for ch in display_name if ch.isprintable() or ch.isspace()).split())[:100] or username
+    engine = make_engine(settings.database_url)
+    with make_sessionmaker(engine)() as db:
+        sync_rbac(db)
+        if db.scalar(select(User).where(User.username == username)):
+            raise ValueError(f"The username '{username}' is already taken")
+        role = db.scalar(select(Role).where(Role.name == "admin"))
+        assert role is not None  # sync_rbac has just created every role
+        db.add(
+            User(username=username, display_name=name, role_id=role.id, password_hash=security.hash_password(password))
+        )
+        audit.record(db, actor="system", action="admin.bootstrap", entity="user", entity_id=username, detail={})
+        db.commit()
+
+
+def _create_admin_command(args, settings: Settings) -> int:
+    password = os.environ.get("AISYS_ADMIN_PASSWORD", "")
+    if not password:
+        if not sys.stdin.isatty():
+            print("error: no password: set AISYS_ADMIN_PASSWORD or run this in a terminal", file=sys.stderr)
+            return 1
+        password = getpass.getpass("Password: ")
+        if getpass.getpass("Password again: ") != password:
+            print("error: the two passwords differ", file=sys.stderr)
+            return 1
+    migrate.upgrade(settings.database_url)
+    try:
+        create_admin(settings, args.username, args.name or "", password)
+    except ValueError as exc:
+        print("error:", exc, file=sys.stderr)
+        return 1
+    print(f"created administrator '{args.username}': sign in on the sign-in page with the username and password")
+    return 0
 
 
 def _backup_command(args, settings: Settings) -> int:
@@ -288,6 +342,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate", help="apply database migrations")
     sub.add_parser("seed-demo", help="load synthetic demo users and cards")
+    ca = sub.add_parser("create-admin", help="create the first administrator of a real site (username and password)")
+    ca.add_argument("--username", required=True)
+    ca.add_argument("--name", default="", help="the name shown on pages (default: the username)")
     bk = sub.add_parser("backup", help="create, list, verify, compare or restore backups")
     bsub = bk.add_subparsers(dest="bk_cmd", required=True)
     bc = bsub.add_parser("create", help="make a verified backup now")
@@ -327,6 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         migrate.upgrade(settings.database_url)
         seed_demo(settings)
         print(f"seeded demo data (staff cards STAFFADMIN01 etc.; admin password: {DEMO_PASSWORD})")
+    elif args.cmd == "create-admin":
+        return _create_admin_command(args, settings)
     elif args.cmd == "notify-dispatch":
         return _notify_command(args, settings)
     elif args.cmd == "gate-poll":

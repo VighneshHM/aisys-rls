@@ -297,3 +297,17 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   (loses track of items and money; rejected).
 * **With a real ILMS** the members live in the ILMS and this application holds a copy: removing or erasing here does not
   touch the ILMS (and the reverse).
+
+## DR-21 First administrator: `create-admin`
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner ("go" after the gap was reported).
+* **Context:** an install without `--seed-demo` has no staff, and the only way to create one was the demo seed, which loads
+  synthetic users and a published demo password.
+* **Decision:** `python manage.py create-admin --username U [--name N]` (and `aisys create-admin`) creates one administrator
+  with a username and password. The password is asked twice without echo, or read from `AISYS_ADMIN_PASSWORD` for scripts,
+  never from the command line (it would show in process lists and shell history) and never printed or audited. 12 to 256
+  characters (256 is what the sign-in form accepts), not only spaces, not the demo password, not the username; the username is
+  3 to 32 lower-case letters, digits, dots, dashes or underscores (the Administration page's rule), not `system` (the audit
+  log's name for the application), and must be free; control characters are removed from the shown name. The event `admin.bootstrap` is audited. Further staff are added on the Administration page.
+* **Alternatives:** a password option on the command line (leaks); generating a random password and printing it (easy to lose,
+  ends up in logs); a first-visit set-up page (an unauthenticated route that creates an administrator is an attack surface).
