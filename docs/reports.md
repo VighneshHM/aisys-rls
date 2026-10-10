@@ -37,8 +37,10 @@ gate (passages, people, alarms) and camera (snapshots), with online state and la
 ## Dashboard
 
 For roles with `reports.view` (librarian, admin, auditor): completed transactions per day and gate alarms per day for the
-last 14 days, and the five most overdue loans with the fine so far. The library figures tiles (items, tagged, on loan,
-overdue) from earlier remain.
+last 14 days, and the five most overdue loans with the fine so far. The count tiles at the top show only what the
+role may see: staff, cards, sessions and events for everyone; with `catalogue.read` the items, items with and without a tag,
+on loan and overdue; with `member.read` the patrons (removed ones are not counted), how many are blocked, owe a fine or have
+items out; with `gate.view` the gate alarms of the last 24 hours and the messages waiting to be sent.
 
 ## API (`reports.view`)
 

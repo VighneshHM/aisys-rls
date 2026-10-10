@@ -13,7 +13,7 @@ card never signs anyone in. Your menu shows only what your role may do.
 | Find a book (for a visitor) | `/opac` (no sign-in) | Type words; results appear as you type; **Show the shelf** shows where it stands. **Return to home page** goes back to the sign-in page |
 | Leave this screen for visitors | **Sign out**, then **Public catalogue** on the sign-in page | The catalogue is not in the staff menu. If you open `/opac` by its address while signed in, you are **not** signed out: the page tells you and offers **Sign out and keep the catalogue open**. Public terminals use their own address, where staff pages do not exist |
 | Look at a shelf | **Shelves** | Choose a shelf: its books in call-number order, coloured by status; red outline = out of order after the last sweep |
-| Print labels | **Labels** | Choose a shelf or type item numbers, preview, print or send to the label printer |
+| Print labels | **Labels** | Choose a shelf or type item numbers, preview, print or send to the label printer; **Recent print jobs** shows what was sent and whether it printed |
 | Order books | **Acquisitions** | New order, add lines, **Place order**; when books arrive **Book in what arrived** |
 | Track a journal | **Serials** | Add the subscription; **Received** when an issue arrives; claim the late ones |
 | Print a member's card | **Circulation** | Choose the member, **Print the card** |

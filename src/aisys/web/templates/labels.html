@@ -27,6 +27,11 @@
 
 <div id="sheet" class="sheet" aria-label="Label preview"></div>
 
+<section class="panel no-print" style="margin-top:16px">
+  <header><h3>Recent print jobs</h3><button class="btn ghost small" id="refresh-jobs" type="button">Refresh</button></header>
+  <div class="table-wrap" id="jobs"></div>
+</section>
+
 <style>
   .sheet { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
   .lbl { border: 1px dashed var(--line); border-radius: 6px; background: #fff; color: #000; padding: 8px; break-inside: avoid; }
@@ -41,7 +46,19 @@
 <script src="/static/ui.js?v={{ asset_v }}"></script>
 <script>
 (() => {
-  const {$, h, fill, api, say, clear} = UI;
+  const {$, h, fill, api, say, clear, when} = UI;
+  const DELIVERY = {sent: ["good", "Printed"], queued: ["", "Waiting"], failed: ["bad", "Failed"], cancelled: ["", "Cancelled"]};
+  async function loadJobs() {
+    try {
+      const d = await api("/api/labels/jobs");
+      $("jobs").replaceChildren(d.jobs.length ? h("table", {}, h("thead", {}, h("tr", {}, ["When", "What", "Printer", "Delivery"].map(t => h("th", {}, t)))),
+        h("tbody", {}, d.jobs.map(j => { const [cls, label] = DELIVERY[j.status] || ["", j.status];
+          return h("tr", {}, h("td", {class: "time"}, when(j.created_at)), h("td", {}, j.what), h("td", {class: "mono"}, j.printer), h("td", {}, h("span", {class: "badge " + cls}, label))); })))
+        : h("div", {class: "empty"}, "No labels sent to a printer yet."));
+    } catch (e) { $("jobs").replaceChildren(h("div", {class: "empty"}, e.message)); }
+  }
+  $("refresh-jobs").onclick = loadJobs;
+  loadJobs();
   const SVG = "http://www.w3.org/2000/svg";
   const params = () => ($("ids").value.trim() ? "ids=" + encodeURIComponent($("ids").value.replace(/\s+/g, "")) : "location=" + encodeURIComponent($("loc").value));
   const ready = () => $("ids").value.trim() || $("loc").value;
@@ -76,6 +93,7 @@
       if ($("ids").value.trim()) body.ids = $("ids").value.split(",").map(x => +x.trim()).filter(Boolean); else body.location = $("loc").value;
       const r = await api("/api/labels/print", {json: body});
       say("notice", "ok", r.queued + " label(s) queued for " + r.printer + ". They are delivered with the other queued messages.");
+      loadJobs();
     } catch (e) { say("notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
   };
   api("/api/shelves").then(d => fill($("loc"), h("option", {value: ""}, "—"), d.shelves.map(s => h("option", {value: s.code}, s.code + " (" + s.items + ")")))).catch(() => {});

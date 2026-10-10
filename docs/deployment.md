@@ -39,7 +39,7 @@ items below and prints OK, WARN or FAIL for each, changing nothing.
 | TLS | a certificate and key (PEM) from the site's own CA or a public one, or a TLS proxy | yes |
 | Licence and key | `licence.json` and the vendor's public key supplied with the package | `manage.py status` |
 | Backups | a place outside the server to copy `data/backups/` to | not checked |
-| Accounts | the service account's rights on the folders; one administrator staff card issued | not checked |
+| Accounts | the service account's rights on the folders; the first administrator created (`manage.py create-admin`) | not checked |
 
 ## Configuration reference
 
@@ -136,6 +136,17 @@ records the install. If anything fails the half-built release is removed. Then:
 ```
 python D:\aisys\manage.py run
 ```
+
+A new install has no staff. Create the first administrator (a lower-case username and a password of 12 to 256 characters; the tool asks
+twice and never prints it; or set `AISYS_ADMIN_PASSWORD` for a script):
+
+```
+python D:\aisys\manage.py create-admin --username site.admin --name "Site Admin"
+```
+
+It is refused for a short password, the demo password, a bad or taken username, and is audited (`admin.bootstrap`). Further
+staff are added on the **Administration** page. `--seed-demo` instead loads the synthetic demo library (`docs/demo-data.md`) and a published demo password: for
+trial and training copies only.
 
 The installation folder is plain and visible:
 

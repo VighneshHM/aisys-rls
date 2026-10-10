@@ -338,7 +338,7 @@ def test_the_command_line_can_back_up_verify_compare_and_restore(tmp_path, capsy
         f'[database]\nurl = "sqlite:///{db.as_posix()}"\n[backup]\ndir = "{(tmp_path / "bk").as_posix()}"\n',
         encoding="utf-8",
     )
-    assert cli_main(["--config", str(cfg), "seed-demo"]) == 0
+    assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
 
     def run(*args):
         capsys.readouterr()

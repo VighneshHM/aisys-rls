@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aisys.labels import code128
-from aisys.models import Item
+from aisys.models import Item, Notification
 from aisys.shelves.service import natural_key
+from aisys.timeutil import iso
 
 MAX_LABELS = 200
 SPINE_LINE = 12  # characters across a spine label
@@ -77,6 +78,23 @@ def pick_items(db: Session, ids: list[int] | None, location: str | None) -> list
         raise LabelError(422, "Choose a shelf or some items")
     items.sort(key=lambda i: (natural_key(i.call_number), i.accession_no))
     return items
+
+
+JOB_SUBJECT = " label(s)"  # how text_job ends a label print job's subject, which tells it apart from other printouts
+
+
+def recent_jobs(db: Session, limit: int = 10) -> list[dict]:
+    """The latest label print jobs sent to label printers, with how their delivery went."""
+    rows = db.scalars(
+        select(Notification)
+        .where(Notification.channel == "print", Notification.subject.like(f"%{JOB_SUBJECT}"))
+        .order_by(Notification.id.desc())
+        .limit(limit)
+    )
+    return [
+        {"id": n.id, "created_at": iso(n.created_at), "what": n.subject, "printer": n.recipient, "status": n.status}
+        for n in rows
+    ]
 
 
 def text_job(labels: list[dict], kind: str) -> tuple[str, str]:

@@ -1,7 +1,7 @@
 # User acceptance test script and results (D6, NFR05)
 
 One scenario per use case in `docs/use-cases.md`. Each has the steps a library person would follow, what they should see, and the
-recorded outcome. Setup for all: a fresh database (`python -m aisys.cli seed-demo`) and `python -m aisys.cli run`, then
+recorded outcome. Setup for all: a fresh database (`python -m aisys.cli seed-demo --minimal`: staff and patron cards, empty catalogue) and `python -m aisys.cli run`, then
 http://127.0.0.1:8000. Demo identities (all synthetic): staff cards `STAFFADMIN01` (administrator), `STAFFLIB0001` (librarian),
 `STAFFCLERK01` (desk clerk), `STAFFAUDIT01` (auditor); demo patron `PATRON000001` (Priya Nair, M0001).
 

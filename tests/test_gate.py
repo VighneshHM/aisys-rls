@@ -379,7 +379,7 @@ def test_the_command_line_can_deliver_the_queue(tmp_path, capsys):
     cfg = tmp_path / "c.toml"
     db = tmp_path / "cli.db"
     cfg.write_text(f'[database]\nurl = "sqlite:///{db.as_posix()}"\n', encoding="utf-8")
-    assert cli_main(["--config", str(cfg), "seed-demo"]) == 0
+    assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
     con = sqlite3.connect(db)
     con.execute(
         "INSERT INTO notifications (created_at, channel, recipient, subject, body, status, attempts, last_error, "
@@ -533,7 +533,7 @@ def test_polling_needs_gate_view(client):
 def test_the_command_line_reads_the_gates(tmp_path, capsys):
     cfg = tmp_path / "c.toml"
     cfg.write_text(f'[database]\nurl = "sqlite:///{(tmp_path / "g.db").as_posix()}"\n', encoding="utf-8")
-    assert cli_main(["--config", str(cfg), "seed-demo"]) == 0
+    assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
     assert cli_main(["--config", str(cfg), "gate-poll"]) == 0  # only the simulator gate is configured: nothing to read
     assert "'events': 0" in capsys.readouterr().out
     assert cli_main(["--config", str(cfg), "gate-poll", "--every", "0.1"]) == 2

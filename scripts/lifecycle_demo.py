@@ -313,6 +313,15 @@ def main() -> None:
     assert not has_table(db, "update_marker") and count(db, "users") == users and count(db, "cards") == cards
     print(f"after rollback: schema back to {down}, {users} users and {cards} cards as before the update")
     print(run([*manage, "status"], offline=True))
+    step("A real site has no demo users: create the first administrator from the command line")
+    env_pw = "AISYS_ADMIN_PASSWORD"
+    os.environ[env_pw] = "demo-site-password-1"  # read by manage.py, passed on to the application, never printed
+    try:
+        print(run([*manage, "create-admin", "--username", "site.admin", "--name", "Site Admin"], offline=True))
+        print("again    :", run([*manage, "create-admin", "--username", "site.admin"], offline=True, expect_fail=True))
+    finally:
+        del os.environ[env_pw]
+    assert count(db, "users") == users + 1
     attempts = guard_log.read_text(encoding="utf-8") if guard_log.exists() else ""
     if attempts:
         sys.exit(f"A target-machine step tried to reach the network:\n{attempts}")
