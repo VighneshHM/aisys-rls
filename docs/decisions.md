@@ -157,7 +157,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-13 NCIP 2.0 is not implemented; SIP2 is the protocol
 
-* **Date:** 2026-10-09 (branch `fix/sop-gaps`); recorded as C-10 and A-41.
+* **Date:** 2026-10-09 (`791ce55`, merged in PR #23); recorded as C-10 and A-41.
 * **Context:** SOP FR03 reads "Support NCIP 2.0 and an SIP2 adapter boundary", and AC03 asks for "a mocked NCIP or SIP2 flow". After
   DR-12 the SIP2 client was real, and the final coverage review asked whether an NCIP 2.0 adapter was still needed.
 * **Proposed:** treat the protocol requirement as met by SIP2; keep NCIP as a documented extension point only.
@@ -167,11 +167,13 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   2.0 is not to be built.** AC03 is met through SIP2 ("NCIP or SIP2"). Nothing in the repository claims NCIP support (SOP section 3).
 * **Consequence:** an NCIP 2.0 connector stays future work behind the same `CirculationConnector` boundary (one class plus a
   `register_driver` line, `docs/remaining-work.md`). The mock ILMS can still word its replies NCIP-style for demonstrations; that is
-  wording, not protocol. A site whose ILMS speaks only NCIP needs that connector first (risk R-16).
+  wording, not protocol. A site whose ILMS speaks only NCIP needs that connector first (risk R-16). **Update
+  2026-10-10 (D-059):** the mock's NCIP wording option was removed, because setting it made the page and the history
+  say NCIP while SIP2 was spoken; a configuration that still asks for NCIP now stops at start with a plain message.
 
 ## DR-14 Custom roles next to the four built-in ones
 
-* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Date:** 2026-10-09 (`791ce55`, merged in PR #23).
 * **Context:** FR11 asks for "user and role management". Roles could be assigned to people but not created or changed.
 * **Proposed:** an administrator (`admin.users`) can create a role with any set of the catalogued permissions, change its
   description and permissions, and remove it when nobody holds it. The four built-in roles (admin, librarian,
@@ -186,7 +188,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-15 One member-record check for every way a patron card is linked
 
-* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Date:** 2026-10-09 (`791ce55`, merged in PR #23).
 * **Context:** FR05 asks to validate "title or member records before tagging or re-tagging". Items had one validation
   (`validate_tagging`); patron cards were checked in `circulation/members.py`, and the Administration page's card form had its own,
   weaker checks (it did not switch off a member's previous card).
@@ -199,7 +201,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-16 Runtime and development locks; a real network block for the offline rehearsal
 
-* **Date:** 2026-10-09 (branch `fix/sop-gaps`).
+* **Date:** 2026-10-09 (`791ce55`, merged in PR #23).
 * **Lock files:** `requirements.lock` now holds only what the application needs to run (it is also what `scripts/release.py`
   builds the shipped wheels from); `requirements-dev.lock` holds the test, lint, type-check and signing tools and the build backend
   (`setuptools`, pinned, so the editable install builds without fetching an unpinned backend). Both carry sha256 hashes and CI
@@ -210,3 +212,88 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   the run fails if the log is not empty. A probe at the start proves the guard is active.
 * **Alternative considered:** a firewall rule on the CI machine (it would also cut the runner off from GitHub and needs
   administrator rights on a developer's PC).
+
+## DR-17 The public catalogue: a deliberate hand-over, and kiosk host names
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`); replaces the D-052 approach of PR #23 and #24.
+* **Context:** D-052: a staff member opened the public catalogue and left the screen; a visitor could step back into the
+  signed-in workspace. The first fix ended the staff session whenever `/opac` was loaded. The second coverage review
+  (D-055) found that this also signs staff out from a link on another site, ends a desk session when the catalogue is
+  opened in a second tab, and revokes API tokens, while a screen left on any other staff page stays open anyway.
+* **Options put to the project owner:** (1) an explicit hand-over only; (2) the hand-over plus kiosk host names; (3) keep
+  signing out on every load and document the side effects.
+* **Decision (project owner, 2026-10-10): option 2.**
+  - Loading `/opac` changes nothing. If a staff session is still open in that browser, the page says so and offers
+    **Sign out and keep the catalogue open**.
+  - The public catalogue is **not in the staff menu**: it is linked from the sign-in page, which shows only once nobody
+    is signed in, so the normal way to it ends the staff session first. (A menu entry built as a sign-out button was
+    removed at the project owner's request the same day, C-12: a menu item that signs you out is easy to press by
+    mistake, and staff search with the richer Catalogue page.)
+  - The warning's sign-out is a POST to `/handover` that ends the session on the server and in the browser, records
+    `auth.logout` with reason `public_catalogue`, and opens the catalogue. Browsers do not send the SameSite=Lax session
+    cookie with another site's POST, and a request whose Origin is another site is refused, so no other site can sign
+    staff out.
+  - `[opac] kiosk_hosts` lists host names for public terminals (for example `opac.library.local`). On those names only
+    the catalogue, its search API, the static files and the health checks exist; every other path answers "not found",
+    sign-in is impossible, and any cookie or token the browser sends is removed before the request is handled.
+* **Consequence:** D-052 stays closed (the way to the catalogue goes through signing out), and a public terminal on a kiosk name can never
+  hold a staff session. A staff member who opens the catalogue by typing its address and walks away is warned by the
+  page but not signed out: the idle timeout (`session_ttl_minutes`) and the hand-over button are the protection there.
+
+## DR-18 A production path from a real gate
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`).
+* **Context:** D-056: the gate logic ran only from the development simulator, so a real gate driver had nothing to
+  call it.
+* **Decision:** `gate.service.poll_all` reads every configured gate that is not a simulator, once. It is run by a
+  background loop inside the application (`[gate] poll_seconds`, 0 = off, 2 in the sample file), by
+  `python -m aisys.cli gate-poll [--every N]` as a separate process (one or the other, since each passage is handed over
+  only once), and by `POST /api/gate/poll` (**Read the gates now** on Gate events). An offline gate is reported and the
+  others are still read. The loop pauses during a restore, like the notification loop.
+* **Alternative considered:** a push interface (the gate calls the server). Gates differ: polling through the existing
+  `Gate.poll()` contract works for every driver, and a push driver can still queue passages for `poll()` to return.
+
+## DR-19 Catalogue corrections and copy status, never deletes
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`).
+* **Context:** D-057: records could not be corrected, and a copy could not be withdrawn or marked lost or damaged.
+* **Decision:** `PATCH /api/catalogue/items/{id}` (permission `catalogue.write`) and **Edit details or status** on the
+  Catalogue page. The merged record goes through the importer's validator. The accession number cannot change (it is
+  written on the tag). Bibliographic fields belong to the record every copy of the title shares, so the audit line says how
+  many copies a correction touched, and a correction that would duplicate another record is refused. Staff may set
+  available, damaged, lost or withdrawn; a copy on loan keeps its status until it is checked in. Nothing is deleted:
+  a copy that leaves the collection is withdrawn, which removes it from the public shelf and refuses loans and tagging.
+* **NFR01:** the rule "never modify existing records" is about the integration with the institution's ILMS and its
+  migrated data: the import still only inserts. A correction here is a deliberate, attributed change by a librarian,
+  recorded with its old and new values.
+
+## DR-20 Patrons page: remove, restore and erase members
+
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner ("go" after the design in chat).
+* **Context:** members could only be added. There was no list of all members and no way to remove one; staff could be
+  seen on the Administration page but a library cannot keep every patron for ever (people leave, ask to be forgotten).
+* **Decision:** a **Patrons** page (`/members`, menu entry for anyone with `member.read`) lists every member with search,
+  filters (blocked, items out, owing, removed), loans, fines, masked card and contact. **Remove** (new permission
+  `member.remove`: librarians and administrators) keeps the member and all history, stops borrowing, switches the card
+  off and cancels waiting reminders; it is refused while items are out or a fine is owed. **Restore** brings them back as
+  they were (an old card stays off). **Erase** (new permission `member.erase`: administrators only) is a second,
+  irreversible step for an already removed member: it clears name, e-mail, phone, card numbers and the text of reminder
+  messages, and keeps loans, fines and counts so reports add up. It needs the member number typed back.
+* **Races:** the ILMS call in a check-out can take seconds, so the member is read again after it answers; if they were
+  removed meanwhile the ILMS loan is taken back and nothing is recorded (D-083). Removal claims the member in one atomic
+  update before it checks loans and fines, so it cannot miss a loan written at the same moment and two removers cannot
+  both succeed.
+* **How "removed" is stored:** the members table has a database rule that allows only `active` and `blocked`, and
+  rebuilding that table (loans, fines and events point at it) is not worth the risk (the same call as migration 0009).
+  A removed member has `removed_at` set and `status = blocked`, so every older code path refuses them as well;
+  `status_before_removal` lets a restore put them back as they were. Staff see "removed".
+* **Personal data in append-only records:** the audit log and the circulation history cannot be edited (database
+  triggers), so they must never hold a name. The audit log already held none of the contact details; this change also
+  stops `member.create` recording the name, and the circulation history now keeps the member number where a message
+  named the member (`service.event_text`). Entries written before this change may still hold a name; they cannot be
+  rewritten, which the security notes state.
+* **Alternatives:** deleting the member row (breaks the loan, fine and audit history and the foreign keys; rejected);
+  adding a `removed` status value (needs a table rebuild; rejected); removing with items out or fines owed "by force"
+  (loses track of items and money; rejected).
+* **With a real ILMS** the members live in the ILMS and this application holds a copy: removing or erasing here does not
+  touch the ILMS (and the reverse).

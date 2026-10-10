@@ -21,12 +21,12 @@ def _http(exc: service.ShelfError) -> HTTPException:
 class ShelfIn(BaseModel):
     code: str = Field(min_length=1, max_length=100)
     description: str = Field(default="", max_length=200)
-    capacity: int | None = Field(default=None, ge=0, le=100_000)
+    capacity: int | None = Field(default=None, ge=0, le=100_000, strict=True)
 
 
 class ShelfPatch(BaseModel):
     description: str | None = Field(default=None, max_length=200)
-    capacity: int | None = Field(default=None, ge=0, le=100_000)
+    capacity: int | None = Field(default=None, ge=0, le=100_000, strict=True)
 
 
 @router.get("")

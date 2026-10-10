@@ -1,6 +1,6 @@
 """Mock ILMS: stands in for the institution's real circulation system (out of scope, SOP section 1).
 
-It owns the *loan policy* (loan period, renewal and loan limits) and answers in SIP2 or NCIP wording. It is stateless
+It owns the *loan policy* (loan period, renewal and loan limits) and answers in SIP2 wording. It is stateless
 about loans, apart from remembering answers by transaction id so a retried request is never processed twice. Failure
 injection (`fail_next`) lets tests and demos exercise timeouts, outages and lost replies.
 """
@@ -19,26 +19,15 @@ from aisys.circulation.connector import (
     MemberView,
 )
 
-# the same outcome, worded the way each protocol would report it
+# each outcome, worded the way a SIP2 ILMS reports it (the only protocol the add-on speaks; see docs/decisions.md DR-13)
 WORDING = {
-    "sip2": {
-        "ok": "Transaction OK",
-        "patron_blocked": "Patron blocked",
-        "fines_exceeded": "Patron has excessive fees",
-        "item_on_loan": "Item already checked out",
-        "not_on_loan": "Item not checked out",
-        "loan_limit": "Too many items charged",
-        "renewal_limit": "Renewal not allowed: maximum renewals reached",
-    },
-    "ncip": {
-        "ok": "Request completed",
-        "patron_blocked": "User Blocked",
-        "fines_exceeded": "User Ineligible To Check Out: fees exceed limit",
-        "item_on_loan": "Item Already Checked Out",
-        "not_on_loan": "Item Not Checked Out",
-        "loan_limit": "Maximum Check Out Limit Reached",
-        "renewal_limit": "Maximum Renewals Exceeded",
-    },
+    "ok": "Transaction OK",
+    "patron_blocked": "Patron blocked",
+    "fines_exceeded": "Patron has excessive fees",
+    "item_on_loan": "Item already checked out",
+    "not_on_loan": "Item not checked out",
+    "loan_limit": "Too many items charged",
+    "renewal_limit": "Renewal not allowed: maximum renewals reached",
 }
 
 
@@ -49,7 +38,7 @@ class MockIlms:
 
     def __init__(self, config: CirculationConfig | None = None, **_options: object) -> None:
         self.config = config or CirculationConfig()
-        self.protocol = self.config.ilms_protocol if self.config.ilms_protocol in WORDING else "sip2"
+        self.protocol = "sip2"
         self.calls: list[tuple[str, str]] = []  # (operation, txn_id) for every request received
         self._answers: dict[str, ConnectorResult] = {}
         self._injected: list[str] = []
@@ -70,7 +59,7 @@ class MockIlms:
 
     # ---- helpers --------------------------------------------------------------------------------
     def _result(self, ok: bool, code: str, due_at: datetime | None = None) -> ConnectorResult:
-        return ConnectorResult(ok, code, WORDING[self.protocol][code], self.protocol, due_at)
+        return ConnectorResult(ok, code, WORDING[code], self.protocol, due_at)
 
     def _run(self, op: str, txn_id: str, decide) -> ConnectorResult:
         with self._lock:

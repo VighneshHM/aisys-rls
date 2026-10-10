@@ -24,6 +24,7 @@ from aisys.deps import (
     get_provider,
     get_settings,
     require,
+    within_own_rights,
 )
 from aisys.integrations.credentials import CardPresentation, CredentialProvider
 from aisys.models import AuditEvent, Card, Role, User
@@ -154,6 +155,7 @@ def create_user(
     role = db.scalar(select(Role).where(Role.name == body.role))
     if role is None:
         raise HTTPException(422, f"Unknown role: {body.role}")
+    within_own_rights(db, request, principal, (p.code for p in role.permissions), f"give the role '{role.name}'")
     user = User(
         username=body.username,
         display_name=body.display_name,
@@ -193,6 +195,9 @@ def issue_card(
             raise HTTPException(422, "Staff card requires an existing username")
         if not user.active:
             raise HTTPException(409, "That staff member is deactivated; activate them before issuing a card.")
+        within_own_rights(
+            db, request, principal, (p.code for p in user.role.permissions), f"issue a card to '{user.username}'"
+        )
         card = Card(uid=body.uid, kind="staff", user_id=user.id)
     else:
         if not body.member_ref:

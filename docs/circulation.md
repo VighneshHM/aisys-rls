@@ -8,7 +8,7 @@ interface**, and every attempt is written to an append-only history.
 | Decision | Why | Cost |
 |---|---|---|
 | **One interface, `CirculationConnector`** (`patron_status`, `checkout`, `renew`, `checkin`, `due_date`). The application never calls an ILMS directly | The SOP asks for an "NCIP 2.0 adapter / SIP2 adapter *boundary*" with mocks where vendor endpoints are unavailable. A real adapter is a new class registered under a driver name; nothing else changes. A SIP2 adapter now exists (`driver = "sip2"`, `docs/sip2.md`) | Only SIP2 is built, and it is tested against a simulator only (no certification claimed). NCIP 2.0 is not built |
-| **Results are protocol-neutral** (`ok`, `code`, `message`, `due_at`); the mock words messages as SIP2 or NCIP (`[ilms] protocol`) | Both protocols report the same facts differently (SIP2 screen message, NCIP problem); callers should not care | Real adapters must map their replies to our codes (the SIP2 mapping is in `docs/sip2.md`) |
+| **Results are protocol-neutral** (`ok`, `code`, `message`, `due_at`); the mock answers in SIP2 wording, and the page shows the protocol the connector actually speaks | Callers should not care how an ILMS words a refusal; another protocol would map its replies to the same codes. A setting that asked the mock for NCIP wording was removed (D-059) | Real adapters must map their replies to our codes (the SIP2 mapping is in `docs/sip2.md`) |
 | **The ILMS owns loan policy** (loan period, renewal limit, loan limit). We check only what our own records know first: reference item, blocked member, fines over the limit, item already out | A real ILMS is the authority on rules; our local checks give a fast, explained refusal for the common blocks | In the demo the mock gets its limits from our config (it has no database of its own) |
 | **Same transaction id on every retry; the ILMS repeats its answer for a known id** | A lost reply must not lend the book twice (tested) | A real ILMS needs to support idempotent requests, or the adapter must emulate it. SIP2 has no transaction id, so the SIP2 adapter remembers answers by id and checks the ILMS before repeating a request whose answer was lost |
 | **Bounded retries, then `ilms_unavailable`; nothing local changes** | Staff are told clearly and can try again; no half-done loan | No offline queue yet (planned with FR12 offline lifecycle) |
@@ -60,7 +60,6 @@ max_loans = 5
 
 [ilms]
 driver = "mock"          # name of a registered connector driver
-protocol = "sip2"        # wording the mock uses: sip2 | ncip
 retries = 2
 backoff_s = 0.1
 ```

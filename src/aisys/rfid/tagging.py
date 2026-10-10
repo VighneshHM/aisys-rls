@@ -190,7 +190,7 @@ class MemberCheck:
         codes = {p["code"] for p in self.problems}
         if "no_such_member" in codes:
             return 404
-        return 409 if codes <= {"card_in_use"} else 422
+        return 409 if codes <= {"card_in_use", "member_removed"} else 422
 
     def out(self) -> dict:
         m = self.member
@@ -229,6 +229,10 @@ def validate_member_tagging(db: Session, member_no: str, card_uid: str) -> Membe
         chk.problems.append(_p("no_such_member", f"No member with number '{member_no}'", "member_no"))
         return chk
     chk.member = member
+    if member.removed_at is not None:
+        chk.problems.append(
+            _p("member_removed", f"{member.name} has been removed: restore them before issuing a card", "member_no")
+        )
     if not member.name.strip():
         chk.problems.append(_p("name_missing", "The member record has no name to print on the card", "name"))
     chk.problems += card_problems(db, uid)

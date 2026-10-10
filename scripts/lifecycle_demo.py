@@ -98,12 +98,15 @@ try:
     sys.exit("probe: the connection was NOT blocked")
 except OSError as exc:
     assert "blocked by lifecycle_demo" in str(exc), exc
-clean = {"SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")}  # like the installer: no PYTHONPATH
+# like the installer: no PYTHONPATH. Windows itself needs SystemRoot and SystemDrive (without SystemDrive it writes a
+# literal "%SystemDrive%" folder into the current directory)
+clean = {k: __import__("os").environ[k] for k in ("SYSTEMROOT", "SYSTEMDRIVE") if k in __import__("os").environ}
 child = subprocess.run([sys.executable, "-c", "import socket; socket.getaddrinfo('pypi.org', 443)"], env=clean,
                        capture_output=True, text=True)
 assert child.returncode != 0 and "blocked by lifecycle_demo" in child.stderr, child.stderr
 print("network block active in this process and in a child started with a clean environment")
 """
+WORK: list[Path] = [Path(tempfile.gettempdir())]  # every step runs in the demo's own folder, never in the repository
 GUARD: dict[str, str] = {}  # PYTHONPATH and log location, set once the guard is written
 MIGRATION = '''"""demo schema change shipped by the 0.2.0 update package"""
 
@@ -128,7 +131,7 @@ def downgrade() -> None:
 def run(cmd: list[str], offline: bool = False, expect_fail: bool = False) -> str:
     env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}  # run as a fresh machine would
     env.update({**OFFLINE, **GUARD} if offline else {})
-    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, check=False)  # noqa: S603
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, check=False, cwd=WORK[0])  # noqa: S603
     out = (proc.stdout + proc.stderr).strip()
     if expect_fail and proc.returncode == 0:
         sys.exit(f"EXPECTED A REFUSAL but it succeeded: {' '.join(cmd[-3:])}\n{out}")
@@ -163,8 +166,11 @@ def main() -> None:
     ap.add_argument("--wheels-from", type=Path)
     ap.add_argument("--work", type=Path)
     a = ap.parse_args()
-    work = a.work or Path(tempfile.mkdtemp(prefix="aisys-demo-"))
+    work = (a.work or Path(tempfile.mkdtemp(prefix="aisys-demo-"))).resolve()  # steps run in it, so no relative paths
+    if a.wheels_from:
+        a.wheels_from = a.wheels_from.resolve()
     work.mkdir(parents=True, exist_ok=True)
+    WORK[0] = work
     wf = ["--wheels-from", str(a.wheels_from)] if a.wheels_from else []
     keys, other, dist, root = work / "keys", work / "other-keys", work / "dist", work / "install"
     step("Build machine: keys, licence and two signed packages")

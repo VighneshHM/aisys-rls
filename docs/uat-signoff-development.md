@@ -14,10 +14,10 @@ owner to complete.** No one has signed on anyone else's behalf.
 | Field | Entry |
 |---|---|
 | Site / library name | none: development environment (demo library, synthetic data) |
-| AISYS version (Updates page) | 0.1.0, branch `fix/sop-gaps` (the evaluation release candidate) |
+| AISYS version (Updates page) | 0.1.0 (`main` after PR #24, then branch `fix/review-gaps` for UAT-27 to UAT-29) |
 | Environment (production-like, devices real or simulated) | Windows 11 developer PC; all devices simulated (mock drivers); ILMS: built-in mock, and the SIP2 simulator for UAT-25 |
 | Database seeded with (demo data / site data) | demo data (`python -m aisys.cli seed-demo`), plus the synthetic sample spreadsheets in `samples/` |
-| Date(s) of the test | 2026-10-05 to 2026-10-09 (each scenario when its feature was built); UAT-23 to UAT-26 on 2026-10-09 |
+| Date(s) of the test | 2026-10-05 to 2026-10-09 (each scenario when its feature was built); UAT-23 to UAT-26 on 2026-10-09; UAT-27 to UAT-29 on 2026-10-10 |
 | Test lead (name, role) | VighneshHM, project owner and developer |
 
 ## 2. Testers
@@ -49,6 +49,10 @@ Extra checks witnessed:
 | UAT-23 | Settings: a bad value refused; public catalogue switched off and back; audited | ✓ | Pass | Development team | 2026-10-09 | |
 | UAT-24 | Custom role: create, assign, enforce, edit, refuse removal while held, remove; audited | ✓ | Pass | Development team | 2026-10-09 | D-047 and D-048 found and fixed during the run |
 | UAT-26 | Patron card from the Administration page uses the member check; the old card stops | ✓ | Pass | Development team | 2026-10-09 | path fixed by D-050 |
+| UAT-27 | Public catalogue hand-over from the menu; opening `/opac` keeps the session; kiosk host serves only the catalogue | ✓ | Pass | Development team | 2026-10-10 | D-055, DR-17 |
+| UAT-28 | Correct a record and withdraw a copy; refused loan; audit line; invalid edit refused | ✓ | Pass | Development team | 2026-10-10 | D-057, DR-19 |
+| UAT-29 | Read the gates now (simulator only); real-driver path by automated tests | ✓ | Pass | Development team | 2026-10-10 | D-056, DR-18 |
+| UAT-30 | Patrons: list, filters, remove (refused while owing), restore, erase with typed confirmation, clerk read-only, phone width | ✓ | Pass | Development team | 2026-10-10 | D-081 to D-084, DR-20 |
 | UAT-17 | Patron reminders | ✓ | Pass | Development team | see `uat.md` | |
 | UAT-12 | Labels | ✓ | Pass | Development team | see `uat.md` | |
 | UAT-03 | Public catalogue | ✓ | Pass | Development team | see `uat.md` | |

@@ -177,12 +177,126 @@ def create_item(db: Session, values: dict[str, str], *, actor: str, ip: str = ""
     return item
 
 
+BIB_FIELDS = ("title", "author", "isbn", "publisher", "pub_year", "edition", "language")
+COPY_FIELDS = ("barcode", "call_number", "location", "item_type", "status", "price", "acquired_on")
+STAFF_STATUSES = ("available", "damaged", "lost", "withdrawn")  # what staff may set; "on_loan" belongs to circulation
+
+
+def _current(item: Item) -> dict[str, str]:
+    out = item_out(item)
+    return {k: "" if out[k] is None else str(out[k]) for k in ITEM_FIELDS}
+
+
+def update_item(
+    db: Session, item_id: int, changes: dict[str, str], *, reason: str = "", actor: str, ip: str = ""
+) -> Item:
+    """Correct a catalogue record or change a copy's status (damaged, lost, withdrawn, back to available).
+
+    The merged record is checked by the same validator as a new item. The accession number is the copy's identity (it is
+    written on its tag) and cannot be changed. Title, author, ISBN and the other bibliographic fields belong to the
+    record that every copy of the title shares, so a correction there applies to all its copies. Nothing is ever
+    deleted: a copy that leaves the collection is marked withdrawn. Every change is audited with the old and new values.
+    """
+    item = get_item(db, item_id)
+    unknown = sorted(set(changes) - set(BIB_FIELDS) - set(COPY_FIELDS))
+    if unknown:
+        raise CatalogueError(422, f"These fields cannot be changed here: {', '.join(unknown)}")
+    before = _current(item)
+    wanted = {k: str(v).strip() for k, v in changes.items()}
+    if "status" in wanted:
+        if wanted["status"] not in STAFF_STATUSES:
+            raise CatalogueError(422, f"Status must be one of: {', '.join(STAFF_STATUSES)}")
+        if item.status == "on_loan" and wanted["status"] != "on_loan":
+            raise CatalogueError(409, "The item is on loan: check it in first, then change its status")
+    merged = {**before, **wanted}
+    if merged["status"] == "on_loan":  # loans are circulation's business; validate the rest of the record as usual
+        merged["status"] = "available"
+    res = validation.validate_row(merged)
+    # The importer only warns about a bad year or an unknown item type and stores a fallback; a person correcting a
+    # record must not lose a value silently, so a warning on a field they changed is refused here (D-063).
+    problems = [i.as_dict() for i in res.issues if i.severity == "error" or (i.field in wanted and i.field != "status")]
+    if problems:
+        for p in problems:
+            p["severity"] = "error"
+        raise CatalogueError(422, "The item has problems; nothing was saved", problems)
+    c = res.clean
+    if c["barcode"] and (c["barcode"] or "").lower() != (item.barcode or "").lower():
+        clash = db.scalar(select(Item).where(func.lower(Item.barcode) == c["barcode"].lower(), Item.id != item.id))
+        if clash is not None:
+            raise CatalogueError(
+                409,
+                "An item with this barcode already exists",
+                [
+                    {
+                        "field": "barcode",
+                        "code": "duplicate",
+                        "severity": "error",
+                        "message": f"Already used by item #{clash.id}",
+                    }
+                ],
+            )
+    bib = item.bib
+    if c["dedupe_key"] != bib.dedupe_key:
+        other = db.scalar(select(BibRecord).where(BibRecord.dedupe_key == c["dedupe_key"], BibRecord.id != bib.id))
+        if other is not None:
+            raise CatalogueError(
+                409,
+                f"Another record (#{other.id}) already has this title and ISBN; correct that one instead",
+                [
+                    {
+                        "field": "title",
+                        "code": "duplicate",
+                        "severity": "error",
+                        "message": f"Same as record #{other.id}",
+                    }
+                ],
+            )
+        bib.dedupe_key = c["dedupe_key"]
+    for k in BIB_FIELDS:
+        setattr(bib, k, c[k])
+    item.barcode = c["barcode"]
+    item.call_number, item.location = c["call_number"], c["location"]
+    item.item_type, item.is_reference = c["item_type"], c["is_reference"]
+    if item.status != "on_loan":
+        item.status = c["status"]
+    item.price = Decimal(c["price"]) if c["price"] else None
+    item.acquired_on = date.fromisoformat(c["acquired_on"]) if c["acquired_on"] else None
+    try:
+        db.flush()
+    except IntegrityError as exc:  # lost a race with another request
+        db.rollback()
+        raise CatalogueError(409, "Another item already has that barcode") from exc
+    after = _current(item)
+    changed = {k: {"from": before[k], "to": after[k]} for k in ITEM_FIELDS if before[k] != after[k]}
+    if changed:
+        detail: dict = {"accession_no": item.accession_no, "changes": changed}
+        if reason.strip():
+            detail["reason"] = reason.strip()[:200]
+        if any(k in BIB_FIELDS for k in changed):
+            detail["copies_sharing_the_record"] = db.scalar(select(func.count()).where(Item.bib_id == bib.id))
+        audit.record(
+            db, actor=actor, action="catalogue.item.update", entity="item", entity_id=item.id, detail=detail, ip=ip
+        )
+        db.commit()
+    else:
+        db.rollback()
+    db.refresh(item)
+    return item
+
+
 def _like(q: str) -> str:
     return "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
 def search(
-    db: Session, q: str = "", *, tagged: bool | None = None, status: str | None = None, limit: int = 25, offset: int = 0
+    db: Session,
+    q: str = "",
+    *,
+    tagged: bool | None = None,
+    status: str | None = None,
+    hide_statuses: tuple[str, ...] = (),
+    limit: int = 25,
+    offset: int = 0,
 ) -> tuple[int, list[tuple[Item, RfidTag | None]], dict[int, str]]:
     """Locate items by title, author, ISBN, publisher, accession no., barcode, call number or tag UID.
 
@@ -232,6 +346,8 @@ def search(
         stmt = stmt.where(RfidTag.id.is_(None))
     if status:
         stmt = stmt.where(Item.status == status)
+    if hide_statuses:
+        stmt = stmt.where(Item.status.not_in(hide_statuses))
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery())) or 0
     order = (
         [func.coalesce(ranked.c.rank, 0.0), BibRecord.title, Item.accession_no]

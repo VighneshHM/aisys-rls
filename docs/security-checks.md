@@ -9,10 +9,22 @@ What was checked, how, and what is left. Each row can be re-run.
 | Static analysis for security defects (Bandit rules) | `ruff check` with the `S` rule set, on every pull request | clean; the few intentional exceptions (subprocess with a fixed argument list, the demo password, constant SQL in migrations) carry a comment saying why |
 | Known vulnerabilities in dependencies | `pip-audit` on `requirements.lock` and `requirements-dev.lock` on every pull request | found 7 in the signing library `cryptography` 48.0.0 during this work; fixed by pinning 50.0.2; clean now |
 | Secrets in the repository | review of `git ls-files`, `.gitignore` (keys, `.env`, `config/config.toml`, databases, `release-keys/` ignored) | none committed; the only credentials are the synthetic demo cards and the documented demo administrator password |
+| Every administrative action recorded (SOP section 10) | the audit log | staff, cards, roles, settings, backups, restores, catalogue corrections and status changes, and the hand-run notification actions (send queued messages, run reminders, retry: added for D-058) each write an audit line with the actor; circulation goes to the append-only history |
 | Permissions on every endpoint | `docs/api-reference.md` is generated from the routes and lists the permission each needs; tests call the sensitive ones with the wrong role | a role without the permission gets 403 and an audit line; no endpoint but sign-in, health and the public catalogue is public |
 | Passwords and sign-in | `test_foundation`: scrypt hashing, lockout after repeated failures, patron card cannot sign in, disabled person or card refused | passes |
 | Session handling | `test_admin`: deactivating a person ends their open sessions at once; tokens are stored hashed | passes |
 | ILMS password | `test_sip2`: `AISYS_ILMS_PASSWORD` is the only source (a password in the file is ignored) and it does not appear in a printout of the settings | passes; also not shown by `aisys doctor` |
+
+## Removing and erasing members
+
+* Removing a member keeps every loan, fine and audit line and refuses while items are out or a fine is owed; it needs
+  `member.remove` (librarians, administrators). Erasing personal details needs `member.erase` (administrators) and the typed
+  member number, works only on a removed member, deletes the card numbers and clears name, contact and reminder text
+  (`test_member_admin`).
+* The audit log and the circulation history are append-only, so they hold member numbers, never names: `member.create` no
+  longer records the name and refusal messages are kept with the member number in place of the name
+  (`service.event_text`). Entries written before this change may still hold a name and cannot be rewritten.
+* A removed member is stored as blocked with `removed_at` set, so a code path that predates the feature still refuses them.
 
 ## Input handling (hostile input tests)
 
@@ -48,11 +60,21 @@ What was checked, how, and what is left. Each row can be re-run.
 * All data is synthetic.
 * The audit log and the application log never hold a whole card number (`STA…N01`), a password or a token; patron e-mail and phone
   are never written to the audit log (`test_security_ops`, `test_reminders`).
-* The public catalogue is not in the staff menu; it is linked from the sign-in page. Opening it, by any route, ends any staff session in
-  that browser (server side, audited as `public_catalogue`), and pages are never cached, so the public screen cannot be used to step
-  back into a staff workspace left signed in. Its only way out is **Return to home page**, the sign-in page (`test_opac_session`).
+* The public catalogue is not in the staff menu; it is linked from the sign-in page, which shows only once nobody is
+  signed in, so the way to it from the workspace goes through signing out (DR-17). Loading the public page itself changes
+  nothing, so no link, second tab or API client can sign anyone out (D-055); if a staff session is still open in that
+  browser the page says so and offers a sign-out (POST `/handover`: ends the session on the server and in the browser,
+  audited as `public_catalogue`, refused when the request's Origin is another site).
+  Pages are never cached, so the Back button cannot show a workspace after signing out (`test_opac_session`).
+* Public terminals use a kiosk host name (`[opac] kiosk_hosts`): there only the catalogue, its search API, static files and
+  the health checks exist, sign-in is impossible, and any cookie or token sent is removed before the request is handled.
 * The public catalogue shows no accession number, barcode, tag, member, loan or due date (`test_search_shelves`).
 * The staff list shows staff card numbers masked.
+* Nobody can grant beyond their own rights: `admin.users` alone cannot create an administrator, widen a role or touch
+  the account or cards of someone who holds more (D-071, `test_managing_staff_never_hands_out_more_than_you_hold`).
+* A NUL character in any JSON body is refused, and money and quantity fields take only real whole numbers (D-079,
+  D-080). On 2026-10-10 an automated probe sent about 3,770 hostile requests to 50 changing endpoints and every
+  route was tried with no session, each built-in role and 20 single-permission roles; the findings are D-071 to D-080.
 
 ## Integrity and supply chain
 
@@ -76,7 +98,7 @@ twice; two scanners never queue a reminder twice; a restore under four clients' 
 
 * **No content-security-policy header**, because the pages use inline scripts; the other headers and the "everything is text"
   rule are the protection today.
-* **No penetration test** and no fuzzing beyond the cases above.
+* **No penetration test** by an outside party, and no fuzzing beyond the cases above.
 * **The credential provider is a mock**; real smart-card challenge-response is a future driver (the interface already carries the
   `proof` field). Assumption A-09.
 * **TLS in front of the application is documented, not tested here** (the built-in TLS is tested).

@@ -235,13 +235,21 @@ class Member(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     member_no: Mapped[str] = mapped_column(String(32), unique=True)
     name: Mapped[str] = mapped_column(String(200), index=True)
-    status: Mapped[str] = mapped_column(String(10), default="active")  # active | blocked
+    status: Mapped[str] = mapped_column(String(10), default="active")  # active | blocked (see removed_at)
     block_reason: Mapped[str] = mapped_column(String(200), default="")
     fines_cents: Mapped[int] = mapped_column(Integer, default=0)
     email: Mapped[str] = mapped_column(String(200), default="")  # where reminders go (optional)
     phone: Mapped[str] = mapped_column(String(32), default="")
     reminders_on: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # A removed member (removed_at set) keeps their history (loans, fines, events) but cannot borrow: their status is
+    # 'blocked' underneath, so every older code path refuses them too. The database rule allows only active|blocked, and
+    # rebuilding this table (other tables point at it) is not worth the risk. Erasing clears the personal details.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    removed_by: Mapped[str] = mapped_column(String(64), default="")
+    removed_reason: Mapped[str] = mapped_column(String(200), default="")
+    status_before_removal: Mapped[str] = mapped_column(String(10), default="")
+    erased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Loan(Base):

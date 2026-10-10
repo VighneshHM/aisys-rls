@@ -61,7 +61,10 @@ def pick_items(db: Session, ids: list[int] | None, location: str | None) -> list
         if len(ids) > MAX_LABELS:
             raise LabelError(422, f"At most {MAX_LABELS} labels at a time")
         found = {i.id: i for i in db.scalars(select(Item).where(Item.id.in_(ids)))}
-        items = [found[i] for i in ids if i in found]
+        unknown = sorted({i for i in ids if i not in found})
+        if unknown:  # D-078: they were dropped without a word, so a job came out short
+            raise LabelError(404, f"No item with number {', '.join(map(str, unknown[:10]))}")
+        items = [found[i] for i in ids]
     elif location:
         items = list(
             db.scalars(select(Item).where(Item.location == location, Item.status.not_in(("withdrawn", "lost"))))

@@ -12,7 +12,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 
 | Type (NFR05) | What is tested | How | Evidence |
 |---|---|---|---|
-| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 26 test files; list below |
+| Functional | every rule of every feature, including refusals and edge cases | pytest against the real application (FastAPI test client, real database file per test) | 28 test files; list below |
 | Integration | routes + services + database + mock devices together; the connector with retries and timeouts; delivery through provider adapters; a real HTTPS server; a real background loop; real subprocess installs and updates | pytest (some tests start a real server, a real `uvicorn`, or a real virtual environment) | `test_gate`, `test_circulation`, `test_security_ops`, `test_lifecycle`, `test_reminders` |
 | Migration | 200- and 20,000-row files, duplicates, invalid rows, reconciliation, rollback, restore after a failed import | pytest with generated synthetic files | `test_migration`, `test_backup` |
 | Performance | search, reports, import, backup, restore, reminders and concurrent desks with 20,000 items | `scripts/perf_report.py` | `docs/performance-results.md` |
@@ -50,26 +50,28 @@ number of tests, and the test names); `tests/test_docs.py` fails if it is stale 
 | File | Tests | Covers |
 |---|---|---|
 | `test_foundation.py` | 23 | sign-in (card and password), lockout, roles, audit log, health, migrations up and down |
-| `test_migration.py` | 30 | AC01: staging, mapping, validation rules, duplicates, reconciliation, rollback, the 20,000-row run |
+| `test_migration.py` | 31 | AC01: staging, mapping, validation rules, duplicates, reconciliation, rollback, the 20,000-row run |
 | `test_tagging.py`, `test_tag_lifecycle.py` | 37, 26 | AC02/FR05: validate, link, re-tag, remove, retire, monitoring, database invariants |
 | `test_circulation.py`, `test_fines.py`, `test_members.py`, `test_member_cards.py` | 22, 8, 8, 11 | AC03/AC04/FR04/FR05: check-out, renew, check-in, blocks, fines ledger, members, cards and the member-record check |
-| `test_inventory.py` | 10 | AC05/FR06: sweeps, signals, missing and misplaced, closing |
-| `test_gate.py` | 22 | AC06/FR07/FR09: alarms, offline behaviour, duplicates, CCTV, queued delivery, retries |
+| `test_inventory.py` | 11 | AC05/FR06: sweeps, signals, missing and misplaced, closing |
+| `test_gate.py` | 32 | AC06/FR07/FR09: alarms, offline behaviour, duplicates, CCTV, queued delivery, retries, the production gate loop, `gate-poll`, audited notification actions, a driver or camera that fails in any way |
 | `test_reports.py` | 18 | AC08/FR08: reports, filters, dashboards, CSV, hostile input, scale |
 | `test_backup.py` | 25 | AC10/NFR01: backups, proof, restore, busy database, maintenance mode, hostile names |
 | `test_lifecycle.py`, `test_lifecycle_api.py` | 49, 12 | AC09/FR12: signatures, tampering, install, update, failure paths, rollback, recovery |
-| `test_admin.py` | 25 | FR11: audit log, staff and cards, lock-out rules, custom roles |
+| `test_admin.py` | 26 | FR11: audit log, staff and cards, lock-out rules, custom roles, no granting beyond your own rights |
 | `test_reminders.py` | 42 | FR09: reminders, once-only, cancellation, the loop, contact details |
-| `test_search_shelves.py` | 72 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing |
+| `test_search_shelves.py` | 73 | FR01/FR02/FR06: full-text search, public catalogue, shelves, order check, net cataloguing, public search counts and pages every match |
 | `test_acquisitions_serials_labels.py` | 62 | FR01/FR04: orders, serials, barcodes and labels, card printing |
-| `test_opac_session.py` | 13 | NFR02/FR02: opening the public catalogue ends the staff session; not in the staff menu; Return to home page; no cached pages; scrollable menu that remembers its position |
+| `test_member_admin.py` | 36 | FR04/FR11: the Patrons page: list, search, filters, remove (refused with items out or a fine owed), restore, erase, permissions, no names in the append-only records, the migration |
+| `test_opac_session.py` | 22 | NFR02/FR02: not in the staff menu, reached from the sign-in page; the warning's sign-out (POST, audited, cross-site refused); opening the public catalogue signs nobody out; kiosk host names; no cached pages; scrollable menu that remembers its position |
+| `test_catalogue_edit.py` | 11 | FR01: corrections and copy status with the importer's rules, on-loan guard, shared-record count, audit trail, no deletes, edits that would lose a value refused |
 | `test_settings.py` | 37 | FR11: the Settings page and API, validation, audit, undo, restart |
 | `test_sip2_codec.py` | 70 | FR03: SIP2 message encoding and decoding, checksum, sequence, limits, hostile and fuzzed input |
-| `test_sip2.py` | 61 | FR03/AC03: SIP2 client and connector against the simulator over a real socket, including the web API end to end; lost, dropped and damaged answers; verify-before-resend; error mapping; configuration and password handling |
-| `test_security_ops.py`, `test_config.py` | 11, 8 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration |
+| `test_sip2.py` | 62 | FR03/AC03: SIP2 client and connector against the simulator over a real socket, including the web API end to end; lost, dropped and damaged answers; verify-before-resend; error mapping; configuration and password handling |
+| `test_security_ops.py`, `test_config.py` | 13, 9 | NFR02/NFR03/NFR06: masking, headers, HTTPS, doctor, configuration, NUL text and loose numbers refused |
 | `test_ui_assets.py`, `test_docs.py` | 32, 11 | page assets and scripts, generated documents, SBOM and licence inventory, hashed lock files, pinned build backend, redistribution notes, stage timeline, sample reports, deliverables present |
 
-Total: 745 test cases (some are parametrised).
+Total: 820 test cases (some are parametrised).
 
 ## 7. Manual scenarios
 

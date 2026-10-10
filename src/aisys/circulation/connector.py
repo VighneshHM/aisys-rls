@@ -1,8 +1,9 @@
 """The ILMS connector boundary (SOP section 6, interoperability layer).
 
-The application never talks to an ILMS directly. It calls a `CirculationConnector`; a real SIP2 or NCIP 2.0 adapter is
-a class that implements this Protocol and is registered under a driver name (see `registry.py`). Results use
-protocol-neutral codes plus a human message, the way both SIP2 ("screen message") and NCIP ("problem") report them.
+The application never talks to an ILMS directly. It calls a `CirculationConnector`; the SIP2 adapter (`sip2/`) and the
+mock are classes that implement this Protocol and are registered under a driver name (see `registry.py`). Results use
+protocol-neutral codes plus a human message (SIP2's "screen message"), so another protocol, such as NCIP 2.0 if a site
+ever needs it (not built, docs/decisions.md DR-13), would be one more class behind the same boundary.
 """
 
 from __future__ import annotations
@@ -32,11 +33,10 @@ class CirculationConfig:
     grace_days: int = 1  # whole days late that cost nothing
     max_fine_per_loan_cents: int = 1000  # one loan never costs more than this
     ilms_driver: str = "mock"
-    ilms_protocol: str = "sip2"  # which dialect the mock imitates in its messages: sip2 | ncip
     ilms_endpoint: str = (
         ""  # host name or IP address of the ILMS server (a real connector uses it; the mock ignores it)
     )
-    ilms_port: int = 0  # the SIP2 / NCIP port of the ILMS server (0 = not set)
+    ilms_port: int = 0  # the SIP2 port of the ILMS server (0 = not set)
     ilms_login: str = ""  # SIP2 login user (CN); empty means the server needs no login
     ilms_password: str = field(default="", repr=False)  # SIP2 login password (CO): from AISYS_ILMS_PASSWORD only
     ilms_institution: str = ""  # SIP2 institution id (AO)

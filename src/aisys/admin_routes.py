@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from aisys import audit
 from aisys.auth.permissions import PERMISSIONS, ROLES
 from aisys.auth.security import card_hint
-from aisys.deps import Principal, client_ip, get_db, require
+from aisys.deps import Principal, client_ip, get_db, require, within_own_rights
 from aisys.models import AuditEvent, AuthSession, Card, Permission, Role, User
 from aisys.timeutil import aware, iso
 
@@ -200,6 +200,8 @@ def patch_user(
     if user is None:
         raise HTTPException(404, "No such user")
     me = principal.user.id == user.id
+    codes = {p.code for p in user.role.permissions}
+    within_own_rights(db, request, principal, codes, f"change the account of '{user.username}'")
     changes: dict = {}
     if body.active is not None and body.active != user.active:
         if me and not body.active:
@@ -219,6 +221,7 @@ def patch_user(
             raise HTTPException(422, f"Unknown role: {body.role}")
         if me:
             raise HTTPException(409, "You cannot change your own role.")
+        within_own_rights(db, request, principal, (p.code for p in role.permissions), f"give the role '{role.name}'")
         if user.role.name == "admin" and user.active and _active_admins(db, user.id) == 0:
             raise HTTPException(409, "This is the last active administrator and cannot be demoted.")
         changes["role"] = {"from": user.role.name, "to": role.name}
@@ -307,9 +310,9 @@ def create_role(body: RoleIn, request: Request, principal: Principal = CanAdmin,
         raise HTTPException(422, "A role name is 3 to 32 lowercase letters, digits or _, starting with a letter")
     if db.scalar(select(Role.id).where(Role.name == name)) is not None:
         raise HTTPException(409, f"There is already a role called '{name}'")
-    role = Role(
-        name=name, description=" ".join(body.description.split()), permissions=_permissions(db, body.permissions)
-    )
+    wanted = _permissions(db, body.permissions)
+    within_own_rights(db, request, principal, (p.code for p in wanted), "create a role with these permissions")
+    role = Role(name=name, description=" ".join(body.description.split()), permissions=wanted)
     db.add(role)
     db.flush()
     audit.record(
@@ -326,6 +329,7 @@ def patch_role(
 ):
     """Change a custom role's description or permissions. People holding it get the new rights on their next request."""
     role = _custom_role(db, name)
+    within_own_rights(db, request, principal, (p.code for p in role.permissions), f"change the role '{role.name}'")
     changes: dict = {}
     if body.description is not None and " ".join(body.description.split()) != role.description:
         role.description = " ".join(body.description.split())
@@ -333,6 +337,7 @@ def patch_role(
     if body.permissions is not None:
         before, wanted = {p.code for p in role.permissions}, _permissions(db, body.permissions)
         after = {p.code for p in wanted}
+        within_own_rights(db, request, principal, after, f"give the role '{role.name}' these permissions")
         if after != before:
             if principal.user.role_id == role.id and "admin.users" in before - after:
                 raise HTTPException(409, "You cannot take 'admin.users' away from your own role.")
@@ -351,6 +356,7 @@ def patch_role(
 def delete_role(name: str, request: Request, principal: Principal = CanAdmin, db: Session = Depends(get_db)):
     """Remove a custom role that nobody holds. Its history stays in the audit log."""
     role = _custom_role(db, name)
+    within_own_rights(db, request, principal, (p.code for p in role.permissions), f"remove the role '{role.name}'")
     holders = _holders(db).get(role.id, 0)
     if holders:
         raise HTTPException(
@@ -376,6 +382,9 @@ def patch_card(
     card = db.get(Card, card_id)
     if card is None:
         raise HTTPException(404, "No such card")
+    if card.kind == "staff" and card.user_id is not None and (owner := db.get(User, card.user_id)) is not None:
+        codes = {p.code for p in owner.role.permissions}
+        within_own_rights(db, request, principal, codes, f"change a card of '{owner.username}'")
     if card.active != body.active:
         card.active = body.active
         audit.record(

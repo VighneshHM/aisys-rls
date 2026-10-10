@@ -51,7 +51,10 @@ def _from_csv(data: bytes) -> tuple[list[str], list[tuple[int, list[str]]]]:
     except csv.Error:
         dialect = csv.excel
     reader = csv.reader(io.StringIO(text), dialect)
-    rows = [[c.strip() for c in r] for r in reader]
+    try:
+        rows = [[c.strip() for c in r] for r in reader]
+    except csv.Error as exc:  # e.g. one cell over the csv module's 131,072-character limit (D-072)
+        raise ParseError(f"The CSV file cannot be read near line {reader.line_num}: {exc}") from exc
     return _split_header(rows)
 
 

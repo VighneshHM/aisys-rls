@@ -61,7 +61,9 @@ and design: `docs/inventory.md`.
 Sign in as `STAFFADMIN01`, open **Gate events**, type a tagged book's accession number under *Simulate a walk through the
 gate* and click **Walk through the gate**. Because the book was never checked out its security bit is still on, so it
 raises an alarm with a CCTV snapshot and queued messages. Click **Send queued messages** to deliver them and read them
-in the mock outbox. Check the book out first and walk it through again: no alarm. Details and design: `docs/gate.md`.
+in the mock outbox. Check the book out first and walk it through again: no alarm. In production a real gate is read by the
+gate loop (`[gate] poll_seconds`), by `python -m aisys.cli gate-poll --every 2`, or by **Read the gates now**. Details and
+design: `docs/gate.md`.
 
 ## Try the reports (AC08)
 
@@ -128,6 +130,17 @@ tests/                            pytest suite, tagged with requirement IDs
 (backup, rehearsal on a copy, migration, start-up check, switch) and rolls back with the data proven unchanged. The
 **Updates** page of an installed copy shows the versions, licence and history and can dry-run check a waiting package.
 How to build, install, update, roll back and recover: `docs/deployment.md`.
+
+## Correct a record, withdraw a copy (FR01)
+
+In **Catalogue** open an item and press **Edit details or status**: fix any field (the accession number is fixed), or mark the copy
+damaged, lost or withdrawn with a reason. The same rules as a new item apply, every change is audited, and nothing is deleted.
+
+## The public catalogue and public terminals
+
+The public catalogue is linked from the sign-in page, not the staff menu: on a shared screen, sign out first, then open it.
+Opening `/opac` by its address changes nothing (it warns if you are still signed in and offers a sign-out). A public terminal gets its own host name in
+`[opac] kiosk_hosts`, where only the catalogue exists (`docs/deployment.md`, *Public terminals*).
 
 ## Audit log and administration
 

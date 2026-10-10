@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from aisys import audit
 from aisys.catalogue import service as catalogue
 from aisys.models import SerialIssue, SerialTitle
-from aisys.timeutil import iso
+from aisys.timeutil import iso, library_today
 
 FREQUENCIES = ("weekly", "monthly", "quarterly", "yearly")
 LATE_AFTER_DAYS = 7
@@ -47,10 +47,27 @@ def add_months(day: date, months: int) -> date:
     return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
 
 
+MONTHS = {"monthly": 1, "quarterly": 3, "yearly": 12}
+
+
 def next_date(day: date, frequency: str) -> date:
     if frequency == "weekly":
         return day + timedelta(days=7)
-    return add_months(day, {"monthly": 1, "quarterly": 3, "yearly": 12}[frequency])
+    return add_months(day, MONTHS[frequency])
+
+
+def nth_date(anchor: date, frequency: str, n: int) -> date:
+    """The n-th issue date counted from the first one, never from the previous (already shortened) date, so a
+    schedule anchored on the 31st stays on the last day of each month instead of drifting to the 28th (D-073)."""
+    if frequency == "weekly":
+        return anchor + timedelta(days=7 * n)
+    return add_months(anchor, MONTHS[frequency] * n)
+
+
+def steps_between(anchor: date, day: date, frequency: str) -> int:
+    if frequency == "weekly":
+        return (day - anchor).days // 7
+    return ((day.year - anchor.year) * 12 + day.month - anchor.month) // MONTHS[frequency]
 
 
 def label_for(day: date, frequency: str) -> str:
@@ -65,7 +82,7 @@ def label_for(day: date, frequency: str) -> str:
 
 
 def issue_out(i: SerialIssue, today: date | None = None) -> dict:
-    today = today or date.today()
+    today = today or library_today()
     late = i.status == "expected" and i.expected_on < today - timedelta(days=LATE_AFTER_DAYS)
     return {
         "id": i.id,
@@ -81,7 +98,7 @@ def issue_out(i: SerialIssue, today: date | None = None) -> dict:
 
 
 def title_out(s: SerialTitle, *, with_issues: bool = False, today: date | None = None) -> dict:
-    today = today or date.today()
+    today = today or library_today()
     counts = {k: sum(1 for i in s.issues if i.status == k) for k in ("expected", "received", "claimed", "missing")}
     late = sum(
         1 for i in s.issues if i.status == "expected" and i.expected_on < today - timedelta(days=LATE_AFTER_DAYS)
@@ -114,15 +131,14 @@ def list_titles(db: Session) -> list[dict]:
     return [title_out(s) for s in db.scalars(select(SerialTitle).order_by(SerialTitle.title))]
 
 
-def _schedule(s: SerialTitle, start: date, count: int) -> None:
-    day = start
+def _schedule(s: SerialTitle, anchor: date, first: int, count: int) -> None:
     have = {i.label for i in s.issues}
-    for _ in range(count):
+    for n in range(first, first + count):
+        day = nth_date(anchor, s.frequency, n)
         label = label_for(day, s.frequency)
         if label not in have:
             s.issues.append(SerialIssue(label=label, expected_on=day))
             have.add(label)
-        day = next_date(day, s.frequency)
 
 
 def create_title(
@@ -156,7 +172,7 @@ def create_title(
         title=title, issn=issn, frequency=frequency, supplier=" ".join((supplier or "").split())[:200],
         location=" ".join((location or "").split())[:100],
     )  # fmt: skip
-    _schedule(s, first_expected_on, issues_ahead)
+    _schedule(s, first_expected_on, 0, issues_ahead)
     db.add(s)
     db.flush()
     audit.record(
@@ -179,7 +195,8 @@ def extend(db: Session, serial_id: int, count: int, *, actor: str, ip: str = "")
     last = max((i.expected_on for i in s.issues), default=None)
     if last is None:
         raise SerialError(409, "This subscription has no issues to continue from")
-    _schedule(s, next_date(last, s.frequency), count)
+    anchor = min(i.expected_on for i in s.issues)
+    _schedule(s, anchor, steps_between(anchor, last, s.frequency) + 1, count)
     audit.record(
         db, actor=actor, action="serial.extend", entity="serial", entity_id=s.id, detail={"count": count}, ip=ip
     )
@@ -213,8 +230,8 @@ def receive_issue(
     if issue.status == "received":
         raise SerialError(409, f"Issue {issue.label} was already received")
     s = get_title(db, issue.serial_id)
-    day = received_on or date.today()
-    if day > date.today() + timedelta(days=1) or day < date(2000, 1, 1):
+    day = received_on or library_today()
+    if day > library_today() + timedelta(days=1) or day < date(2000, 1, 1):
         raise SerialError(422, "The date received looks wrong")
     item = None
     if book_in:
@@ -266,7 +283,7 @@ def mark(db: Session, issue_id: int, status: str, note: str, *, actor: str, ip: 
 
 def late_issues(db: Session, today: date | None = None) -> list[dict]:
     """Issues that should have arrived more than a week ago (still expected or already claimed)."""
-    today = today or date.today()
+    today = today or library_today()
     rows = db.execute(
         select(SerialIssue, SerialTitle)
         .join(SerialTitle, SerialTitle.id == SerialIssue.serial_id)

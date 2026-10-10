@@ -240,6 +240,8 @@ def test_rejects_bad_files(client, lib):
     assert upload(client, lib, b"not a zip", "broken.xlsx").status_code == 422
     assert client.post("/api/migrations", headers=lib, files={"file": ("a.csv", b"a,b\n1,2", "text/csv")},
                        data={"mapping": "[1,2]"}).status_code == 422  # fmt: skip
+    huge = upload(client, lib, b"title,accession_no\n" + b"x" * 200_000 + b",A\n")  # one cell past csv's limit (D-072)
+    assert huge.status_code == 422 and "cannot be read" in huge.text
 
 
 @pytest.mark.req("FR10")
@@ -408,3 +410,19 @@ def test_unchanged_library_is_not_rechecked(client, lib):
         assert "refreshed" not in client.get(f"/api/migrations/{b['id']}", headers=lib).json()
     aud = login_card(client, "STAFFAUDIT01")
     assert client.get("/api/audit?action=migration.revalidate", headers=aud).json() == []
+
+
+@pytest.mark.req("FR10", "FR01")
+def test_a_date_of_today_east_of_utc_is_not_called_a_future_date():
+    """D-060: just after midnight east of UTC the person's today is tomorrow in UTC; it must still be accepted."""
+    from datetime import UTC, datetime, timedelta
+
+    from aisys.migration.validation import validate_row
+    from aisys.timeutil import library_today
+
+    utc_today = datetime.now(UTC).date()
+    assert library_today() == utc_today
+    for days, ok in ((0, True), (1, True), (2, False)):
+        day = (utc_today + timedelta(days=days)).isoformat()
+        res = validate_row({"title": "T", "accession_no": f"D{days}", "acquired_on": day})
+        assert res.ok is ok, (days, [i.as_dict() for i in res.issues])

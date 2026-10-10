@@ -29,9 +29,9 @@ def test_the_sample_config_loads_and_builds_every_device():
 
 
 def test_the_ilms_address_is_configurable(tmp_path):
-    s = load_settings(write(tmp_path, '[ilms]\nendpoint = " 192.168.1.50 "\nport = 6001\nprotocol = "ncip"\n'))
+    s = load_settings(write(tmp_path, '[ilms]\nendpoint = " 192.168.1.50 "\nport = 6001\nprotocol = "sip2"\n'))
     c = s.circulation
-    assert (c.ilms_endpoint, c.ilms_port, c.ilms_protocol) == ("192.168.1.50", 6001, "ncip")
+    assert (c.ilms_endpoint, c.ilms_port) == ("192.168.1.50", 6001)
     assert load_settings(write(tmp_path, '[ilms]\nport = "6001"\n')).circulation.ilms_port == 6001, (
         "a quoted number works too"
     )
@@ -59,3 +59,10 @@ def test_production_refuses_a_short_secret(tmp_path, monkeypatch):
     monkeypatch.setenv("AISYS_SECRET_KEY", "short")
     with pytest.raises(RuntimeError, match="AISYS_SECRET_KEY"):
         load_settings(write(tmp_path, ""))
+
+
+@pytest.mark.req("FR03")
+def test_an_ncip_protocol_setting_is_refused_rather_than_mislabelling_sip2(tmp_path):
+    with pytest.raises(ValueError, match="only SIP2 is supported"):
+        load_settings(write(tmp_path, '[ilms]\nprotocol = "ncip"\n'))
+    assert load_settings(write(tmp_path, "[ilms]\n")).circulation.ilms_driver == "mock"  # no line is fine

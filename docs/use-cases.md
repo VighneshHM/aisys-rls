@@ -36,6 +36,9 @@ tests tagged with the requirement (`docs/traceability.md` lists every test per r
 | UC-23 | Change the library's rules | Administrator | FR11 | Settings |
 | UC-24 | Define a custom role | Administrator | FR11 | Administration |
 | UC-25 | Circulation through the SIP2 protocol | Desk clerk | FR03, AC03 | Circulation |
+| UC-26 | Correct a record; withdraw or write off a copy | Librarian | FR01 | Catalogue |
+| UC-27 | Hand a screen over to visitors; a public terminal | Any staff, Visitor | NFR02, FR02 | Menu, `/opac` |
+| UC-28 | See every patron; remove, restore or erase one | Librarian, Administrator | FR04, FR11 | Patrons |
 
 ---
 
@@ -210,6 +213,8 @@ minute is recorded but not sent again.
 
 - An unissued or still-armed item raises one alarm with its accession number, a camera snapshot and queued alerts (AC06). UAT-15.
 - The decision uses only the security bit, so it works while the ILMS is down; footfall is counted; a camera failure still records and announces the alarm.
+- In production a real gate is read by the gate loop, `aisys gate-poll` or **Read the gates now** (DR-18); an offline
+  gate is named and the others are still read.
 
 ## UC-16 Staff are alerted
 **Actor:** Administrator. Each staff member chooses e-mail, SMS and/or print and an address; alarms create queued messages in the
@@ -313,3 +318,51 @@ simulator) reachable, the desk works exactly as in UC-06; `aisys doctor` reports
 - Check-out, renew and check-in travel as SIP2 messages over TCP with checksums and are answered by the ILMS (FR03, AC03). UAT-25.
 - A lost answer is verified with the ILMS before anything is sent again, so an item is never lent twice.
 - The ILMS password comes only from the environment; the doctor line is OK when the ILMS answers and FAIL when it does not.
+
+## UC-26 Correct a record; withdraw or write off a copy
+**Actor:** Librarian. **Flow:** open the item in **Catalogue**, **Edit details or status**; correct the title, author, call number,
+location or any other field, or set the status to damaged, lost, withdrawn or back to available with a reason; **Save changes**.
+**Alternatives:** an invalid value (refused with the field and the reason, nothing saved); a barcode or title and ISBN that another
+record has (refused, naming it); a copy on loan (its status stays until it is checked in).
+
+**Acceptance criteria:**
+
+- The merged record passes the same rules as a new item; the accession number cannot change (FR01). UAT-28.
+- A correction is searchable at once; book details changed on one copy show on every copy of the title, and the audit line says
+  how many copies that touched.
+- A damaged, lost or withdrawn copy cannot be lent or tagged; a withdrawn copy leaves the public shelf; nothing is deleted.
+- Every change is audited with the old and new values and the reason; a save that changes nothing writes nothing.
+
+## UC-27 Hand a screen over to visitors; a public terminal
+**Actor:** any member of staff; a Visitor. **Flow:** on a shared screen, **Sign out**, then choose **Public catalogue** on the
+sign-in page. A public terminal opens the kiosk host name, where only the catalogue exists.
+**Alternatives:** someone opens `/opac` by its address while signed in (nothing happens to the session; the page warns and offers
+the sign-out); a link from another site to `/opac` (nobody is signed out).
+
+**Acceptance criteria:**
+
+- The staff menu has no public catalogue entry; the sign-in page links to it. The warning's sign-out ends the session on
+  the server and in the browser, is audited with reason `public_catalogue`, and opens the catalogue; afterwards no staff
+  page opens without signing in again (NFR02). UAT-27.
+- Loading `/opac` never signs anyone out: not a link from another site, not a second tab, not an API client.
+- A hand-over posted from another site is refused.
+- On a kiosk host name only the catalogue, its search, static files and health checks answer; sign-in is impossible and any
+  session sent is ignored; the staff host name is unaffected.
+
+## UC-28 See every patron; remove, restore or erase one
+**Actor:** Librarian (remove, restore), Administrator (also erase); a desk clerk can only look. **Flow:** open **Patrons**;
+search by name, number, e-mail or phone, or press *Blocked*, *Items out*, *Owe a fine* or *Removed*; **Remove** a member who
+has left (a reason is optional) and confirm; **Restore** brings a removed member back; **Erase details...** on a removed member
+clears their personal details after the member number is typed back.
+**Alternatives:** a member with items out or a fine owed (removal refused, saying what to do first); a removed member scanned
+at the desk (refused as removed); an erased member (cannot be restored: add them as a new member).
+
+**Acceptance criteria:**
+
+- Every member can be seen, a page at a time, with loans out, fines, masked card and contact; removed members only appear
+  under *Removed* (FR04). UAT-30.
+- Removing keeps the loans, fines and history, stops borrowing, switches the card off and cancels waiting reminders; it is
+  refused while items are out or a fine is owed. Restoring brings the member back as they were; the old card stays off.
+- Erasing clears the name, e-mail, phone, card numbers and reminder text, keeps the loan and fine history without a name, and is
+  refused unless the member was removed and the number was typed correctly; an erased member cannot be restored.
+- Every removal, restoration and erasure is audited by member number only (no name or contact detail).

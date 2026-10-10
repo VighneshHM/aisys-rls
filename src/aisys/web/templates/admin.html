@@ -11,6 +11,11 @@
 <div class="grid two">
   <section class="panel">
     <header><h3>Staff</h3><span class="badge" id="count"></span></header>
+    <div class="toolbar" style="margin:0;padding:12px 18px 0">
+      <div class="field grow" style="margin:0"><label for="s-q">Name or username contains</label><input id="s-q" type="search" autocomplete="off" maxlength="64"></div>
+      <div class="field" style="margin:0"><label for="s-role">Role</label><select id="s-role"><option value="">Any role</option></select></div>
+      <div class="field" style="margin:0"><label for="s-status">Status</label><select id="s-status"><option value="">Everyone</option><option value="active">Active</option><option value="off">Deactivated</option><option value="locked">Locked out</option></select></div>
+    </div>
     <div class="table-wrap" id="people" style="max-height:70vh;overflow:auto"></div>
     <div id="people-notice" class="notice" role="alert" style="margin:12px 18px"></div>
   </section>
@@ -100,15 +105,26 @@
         you ? null : h("button", {class: "btn ghost small" + (p.active ? " danger-text" : ""), type: "button", onclick: () => patch("/api/admin/users/" + p.id, {active: !p.active})}, p.active ? "Deactivate" : "Activate"))));
   }
 
+  let everyone = [];
+  function drawPeople() {
+    const q = $("s-q").value.trim().toLowerCase(), role = $("s-role").value, st = $("s-status").value;
+    const shown = everyone.filter(p => (!q || p.display_name.toLowerCase().includes(q) || p.username.toLowerCase().includes(q))
+      && (!role || p.role === role) && (!st || (st === "active" ? p.active : st === "off" ? !p.active : p.locked)));
+    $("count").textContent = (shown.length === everyone.length ? fmt(everyone.length) : fmt(shown.length) + " of " + fmt(everyone.length)) + " staff";
+    fill($("people"), shown.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Person", "Role", "Status", "Staff cards", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, shown.map(row))) : h("div", {class: "empty"}, "No staff match."));
+  }
+  ["s-q", "s-role", "s-status"].forEach(id => $(id).addEventListener(id === "s-q" ? "input" : "change", drawPeople));
+
   async function load() {
     let d;
     try { d = await api("/api/admin/people"); }
     catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("people"), h("div", {class: "empty"}, e.message)); return; }
-    roles = d.roles;
-    $("count").textContent = fmt(d.people.length) + " staff";
-    fill($("people"), h("table", {},
-      h("thead", {}, h("tr", {}, ["Person", "Role", "Status", "Staff cards", ""].map(t => h("th", {}, t)))),
-      h("tbody", {}, d.people.map(row))));
+    roles = d.roles; everyone = d.people;
+    const keepRole = $("s-role").value;
+    fill($("s-role"), h("option", {value: ""}, "Any role"), roles.map(r => h("option", {value: r.name, selected: r.name === keepRole ? "" : false}, r.name)));
+    drawPeople();
     const keep = $("u-role").value;
     fill($("u-role"), roles.map(r => h("option", {value: r.name, selected: r.name === keep ? "" : false}, r.name)));
     $("u-role-help").textContent = (roles.find(r => r.name === $("u-role").value) || {}).description || "";

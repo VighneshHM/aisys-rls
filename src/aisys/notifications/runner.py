@@ -78,11 +78,11 @@ class Loop:
             self.last = self.pass_fn()
             self.passes += 1
             sent = (self.last.get("delivery") or {}).get("sent", 0)
-            if sent or (self.last.get("reminders") or {}).get("queued"):
-                log.info("notification pass: %s", self.last)
+            if sent or (self.last.get("reminders") or {}).get("queued") or self.last.get("events"):
+                log.info("%s pass: %s", self.thread.name, self.last)
         except Exception:  # noqa: BLE001 - the loop must outlive any single bad pass
             self.errors += 1
-            log.exception("notification pass failed; will try again in %s s", self.every_s)
+            log.exception("%s pass failed; will try again in %s s", self.thread.name, self.every_s)
 
     def _run(self) -> None:
         while not self.stop_event.is_set():

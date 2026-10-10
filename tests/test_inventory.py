@@ -134,6 +134,25 @@ def test_loans_are_not_missing_and_a_returned_but_unchecked_book_is_flagged(clie
     assert accs(flagged) == ["A1"] and flagged[0]["signal"] == "warning" and "check it in" in flagged[0]["note"]
 
 
+@pytest.mark.req("AC05", "FR06")
+def test_a_written_off_copy_found_on_the_shelf_is_flagged(client, lib, hh, shelves):
+    """D-076: a lost or withdrawn copy read on the shelf was reported as plainly found, with nothing to act on."""
+    ids = {
+        i["accession_no"]: i["id"] for i in client.get("/api/catalogue/items?q=Title of A", headers=lib).json()["items"]
+    }
+    sid = begin(client, lib)
+    plant(client, lib, sid, missing=0, strays=0, unknown=0, duplicates=0)
+    for acc, status in (("A1", "lost"), ("A2", "withdrawn"), ("A3", "damaged")):
+        r = client.patch(f"/api/catalogue/items/{ids[acc]}", headers=lib, json={"status": status, "reason": "test"})
+        assert r.status_code == 200, r.text
+    new = {n["accession_no"]: n for n in sweep(client, lib, sid)["new"]}
+    assert "set it back to available" in new["A1"]["note"] and "take it off" in new["A2"]["note"]
+    assert "damaged" in new["A3"]["note"] and {new[a]["signal"] for a in ("A1", "A2", "A3")} == {"warning"}
+    found = {e["accession_no"]: e for e in report(client, lib, sid)["found"]}
+    assert found["A4"]["note"] == "" and found["A4"]["signal"] == "ok"
+    assert found["A1"]["note"] and found["A2"]["note"] and found["A3"]["note"]
+
+
 def _tag_of(client, lib, acc):
     item_id = client.get("/api/catalogue/items", headers=lib, params={"q": acc}).json()["items"][0]["id"]
     return client.get(f"/api/catalogue/items/{item_id}", headers=lib).json()["tag"]["uid"]

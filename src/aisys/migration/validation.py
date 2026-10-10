@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 ACCESSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,31}$")
@@ -195,7 +195,8 @@ def validate_row(values: dict[str, str]) -> RowResult:
     clean["acquired_on"] = None
     if date_raw:
         d = parse_date(date_raw)
-        if d is None or d > datetime.now(UTC).date():
+        # one day of slack: just after midnight east of UTC, the person's "today" is still tomorrow in UTC (D-060)
+        if d is None or d > datetime.now(UTC).date() + timedelta(days=1):
             err("acquired_on", "date_invalid", f"'{date_raw}' is not a valid past date (day-first formats assumed)")
         else:
             clean["acquired_on"] = d.isoformat()

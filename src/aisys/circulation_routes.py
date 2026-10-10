@@ -33,10 +33,16 @@ def desk_staff(principal: Principal = Depends(get_principal)) -> Principal:
     return principal
 
 
+desk_staff.any_of = CIRC_PERMISSIONS  # type: ignore[attr-defined]  # for the API reference
+
+
 def history_viewer(principal: Principal = Depends(get_principal)) -> Principal:
     if not principal.permissions.intersection({"member.read", "audit.read", *CIRC_PERMISSIONS}):
         raise HTTPException(403, "Missing permission: member.read or audit.read")
     return principal
+
+
+history_viewer.any_of = ("member.read", "audit.read", *CIRC_PERMISSIONS)  # type: ignore[attr-defined]
 
 
 def get_connector(request: Request) -> ResilientConnector:
@@ -79,7 +85,7 @@ class CardIn(BaseModel):
 
 
 class MoneyIn(BaseModel):
-    amount_cents: int = Field(gt=0, le=10_000_000)
+    amount_cents: int = Field(gt=0, le=10_000_000, strict=True)  # true is not one cent (D-080)
     note: str = Field(default="", max_length=200)
 
 

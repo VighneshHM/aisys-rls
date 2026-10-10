@@ -216,21 +216,24 @@ def test_the_ilms_owns_the_loan_policy(client, lib):
 
 
 @pytest.mark.req("AC03", "FR03")
-def test_the_same_flow_works_in_ncip_wording(tmp_path):
+def test_the_page_and_the_history_name_the_protocol_actually_spoken(tmp_path):
+    """Only SIP2 is spoken (DR-13); the label comes from the connector, not from a setting that could say otherwise."""
     settings = Settings(
         database_url=f"sqlite:///{(tmp_path / 'n.db').as_posix()}",
         log_level="WARNING",
-        circulation=CirculationConfig(ilms_protocol="ncip", ilms_backoff_s=0, max_renewals=0),
+        circulation=CirculationConfig(ilms_backoff_s=0, max_renewals=0),
     )
     app = create_app(settings)
     seed_demo(settings)
     with TestClient(app) as c:
         hdr = login_card(c, "STAFFLIB0001")
         book(c, hdr, "N1")
-        assert out(c, hdr, "M0001", "N1").json()["protocol"] == "ncip"
+        assert out(c, hdr, "M0001", "N1").json()["protocol"] == "sip2"
         refused = renew(c, hdr, "N1")
-        assert refused.json()["detail"]["message"] == "Maximum Renewals Exceeded"
-        assert events(c, hdr)[0]["protocol"] == "ncip"
+        assert refused.json()["detail"]["message"] == "Renewal not allowed: maximum renewals reached"
+        assert events(c, hdr)[0]["protocol"] == "sip2"
+        page = c.get("/circulation").text
+        assert "SIP2" in page and "NCIP" not in page
 
 
 # ================================================================== retries, timeouts, duplicates

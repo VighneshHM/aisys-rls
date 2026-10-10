@@ -25,7 +25,7 @@ from aisys.gate.config import GateConfig
 from aisys.models import GateEvent, GateImage, GatePassage, Item, Loan, Notification, utcnow
 from aisys.notifications import prefs, queue
 from aisys.notifications.messages import KIND_LABEL, gate_alert
-from aisys.rfid.devices import DeviceError, DeviceUnavailable
+from aisys.rfid.devices import DeviceUnavailable
 from aisys.rfid.registry import DeviceRegistry
 from aisys.rfid.tagging import state_of, tag_links
 from aisys.timeutil import aware, iso
@@ -97,18 +97,54 @@ def process(db: Session, registry: DeviceRegistry, gate_id: str, config: GateCon
         passages = gate.poll()
     except DeviceUnavailable as exc:
         raise GateError(503, f"Gate '{gate_id}' is offline") from exc
-    except DeviceError as exc:
+    except Exception as exc:  # noqa: BLE001 - a vendor driver may raise anything; report it, never crash the loop
         raise GateError(502, f"Gate error: {exc}") from exc
     camera = pick_camera(registry)
     created: list[GateEvent] = []
-    for passage in passages:
-        row = GatePassage(ts=passage.at, gate_id=passage.gate_id, people=passage.people)
-        db.add(row)
-        db.flush()
-        for obs in {o.uid: o for o in passage.tags}.values():  # a tag read twice in one passage is one event
-            created.append(_record(db, gate, camera, config, row, obs))
-    db.commit()
+    try:
+        for passage in passages:
+            row = GatePassage(ts=passage.at, gate_id=passage.gate_id, people=passage.people)
+            db.add(row)
+            db.flush()
+            for obs in {o.uid: o for o in passage.tags}.values():  # a tag read twice in one passage is one event
+                created.append(_record(db, gate, camera, config, row, obs))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        # poll() hands each passage over once: if it cannot be recorded, it must at least be in the log, never silent
+        for passage in passages:
+            log.error(
+                "gate %s: passage at %s (%s people, tags %s) was NOT recorded: %s",
+                gate_id, passage.at, passage.people, ", ".join(o.uid for o in passage.tags), exc,
+            )  # fmt: skip
+        raise GateError(500, f"Gate '{gate_id}': passages could not be recorded ({exc}); they are in the log") from exc
     return [event_out(e, has_image=_has_image(db, e.id)) for e in created]
+
+
+def poll_all(db: Session, registry: DeviceRegistry, config: GateConfig, *, include_mock: bool = False) -> dict:
+    """Read every configured gate once: the production path from a real gate to events, alarms, snapshots and alerts.
+
+    Run by the application's gate loop (`[gate] poll_seconds`), by `aisys gate-poll` and by the Gate events page.
+    Simulator gates are skipped unless asked for: in development the simulator hands its passages over itself. One gate
+    that is offline or fails is reported and does not stop the others.
+    """
+    out: dict = {"gates": {}, "events": 0, "alarms": 0}
+    for device in registry.all():
+        if device.kind != "gate" or (getattr(device, "is_mock", False) and not include_mock):
+            continue
+        try:
+            events = process(db, registry, device.device_id, config)
+        except Exception as exc:  # noqa: BLE001 - one bad gate must not stop the others (D-062)
+            db.rollback()
+            message = exc.message if isinstance(exc, GateError) else f"Gate error: {exc}"
+            out["gates"][device.device_id] = {"ok": False, "error": message}
+            log.warning("gate %s could not be read: %s", device.device_id, message)
+            continue
+        alarms = sum(1 for e in events if e["alarm"])
+        out["gates"][device.device_id] = {"ok": True, "events": len(events), "alarms": alarms}
+        out["events"] += len(events)
+        out["alarms"] += alarms
+    return out
 
 
 def _record(db, gate, camera, config: GateConfig, passage: GatePassage, obs) -> GateEvent:
@@ -158,7 +194,7 @@ def _record(db, gate, camera, config: GateConfig, passage: GatePassage, obs) -> 
                 snapshot = camera.capture(caption)
             except DeviceUnavailable:
                 image_error = "The camera is offline"
-            except DeviceError as exc:
+            except Exception as exc:  # noqa: BLE001 - a camera SDK may raise anything; the alarm is still recorded
                 image_error = f"The camera failed: {exc}"[:200]
 
     event = GateEvent(
@@ -204,7 +240,7 @@ def _record(db, gate, camera, config: GateConfig, passage: GatePassage, obs) -> 
 def _signal(gate, pattern: str) -> None:
     try:
         gate.indicate(pattern)
-    except DeviceError:  # a dead siren must never lose the record
+    except Exception:  # noqa: BLE001 - a dead siren must never lose the record
         log.warning("could not signal '%s' on gate %s", pattern, gate.device_id)
 
 

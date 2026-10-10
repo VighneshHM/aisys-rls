@@ -23,6 +23,8 @@ router = APIRouter(prefix="/api/opac", tags=["opac"])
 
 LIMIT_PER_MINUTE = 60
 MIN_QUERY = 2
+MAX_QUERY = 100
+MAX_COPIES = 5000  # one search reads at most this many copies; beyond it the answer says it is incomplete
 _hits: dict[str, deque[float]] = defaultdict(deque)
 _lock = threading.Lock()
 
@@ -70,14 +72,24 @@ def search(
 ):
     _guard(request, settings)
     q = " ".join(q.split())
-    if len(q) < MIN_QUERY or len(q) > 100:
+    if len(q) < MIN_QUERY:
         raise HTTPException(422, detail={"message": f"Type at least {MIN_QUERY} characters to search.", "problems": []})
+    if len(q) > MAX_QUERY:  # D-075: a long query was told it was too short
+        raise HTTPException(422, detail={"message": f"Type at most {MAX_QUERY} characters to search.", "problems": []})
     limit, offset = min(max(limit, 1), 50), max(offset, 0)
-    total_items, rows, _ = catalogue.search(db, q, limit=200)
+    # every matching copy, not only the first 200, so the count and the paging cover the whole catalogue (D-074);
+    # withdrawn and lost copies are left out by the query itself and never use up a page
+    rows: list = []
+    total_copies = None
+    while total_copies is None or len(rows) < min(total_copies, MAX_COPIES):
+        total_copies, page, _ = catalogue.search(
+            db, q, hide_statuses=shelves.HIDDEN_STATUSES, limit=min(200, MAX_COPIES - len(rows)), offset=len(rows)
+        )
+        if not page:
+            break
+        rows.extend(page)
     books: dict[int, dict] = {}
     for item, _tag in rows:
-        if item.status in shelves.HIDDEN_STATUSES:
-            continue
         b = item.bib
         entry = books.setdefault(
             b.id,
@@ -99,7 +111,8 @@ def search(
             key=lambda c: (c["availability"] != "Available", c["shelf"], shelves.natural_key(c["call_number"]))
         )
         entry["available"] = sum(1 for c in entry["copies"] if c["availability"] == "Available")
-    return {"query": q, "total": len(ordered), "results": ordered[offset : offset + limit]}
+    complete = len(rows) >= (total_copies or 0)
+    return {"query": q, "total": len(ordered), "complete": complete, "results": ordered[offset : offset + limit]}
 
 
 @router.get("/shelf")

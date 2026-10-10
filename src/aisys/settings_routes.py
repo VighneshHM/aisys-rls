@@ -38,7 +38,7 @@ def _readonly(s: Settings) -> list[dict]:
     db = s.database_url.rsplit("/", 1)[-1] if s.database_url.startswith("sqlite") else "an external database"
     devices = ", ".join(f"{d.id} ({d.kind}, {d.driver})" for d in s.devices)
     c, n = s.circulation, s.notifications
-    ilms = f"{c.ilms_driver}, {c.ilms_protocol.upper()}"
+    ilms = f"{c.ilms_driver}, SIP2"
     ilms += f", {c.ilms_endpoint}:{c.ilms_port}" if c.ilms_endpoint else ", no address set"
     return [
         _fact("System", "Library name", s.app_name),
@@ -53,6 +53,8 @@ def _readonly(s: Settings) -> list[dict]:
         _fact("Connections", "E-mail, SMS, print", f"{n.email_driver}, {n.sms_driver}, {n.print_driver}"),
         _fact("Connections", "Devices", devices),
         _fact("Connections", "Message loop", f"every {n.auto_dispatch_s:g} s" if n.auto_dispatch_s else "off"),
+        _fact("Connections", "Gate reading", f"every {s.gate.poll_seconds:g} s" if s.gate.poll_seconds else "off"),
+        _fact("System", "Public kiosk host names", ", ".join(s.opac_kiosk_hosts) or "none"),
     ]
 
 

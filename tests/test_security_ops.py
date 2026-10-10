@@ -216,3 +216,27 @@ def test_the_doctor_command_sets_its_exit_code(settings, tmp_path, monkeypatch, 
     monkeypatch.setenv("AISYS_TLS_CERTFILE", "half.pem")
     assert cli_main(["doctor"]) == 1
     assert "problem(s) to fix" in capsys.readouterr().out
+
+
+# ---------- hostile input that used to be stored or coerced ----------
+def test_a_nul_character_is_refused_in_any_json_body(client, admin):
+    """D-079: NUL was stored in names, notes and titles and broke the exports downstream."""
+    lib = login_card(client, "STAFFLIB0001")
+    r = client.post("/api/circulation/members", json={"name": "a\u0000b"}, headers=lib)
+    assert r.status_code == 422 and "NUL" in r.text
+    raw = client.post(
+        "/api/admin/roles", content=b'{"name":"nul_role","description":"x\\u0000","permissions":["catalogue.read"]}',
+        headers={**admin, "content-type": "application/json"},
+    )  # fmt: skip
+    assert raw.status_code == 422
+    assert client.post("/api/circulation/members", json={"name": "Ann Ok"}, headers=lib).status_code == 201
+
+
+def test_money_and_quantities_must_be_real_whole_numbers(client):
+    """D-080: true was taken as 1 cent and "100" as an amount."""
+    lib = login_card(client, "STAFFLIB0001")
+    for bad in (True, "100", 1.5):
+        r = client.post("/api/circulation/members/M0005/fines/payment", json={"amount_cents": bad}, headers=lib)
+        assert r.status_code == 422, bad
+    line = {"title": "T", "quantity": True}
+    assert client.post("/api/acquisitions", json={"supplier": "S", "lines": [line]}, headers=lib).status_code == 422

@@ -58,7 +58,9 @@
         <div class="toolbar">
           <div class="grow"><input id="q" type="search" placeholder="Search accession no., title or tag…" autocomplete="off" aria-label="Search gate events"></div>
           <select id="filter" aria-label="Show"><option value="">All events</option><option value="alarms">Alarms only</option></select>
+          <button class="btn ghost small" id="poll-btn" type="button" title="Read every real gate now (the gate loop also does this by itself when it is switched on)">Read the gates now</button>
         </div>
+        <div id="poll-notice" class="notice" role="status"></div>
       </div>
       <div class="table-wrap" id="events"></div>
     </section>
@@ -234,6 +236,20 @@
 
   // ------------------------------------------------------------------ simulator
   function refreshAll() { loadTiles(); loadEvents(); loadQueue(); loadOutbox(); }
+  $("poll-btn").onclick = async () => {
+    const button = $("poll-btn");
+    if (button.disabled) return;
+    button.disabled = true; UI.clear("poll-notice");
+    try {
+      const r = await UI.api("/api/gate/poll", {method: "POST"});
+      const gates = Object.entries(r.gates);
+      const down = gates.filter(([, g]) => !g.ok).map(([id, g]) => id + ": " + g.error);
+      if (!gates.length) UI.say("poll-notice", "warn", "No real gate is configured: only the simulator, which hands its passages over by itself.");
+      else UI.say("poll-notice", down.length ? "warn" : "ok", "Read " + gates.length + " gate(s): " + r.events + " new event(s), " + r.alarms + " alarm(s)." + (down.length ? " Not read: " + down.join("; ") : ""));
+      refreshAll();
+    } catch (e) { UI.say("poll-notice", "bad", e.message); }
+    finally { button.disabled = false; }
+  };
 
   if (SIM) {
     $("walk-btn").onclick = async () => {

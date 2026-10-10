@@ -46,6 +46,19 @@ class CircError(Exception):
 
 
 # ------------------------------------------------------------------ lookups and presentation
+def member_status(member: Member) -> str:
+    """active | blocked | removed: what staff see (a removed member is stored as blocked with `removed_at` set)."""
+    return "removed" if member.removed_at is not None else member.status
+
+
+def event_text(message: str, member: Member | None) -> str:
+    """The text kept in the history: the member number stands in for the name. The history can never be edited, so it
+    must not hold personal data (it already records who it was about by member number)."""
+    if member is None or not member.name:
+        return message
+    return message.replace(member.name, member.member_no)
+
+
 def find_member(db: Session, member_no: str) -> Member:
     member = db.scalar(select(Member).where(Member.member_no == member_no.strip().upper()))
     if member is None:
@@ -58,9 +71,11 @@ def identify(db: Session, uid: str, *, actor: str, ip: str = "") -> Member:
     card = db.scalar(select(Card).where(Card.uid == uid.strip().upper()))
     if card is None or card.kind != "patron" or not card.member_ref:
         raise CircError(404, "unknown_card", "This is not a registered patron card")
+    member = find_member(db, card.member_ref)
+    if member.removed_at is not None:
+        raise CircError(409, "member_removed", f"{member.name} has been removed as a member")
     if not card.active:
         raise CircError(409, "card_inactive", "This card is no longer active (it was replaced or withdrawn)")
-    member = find_member(db, card.member_ref)
     audit.record(db, actor=actor, action="member.identify", entity="member", entity_id=member.member_no, ip=ip)
     db.commit()
     return member
@@ -152,8 +167,14 @@ def member_out(db: Session, member: Member, config: CirculationConfig, *, with_l
         "name": member.name,
         "card": {"uid": current.uid, "issued_at": iso(current.issued_at)} if current else None,
         "cards_withdrawn": sum(1 for c in cards if not c.active),
-        "status": member.status,
-        "block_reason": member.block_reason,
+        "status": member_status(member),
+        "block_reason": "" if member.removed_at is not None else member.block_reason,
+        "removed": (
+            {"at": iso(member.removed_at), "by": member.removed_by, "reason": member.removed_reason}
+            if member.removed_at is not None
+            else None
+        ),
+        "erased": member.erased_at is not None,
         "contact": {"email": member.email, "phone": member.phone, "reminders_on": member.reminders_on},
         "reminders": _recent_reminders(db, member),
         "fines_cents": member.fines_cents,
@@ -169,6 +190,8 @@ def member_out(db: Session, member: Member, config: CirculationConfig, *, with_l
 
 def set_blocked(db: Session, member_no: str, blocked: bool, reason: str, *, actor: str, ip: str = "") -> Member:
     member = find_member(db, member_no)
+    if member.removed_at is not None:
+        raise CircError(409, "member_removed", f"{member.name} has been removed: restore them before changing anything")
     member.status = "blocked" if blocked else "active"
     member.block_reason = reason.strip() if blocked else ""
     audit.record(
@@ -222,7 +245,7 @@ def _refuse(
             action=action,
             outcome=outcome,
             code=code,
-            message=message,
+            message=event_text(message, member),
             protocol=protocol,
             txn_id=txn_id,
             member_id=member.id if member else None,
@@ -249,6 +272,8 @@ def _local_refusal(member: Member | None, item: Item, loan: Loan | None, config:
     if loan is not None:
         return "item_on_loan", "This item is already on loan"
     if member is not None:
+        if member.removed_at is not None:
+            return "member_removed", f"{member.name} has been removed as a member"
         if member.status != "active":
             why = f": {member.block_reason}" if member.block_reason else ""
             return "patron_blocked", f"{member.name} is blocked{why}"
@@ -323,7 +348,7 @@ def _finish(
             action=action,
             outcome="ok",
             code=result.code,
-            message=result.message,
+            message=event_text(result.message, member),
             protocol=result.protocol,
             txn_id=txn_id,
             member_id=member.id,
@@ -386,6 +411,17 @@ def checkout(
     if not result.ok:
         outcome = "failed" if result.code == "ilms_unavailable" else "refused"
         _refuse(db, code=result.code, message=result.message, status=409, source="ilms", outcome=outcome, **common)
+    db.refresh(member)  # the ILMS call can take seconds: was the member removed meanwhile?
+    if member.removed_at is not None:
+        _undo_ilms_checkout(connector, item, result.due_at, now)
+        _refuse(
+            db,
+            code="member_removed",
+            message=f"{member.name} was removed while this was being recorded, so nothing was lent",
+            status=409,
+            source="local",
+            **common,
+        )
     new = Loan(member_id=member.id, item_id=item.id, out_at=now, due_at=result.due_at, out_by=actor)
     db.add(new)
     item.status = "on_loan"
@@ -407,6 +443,16 @@ def checkout(
         reader_id=reader_id,
         armed=False,
     )
+
+
+def _undo_ilms_checkout(connector: CirculationConnector, item: Item, due_at: datetime | None, now: datetime) -> None:
+    """Take back a loan the ILMS accepted but is not going to be recorded here. Best effort; a failure is logged."""
+    try:
+        undone = connector.checkin(_txn_id(), ItemView(item.accession_no, True, 0, due_at), now=now)
+        if not undone.ok:
+            log.warning("could not take back the ILMS loan of %s: %s", item.accession_no, undone.message)
+    except Exception:  # noqa: BLE001 - never let the undo hide the reason the loan was refused
+        log.exception("could not take back the ILMS loan of %s", item.accession_no)
 
 
 def renew(
