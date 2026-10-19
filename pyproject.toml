@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.16.10", "mypy==2.4.0"]
+dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.17.1", "mypy==2.4.0"]
 
 [project.scripts]
 aisys = "aisys.cli:main"
