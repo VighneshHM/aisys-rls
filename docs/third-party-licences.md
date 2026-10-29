@@ -35,7 +35,7 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 | typing-inspection | 0.4.4 | runtime | MIT | ok |
 | uvicorn | 0.54.0 | runtime | BSD-3-Clause | ok |
 | ast-serialize | 0.12.1 | development | MIT | ok |
-| certifi | 2026.7.22 | development | Mozilla Public License 2.0 (MPL 2.0) | ok, not shipped |
+| certifi | 2026.10.19 | development | Mozilla Public License 2.0 (MPL 2.0) | ok, not shipped |
 | cffi | 2.1.1 | development | MIT-0 | ok |
 | colorama | 0.4.6 | development | BSD License | ok |
 | cryptography | 50.0.2 | development | Apache-2.0 OR BSD-3-Clause | ok |
@@ -54,4 +54,4 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 | pytest | 9.1.1 | development | MIT | ok |
 | pytest-xdist | 3.8.0 | development | MIT | ok |
 | ruff | 0.16.10 | development | MIT | ok |
-| setuptools | 84.0.0 | build | MIT | ok |
+| setuptools | 84.1.0 | build | MIT | ok |
