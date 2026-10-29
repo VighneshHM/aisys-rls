@@ -9,7 +9,7 @@ description = "RFID add-on for libraries: tagging, circulation, inventory and a 
 license = "LicenseRef-ShelfSense"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi==0.161.1",
+  "fastapi==0.162.0",
   "uvicorn==0.54.0",
   "SQLAlchemy==2.1.6",
   "alembic==1.20.1",
