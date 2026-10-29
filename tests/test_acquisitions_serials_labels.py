@@ -7,11 +7,11 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select
 
-from aisys.labels import code128
-from aisys.labels import service as labels
-from aisys.models import Item, Notification
-from aisys.serials import service as ser
 from conftest import login_card
+from shelfsense.labels import code128
+from shelfsense.labels import service as labels
+from shelfsense.models import Item, Notification
+from shelfsense.serials import service as ser
 from test_tagging import make_item
 
 pytestmark = pytest.mark.req("FR01", "FR04")
@@ -432,7 +432,7 @@ def test_the_labels_page_lists_recent_print_jobs_only(client, lib):
         "/api/labels/print", json={"kind": "barcode", "printer": "label-printer", "location": "Print/2"}, headers=lib
     )
     with client.app.state.session_factory() as db:  # another kind of printout (a gate alert slip) is not a label job
-        from aisys.notifications import queue
+        from shelfsense.notifications import queue
 
         queue.enqueue(db, channel="print", recipient="front-desk", subject="Gate alarm", body="slip")
         db.commit()
@@ -499,9 +499,9 @@ def test_the_card_printer_is_a_configured_device(client):
 
 def test_pages_render_for_the_right_roles(client, lib):
     for path in ("/labels", "/acquisitions", "/serials", "/shelves"):
-        client.cookies.set("aisys_session", lib["Authorization"].split()[1])
+        client.cookies.set("shelfsense_session", lib["Authorization"].split()[1])
         assert client.get(path).status_code == 200, path
     clerk = login_card(client, "STAFFCLERK01")
-    client.cookies.set("aisys_session", clerk["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", clerk["Authorization"].split()[1])
     assert [client.get(p).status_code for p in ("/labels", "/acquisitions", "/serials")] == [403, 403, 403]
     assert Item  # imported for the type checkers of the readers of this file

@@ -1,4 +1,4 @@
-# Use cases (D1)
+# Use cases
 
 Actors: **Librarian** (catalogue, tagging, orders, serials, inventory, imports), **Desk clerk** (circulation only),
 **Administrator** (people, cards, backups, updates), **Auditor** (read-only: audit log, reports, gate events), **Visitor**
@@ -213,7 +213,7 @@ minute is recorded but not sent again.
 
 - An unissued or still-armed item raises one alarm with its accession number, a camera snapshot and queued alerts (AC06). UAT-15.
 - The decision uses only the security bit, so it works while the ILMS is down; footfall is counted; a camera failure still records and announces the alarm.
-- In production a real gate is read by the gate loop, `aisys gate-poll` or **Read the gates now** (DR-18); an offline
+- In production a real gate is read by the gate loop, `shelfsense gate-poll` or **Read the gates now** (DR-18); an offline
   gate is named and the others are still read.
 
 ## UC-16 Staff are alerted
@@ -311,7 +311,7 @@ give it to a person in the staff list; **Edit** to change its permissions; **Rem
 
 ## UC-25 Circulation through the SIP2 protocol
 **Actor:** Desk clerk (the administrator configures it). **Flow:** with `[ilms] driver = "sip2"` and the ILMS (here the SIP2
-simulator) reachable, the desk works exactly as in UC-06; `aisys doctor` reports the ILMS connection.
+simulator) reachable, the desk works exactly as in UC-06; `shelfsense doctor` reports the ILMS connection.
 
 **Acceptance criteria:**
 

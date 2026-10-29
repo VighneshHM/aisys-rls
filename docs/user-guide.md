@@ -29,7 +29,7 @@ card never signs anyone in. Your menu shows only what your role may do.
 | Manage staff and cards | **Administration** (administrators) | Add people, issue cards, deactivate, unlock, change role. |
 | Make a role for a special job | **Administration**, **Roles** (administrators) | Add a custom role, tick its permissions, give it to people; edit or remove it later (not while someone holds it). The four built-in roles cannot be changed |
 | Change the library's rules | **Settings** (administrators) | Loan period, renewals, fines, reminders, sign-in limits, public catalogue on or off; **Save**, or **Use file value** to undo. Changes apply at once and are audited |
-| Check the library system connection | **Settings**, *Library system (ILMS)* | Shows the driver (mock or SIP2) and address; `python -m aisys.cli doctor` tests it (`docs/sip2.md`) |
+| Check the library system connection | **Settings**, *Library system (ILMS)* | Shows the driver (mock or SIP2) and address; `python -m shelfsense.cli doctor` tests it (`docs/sip2.md`) |
 | See who did what | **Audit log** | Filter by person, action and outcome; export CSV. |
 
 If something does not work, see `docs/troubleshooting.md`.

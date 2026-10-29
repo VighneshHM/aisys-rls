@@ -1,4 +1,4 @@
-# Development and build tools of aisys (tests, lint, type check, audit, signing, the build backend). Never shipped to a site.
+# Development and build tools of shelfsense (tests, lint, type check, audit, signing, the build backend). Never shipped to a site.
 # Install together with the runtime lock:
 #   pip install --require-hashes -r requirements.lock -r requirements-dev.lock
 #   pip install -e . --no-deps --no-build-isolation

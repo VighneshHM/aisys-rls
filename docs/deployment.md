@@ -1,6 +1,6 @@
 # Offline install, update and rollback (AC09, FR12, NFR04, NFR06)
 
-AISYS is delivered as one **signed package** (a folder or `.zip`). It contains the application, every dependency, the
+ShelfSense is delivered as one **signed package** (a folder or `.zip`). It contains the application, every dependency, the
 tools to install it, a software bill of materials and the licence inventory. Nothing is downloaded at any point after
 the package is built, so it works on a computer with no internet.
 
@@ -17,13 +17,13 @@ python scripts/lifecycle_demo.py --keep     # leaves the installation so you can
 | Piece | Where | Needs internet? |
 |---|---|---|
 | Build a package | `scripts/release.py` (build machine, once) | Yes, to fetch the wheels (or `--wheels-from <folder>` for none) |
-| Install, update, rollback, recover | `aisys_lifecycle` (Python standard library only) | **No** |
-| Signature check | `aisys_lifecycle/ed25519.py` (pure Python, so it runs before anything is installed) | No |
+| Install, update, rollback, recover | `shelfsense_lifecycle` (Python standard library only) | **No** |
+| Signature check | `shelfsense_lifecycle/ed25519.py` (pure Python, so it runs before anything is installed) | No |
 | See the state | **Updates** page and `manage.py status` | No |
 
 ## Environment checklist (before installing)
 
-Run `python -m aisys.cli doctor` on the target (or `python manage.py doctor` after installing) and fix every FAIL; it checks the
+Run `python -m shelfsense.cli doctor` on the target (or `python manage.py doctor` after installing) and fix every FAIL; it checks the
 items below and prints OK, WARN or FAIL for each, changing nothing.
 
 | Item | Needed | Checked by the doctor |
@@ -35,7 +35,7 @@ items below and prints OK, WARN or FAIL for each, changing nothing.
 | Folders | the install folder (short path on Windows, about 150 characters at most); `data/` and `data/backups/` writable by the account that runs the service | yes |
 | Network | Ethernet to the readers, gate, camera, card printer and the ILMS (SIP2 is unencrypted: use a VPN, stunnel or TLS proxy); staff browsers reach the server on the HTTPS port; **no internet needed** | port free: yes; the ILMS (when `driver = "sip2"`): connects, logs in and asks for its status |
 | Port | 8000 on the loopback address by default; 443 when a proxy or the built-in TLS is used | yes |
-| Secret key | 32 or more characters in `AISYS_SECRET_KEY` (the installer writes one to `config/secret.key`) | yes (in production) |
+| Secret key | 32 or more characters in `SHELFSENSE_SECRET_KEY` (the installer writes one to `config/secret.key`) | yes (in production) |
 | TLS | a certificate and key (PEM) from the site's own CA or a public one, or a TLS proxy | yes |
 | Licence and key | `licence.json` and the vendor's public key supplied with the package | `manage.py status` |
 | Backups | a place outside the server to copy `data/backups/` to | not checked |
@@ -49,10 +49,10 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 
 | Section and key | Default | Meaning |
 |---|---|---|
-| `[app] name` | AISYS RFID Library | name shown on pages and in messages |
+| `[app] name` | ShelfSense | name shown on pages and in messages |
 | `[app] environment` | development | `production` turns the simulators off (404), makes cookies Secure and demands a secret key |
 | `[app] host`, `port` | 127.0.0.1, 8000 | where the application listens |
-| `[database] url` | `sqlite:///data/aisys.db` | the database file |
+| `[database] url` | `sqlite:///data/shelfsense.db` | the database file |
 | `[security] session_ttl_minutes` | 480 | how long a sign-in lasts |
 | `[security] max_failed_logins`, `lockout_minutes` | 5, 15 | account lock after repeated wrong passwords |
 | `[logging] level`, `format` | INFO, json | `json` or `text` |
@@ -69,7 +69,7 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 | `[ilms] checksum` | true | SIP2 error detection (sequence digit and checksum); turn off only if the ILMS rejects it |
 | `[ilms] retries`, `backoff_s` | 2, 0.1 | extra attempts and the wait between them |
 | `[gate] duplicate_window_s` | 60 | a repeat alarm for the same tag within this many seconds is recorded, not re-sent |
-| `[gate] poll_seconds` | 0 (2 in the sample file) | read every real gate this often while the application runs; 0 = off (then run `aisys gate-poll --every 2`, not both) |
+| `[gate] poll_seconds` | 0 (2 in the sample file) | read every real gate this often while the application runs; 0 = off (then run `shelfsense gate-poll --every 2`, not both) |
 | `[notifications] email, sms, print` | mock | the provider driver per channel |
 | `[notifications] max_attempts`, `backoff_s` | 3, 60 | delivery attempts before a message is marked failed; the wait grows with each failure |
 | `[notifications] reminders`, `remind_days_before` | true, 1 | patron loan reminders and how many days ahead (1 to 30) |
@@ -81,23 +81,23 @@ name*; `mock` is built in and a real one is a class registered in code (`docs/ar
 
 | Environment variable | Effect |
 |---|---|
-| `AISYS_CONFIG` | path of the config file |
-| `AISYS_ENV` | overrides `environment` |
-| `AISYS_DATABASE_URL`, `AISYS_BACKUP_DIR` | override the database and backup folder |
-| `AISYS_HOST`, `AISYS_PORT` | override the listening address |
-| `AISYS_SECRET_KEY` | the secret (32+ characters; required in production) |
-| `AISYS_ILMS_PASSWORD` | the SIP2 login password for the ILMS; read only from the environment, a password in the file is ignored |
-| `AISYS_TLS_CERTFILE`, `AISYS_TLS_KEYFILE` | override the TLS files (an empty value switches TLS off) |
-| `AISYS_HOME` | set by the installer: the installation folder (enables the Updates page) |
+| `SHELFSENSE_CONFIG` | path of the config file |
+| `SHELFSENSE_ENV` | overrides `environment` |
+| `SHELFSENSE_DATABASE_URL`, `SHELFSENSE_BACKUP_DIR` | override the database and backup folder |
+| `SHELFSENSE_HOST`, `SHELFSENSE_PORT` | override the listening address |
+| `SHELFSENSE_SECRET_KEY` | the secret (32+ characters; required in production) |
+| `SHELFSENSE_ILMS_PASSWORD` | the SIP2 login password for the ILMS; read only from the environment, a password in the file is ignored |
+| `SHELFSENSE_TLS_CERTFILE`, `SHELFSENSE_TLS_KEYFILE` | override the TLS files (an empty value switches TLS off) |
+| `SHELFSENSE_HOME` | set by the installer: the installation folder (enables the Updates page) |
 
 ## What is inside a package
 
 ```
-aisys-0.2.0/
+shelfsense-0.2.0/
   manifest.json     name, version, kind (release | patch | security), schema revision, Python needed, SHA-256 of every file
   manifest.sig      Ed25519 signature over manifest.json
   wheels/*.whl      the application and all 22 dependencies
-  tools/aisys_lifecycle/   the install/update tools (so a first install needs only Python)
+  tools/shelfsense_lifecycle/   the install/update tools (so a first install needs only Python)
   SBOM.json         CycloneDX software bill of materials
   LICENSES.md       every dependency's licence; copyleft or unknown ones are flagged for review
   config.sample.toml, vendor.pub, install.py
@@ -112,7 +112,7 @@ than the installed one, it needs a newer Python, the licence is not valid, or th
 ```
 python scripts/release.py keygen  --out release-keys                    # once; keep release-keys/ OFF the target machines
 python scripts/release.py licence --key release-keys/private.key --customer "Demo Library" --expires 2027-12-31 --out licence.json
-python scripts/release.py build   --key release-keys/private.key --notes "what changed"          # dist/aisys-<version>.zip
+python scripts/release.py build   --key release-keys/private.key --notes "what changed"          # dist/shelfsense-<version>.zip
 python scripts/release.py build   --key release-keys/private.key --version 0.1.1 --kind security  # a patch / security update
 ```
 
@@ -122,7 +122,7 @@ into that copy. Give the build `--wheels-from <folder>` to build with no interne
 ## Install (target machine, no internet)
 
 ```
-python install.py --root D:\aisys --licence licence.json --trusted-key vendor.pub [--seed-demo]
+python install.py --root D:\shelfsense --licence licence.json --trusted-key vendor.pub [--seed-demo]
 ```
 
 The vendor's public key should reach you **separately** from the package (`--trusted-key`). For a quick trial,
@@ -134,14 +134,14 @@ from the package's own wheels, prepares the database, **starts the application o
 records the install. If anything fails the half-built release is removed. Then:
 
 ```
-python D:\aisys\manage.py run
+python D:\shelfsense\manage.py run
 ```
 
 A new install has no staff. Create the first administrator (a lower-case username and a password of 12 to 256 characters; the tool asks
-twice and never prints it; or set `AISYS_ADMIN_PASSWORD` for a script):
+twice and never prints it; or set `SHELFSENSE_ADMIN_PASSWORD` for a script):
 
 ```
-python D:\aisys\manage.py create-admin --username site.admin --name "Site Admin"
+python D:\shelfsense\manage.py create-admin --username site.admin --name "Site Admin"
 ```
 
 It is refused for a short password, the demo password, a bad or taken username, and is audited (`admin.bootstrap`). Further
@@ -165,8 +165,8 @@ incoming/                 drop update packages here; the Updates page can check 
 Stop the application first (an update restarts it anyway; the tool refuses while it is running).
 
 ```
-python D:\aisys\manage.py update aisys-0.2.0.zip --dry-run     # verify and say what would happen; changes nothing
-python D:\aisys\manage.py update aisys-0.2.0.zip
+python D:\shelfsense\manage.py update shelfsense-0.2.0.zip --dry-run     # verify and say what would happen; changes nothing
+python D:\shelfsense\manage.py update shelfsense-0.2.0.zip
 ```
 
 The order is chosen so that the only irreversible moment is the last one:
@@ -188,8 +188,8 @@ accepted).
 ## Rollback (the documented procedure)
 
 ```
-python D:\aisys\manage.py rollback --dry-run      # what would happen
-python D:\aisys\manage.py rollback --yes
+python D:\shelfsense\manage.py rollback --dry-run      # what would happen
+python D:\shelfsense\manage.py rollback --yes
 ```
 
 * The previous version becomes current again. It is started once to prove it works.
@@ -206,7 +206,7 @@ python D:\aisys\manage.py rollback --yes
 |---|---|
 | It printed an error and says the old version is still current | Nothing: the old version and its data are as before. Read the message, fix the cause, try again. |
 | The computer lost power or the tool was killed mid-update | `python manage.py recover`: puts the data back from the recorded backup if the migration had started, deletes the half-built release, clears the marker. `status` warns about an interrupted update. |
-| The automatic data restore itself failed | The message names the backup file. Restore it by hand: `python -m aisys.cli backup restore <file> --yes` using the previous release's python (`releases/<previous>/venv`), see `docs/backup-restore.md`. |
+| The automatic data restore itself failed | The message names the backup file. Restore it by hand: `python -m shelfsense.cli backup restore <file> --yes` using the previous release's python (`releases/<previous>/venv`), see `docs/backup-restore.md`. |
 | You want to reclaim disk space | `python manage.py prune` removes releases older than the previous one. |
 
 ## Activation (offline)
@@ -225,7 +225,7 @@ trusted vendor key: no network, no phone-home. An invalid or expired licence sto
   are exactly those) and `requirements-dev.lock` the development and build tools, which are never shipped.
 * `SBOM.json` (CycloneDX) and `LICENSES.md` are generated from the shipped wheels and included in every package. The
   repository's full inventory, runtime, development and build, is `docs/third-party-licences.md` (with `docs/sbom.cdx.json`),
-  generated from both lock files. The AISYS code itself is marked `LicenseRef-AISYS-Candidate-Exercise`.
+  generated from both lock files. The ShelfSense code itself is marked `LicenseRef-ShelfSense`.
 * The private signing key and the secrets are never in a package. `config/secret.key` is generated at install.
 
 ## Redistribution and offline use (NFR04)
@@ -235,26 +235,26 @@ the licence texts in each wheel are what count.
 
 **What is redistributed.** Only the 22 **runtime** packages in `docs/third-party-licences.md`, as the wheels inside each offline
 package. Every one is under a permissive licence: MIT, BSD-2/3-Clause, Apache-2.0 or PSF-2.0. None is copyleft, so shipping them
-inside the package creates no duty to publish the AISYS source code. The development tools (pytest, ruff, mypy, httpx, and
+inside the package creates no duty to publish the ShelfSense source code. The development tools (pytest, ruff, mypy, httpx, and
 `cryptography` for signing) and the build backend (`setuptools`) stay on the developer's and the build machine and are
 **not redistributed**. Two of them, `certifi` and `pathspec`, are MPL-2.0 (weak copyleft); because they are never shipped, MPL
 places no duty on the package. If a future release ever ships one of them, MPL-2.0 requires making the source of those files (not
-of AISYS) available, and the release script flags any copyleft wheel for review before it is shipped.
+of ShelfSense) available, and the release script flags any copyleft wheel for review before it is shipped.
 
 **What every package must keep (the obligations).**
 * *Notices.* MIT, BSD and PSF require the copyright notice and licence text to travel with the software. They do: each wheel's
   `.dist-info` folder holds its own `LICENSE` file, and the installed releases keep those folders. Do not strip `.dist-info`
   folders to save space.
 * *Apache-2.0* (`opentelemetry-api`, `python-multipart`): keep the licence and any `NOTICE` file the wheel carries (they stay in
-  `.dist-info`); a modified copy must say it was changed. AISYS ships them unmodified.
+  `.dist-info`); a modified copy must say it was changed. ShelfSense ships them unmodified.
 * *Attribution in one place.* `LICENSES.md` and `SBOM.json` at the top of every package list every shipped component with its
   licence, for the site's records.
-* *No endorsement.* BSD-3-Clause forbids using the authors' names to promote the product; nothing in AISYS does.
+* *No endorsement.* BSD-3-Clause forbids using the authors' names to promote the product; nothing in ShelfSense does.
 
 **Offline use.** No shipped licence restricts use on an isolated network, needs online activation, phones home or limits the
-number of machines. Licence checking in AISYS itself is offline (the signed licence file, section *Activation*). The one runtime
+number of machines. Licence checking in ShelfSense itself is offline (the signed licence file, section *Activation*). The one runtime
 component that is **not** in the package is **Python** (PSF licence, permissive), which the site installs from the official
-Windows installer before AISYS (environment checklist). `certifi` (a bundle of web certificate authorities) is not shipped, so
+Windows installer before ShelfSense (environment checklist). `certifi` (a bundle of web certificate authorities) is not shipped, so
 nothing in a site installation depends on an internet trust store.
 
 **Changing a dependency.** A new or upgraded package goes through `requirements.lock` or `requirements-dev.lock`, then
@@ -284,24 +284,24 @@ kiosk name.
 ## Running in production: service, scheduled jobs, TLS
 
 Background work inside the application: the message loop (`[notifications] auto_dispatch_seconds`) and the gate loop
-(`[gate] poll_seconds`). Either can instead run as its own scheduled process: `python -m aisys.cli notify-dispatch --every 60`
-and `python -m aisys.cli gate-poll --every 2`. Run each job in one place only.
+(`[gate] poll_seconds`). Either can instead run as its own scheduled process: `python -m shelfsense.cli notify-dispatch --every 60`
+and `python -m shelfsense.cli gate-poll --every 2`. Run each job in one place only.
 
-These are **documented examples, not tested here**: the exercise has no production server. Adapt them to the site.
+These are **documented examples, not tested here**: the project has no production server. Adapt them to the site.
 
 **Run as a service.** The application is `python <root>/manage.py run`; it holds a lock so an update can tell it is running.
-- *Windows:* register it with a service wrapper such as NSSM (`nssm install AISYS C:\Python312\python.exe D:\aisys\manage.py run`),
+- *Windows:* register it with a service wrapper such as NSSM (`nssm install ShelfSense C:\Python312\python.exe D:\shelfsense\manage.py run`),
   or with Task Scheduler ("At startup", "Run whether user is logged on", restart on failure). Stop the service before `manage.py update`.
-- *Linux (systemd):* a unit with `ExecStart=/usr/bin/python3 /opt/aisys/manage.py run`, `Restart=on-failure` and a dedicated
-  `User=`. `systemctl stop aisys` before an update and `systemctl start aisys` after it.
+- *Linux (systemd):* a unit with `ExecStart=/usr/bin/python3 /opt/shelfsense/manage.py run`, `Restart=on-failure` and a dedicated
+  `User=`. `systemctl stop shelfsense` before an update and `systemctl start shelfsense` after it.
 
 **Scheduled jobs.** Patron loan reminders and queued notifications are handled by a loop inside the running application when
 `[notifications] auto_dispatch_seconds` is set (the sample config sets 60; see `docs/reminders.md`). If you would rather run it as a
-separate process, `python -m aisys.cli notify-dispatch --every 60` does the same. Otherwise queued notifications are delivered by `python -m aisys.cli notify-dispatch` (also the **Send queued
+separate process, `python -m shelfsense.cli notify-dispatch --every 60` does the same. Otherwise queued notifications are delivered by `python -m shelfsense.cli notify-dispatch` (also the **Send queued
 messages** button and `POST /api/notifications/dispatch`). To deliver automatically, schedule that command every minute or two
 (Task Scheduler or cron), using the installation's own python and settings:
-`<root>/releases/<current>/venv/Scripts/python.exe -m aisys.cli --config <root>/config/config.toml notify-dispatch`, with the
-environment variables `AISYS_DATABASE_URL` (the database in `<root>/data`) and `AISYS_SECRET_KEY` (from `config/secret.key`) set.
+`<root>/releases/<current>/venv/Scripts/python.exe -m shelfsense.cli --config <root>/config/config.toml notify-dispatch`, with the
+environment variables `SHELFSENSE_DATABASE_URL` (the database in `<root>/data`) and `SHELFSENSE_SECRET_KEY` (from `config/secret.key`) set.
 A nightly backup is the same pattern with `backup create --label nightly`. Backups are not deleted automatically.
 
 **TLS and the reverse proxy.** The application speaks plain HTTP on `127.0.0.1` by default; terminate TLS in front of it.
@@ -318,8 +318,8 @@ For nginx use `proxy_pass http://127.0.0.1:8000;`, `proxy_set_header Host $host;
 names in `[opac] kiosk_hosts` and the hand-over's Origin check both compare against it, so a proxy that rewrites it to
 `127.0.0.1:8000` turns every request into a kiosk request (when `127.0.0.1` is listed) or lets a kiosk name reach staff
 pages (D-070). In production
-(`AISYS_ENV=production`) session cookies are `Secure`, `HttpOnly` and `SameSite=Lax`, and the application refuses to start
-without a 32-character `AISYS_SECRET_KEY` (the installer generates one into `config/secret.key`). Uvicorn trusts forwarded
+(`SHELFSENSE_ENV=production`) session cookies are `Secure`, `HttpOnly` and `SameSite=Lax`, and the application refuses to start
+without a 32-character `SHELFSENSE_SECRET_KEY` (the installer generates one into `config/secret.key`). Uvicorn trusts forwarded
 headers only from `127.0.0.1`, so with a proxy on the same machine the audit log shows the real client address. Keep the
 reader, gate and handheld devices on the site's wired network, not exposed to the internet.
 
@@ -342,7 +342,7 @@ reader, gate and handheld devices on the site's wired network, not exposed to th
   systemd unit (run `manage.py run` under your service manager). Only Windows has been exercised here.
 * Packages contain wheels for the platform they were built on; build on the target's platform and Python version.
 * SQLite databases only (the backup code is SQLite-only).
-* On Windows the installation folder must be short (about 150 characters including `releases\<version>\venv`; use something like `C:\aisys`). The installer checks this first and says so, because Windows stops at 260 characters per path.
+* On Windows the installation folder must be short (about 150 characters including `releases\<version>\venv`; use something like `C:\shelfsense`). The installer checks this first and says so, because Windows stops at 260 characters per path.
 * A rollback across a layout change returns the data to the pre-update moment (by design).
 * A first install trusts the key you give it; there is no certificate authority or key revocation. Replace the trusted
   key by reinstalling.

@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys import __version__
-from aisys.app import create_app
 from conftest import login_card
+from shelfsense import __version__
+from shelfsense.app import create_app
 from test_lifecycle import (  # noqa: F401 - fixtures
     _keyfile,
     fake_release,
@@ -24,9 +24,9 @@ pytestmark = pytest.mark.req("AC09", "FR12")
 
 @pytest.fixture
 def managed(installed, settings, monkeypatch):
-    monkeypatch.setenv("AISYS_HOME", str(installed.path))
+    monkeypatch.setenv("SHELFSENSE_HOME", str(installed.path))
     with TestClient(create_app(settings)) as c:
-        from aisys.cli import seed_demo
+        from shelfsense.cli import seed_demo
 
         seed_demo(settings)
         c.root = installed  # type: ignore[attr-defined]
@@ -34,12 +34,12 @@ def managed(installed, settings, monkeypatch):
 
 
 def test_not_an_installed_copy_says_so(client, admin, monkeypatch):
-    monkeypatch.delenv("AISYS_HOME", raising=False)
+    monkeypatch.delenv("SHELFSENSE_HOME", raising=False)
     s = client.get("/api/updates/status", headers=admin).json()
     assert s["managed"] is False and s["running_version"] == __version__
     r = client.post("/api/updates/check", json={"name": "x.zip"}, headers=admin)
     assert r.status_code == 409
-    client.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     assert client.get("/updates").status_code == 200
 
 
@@ -61,9 +61,9 @@ def test_only_administrators_may_see_it(managed):
 
 def test_page_renders_for_admin_and_is_forbidden_for_clerk(managed):
     admin, clerk = login_card(managed, "STAFFADMIN01"), login_card(managed, "STAFFCLERK01")
-    managed.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    managed.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     assert managed.get("/updates").status_code == 200
-    managed.cookies.set("aisys_session", clerk["Authorization"].split()[1])
+    managed.cookies.set("shelfsense_session", clerk["Authorization"].split()[1])
     assert managed.get("/updates").status_code == 403
 
 

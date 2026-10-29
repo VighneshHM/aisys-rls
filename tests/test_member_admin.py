@@ -9,10 +9,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from aisys import migrate
-from aisys.auth.permissions import PERMISSIONS, ROLES
-from aisys.models import AuditEvent, Card, CircEvent, Loan, Member, Notification, utcnow
 from conftest import login_card
+from shelfsense import migrate
+from shelfsense.auth.permissions import PERMISSIONS, ROLES
+from shelfsense.models import AuditEvent, Card, CircEvent, Loan, Member, Notification, utcnow
 from test_circulation import book, out
 
 pytestmark = pytest.mark.req("FR04", "FR11")
@@ -102,14 +102,14 @@ def test_nothing_works_without_signing_in(client):
 def test_the_patrons_page_and_its_menu_entry(client, admin, lib, clerk):
     for hdr, can_remove, can_erase in ((admin, "true", "true"), (lib, "true", "false"), (clerk, "false", "false")):
         client.cookies.clear()
-        client.cookies.set("aisys_session", hdr["Authorization"].split()[1])
+        client.cookies.set("shelfsense_session", hdr["Authorization"].split()[1])
         page = client.get("/members")
         assert page.status_code == 200 and "Every library member" in page.text
         assert f"CAN_REMOVE = {can_remove}" in page.text and f"CAN_ERASE = {can_erase}" in page.text
         assert 'href="/members"' in page.text  # in the menu
     auditor = login_card(client, "STAFFAUDIT01")
     client.cookies.clear()
-    client.cookies.set("aisys_session", auditor["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", auditor["Authorization"].split()[1])
     assert client.get("/members").status_code == 403
     client.cookies.clear()
     assert client.get("/members", follow_redirects=False).status_code in (302, 303, 307)
@@ -430,7 +430,7 @@ def test_a_name_with_html_is_shown_as_text(client, lib):
 # ================================================================== staff view
 def test_the_staff_list_can_be_filtered_by_name_role_and_status(client, admin):
     page = client.get("/admin")
-    client.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     page = client.get("/admin").text
     for control in ('id="s-q"', 'id="s-role"', 'id="s-status"', "Deactivated", "Locked out"):
         assert control in page, control
@@ -529,7 +529,7 @@ def test_a_member_removed_while_a_checkout_is_with_the_ilms_is_not_left_with_a_l
 
 
 def test_the_patrons_page_asks_inline_never_with_a_browser_pop_up(client, admin):
-    client.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     page = client.get("/members").text
     assert "prompt(" not in page and "confirm(" not in page and "alert(" not in page
     assert "Enter" in page and "Escape" in page  # the panels answer the keyboard

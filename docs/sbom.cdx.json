@@ -5,7 +5,7 @@
   "metadata": {
     "component": {
       "type": "application",
-      "name": "aisys",
+      "name": "shelfsense",
       "version": "0.1.0"
     }
   },
@@ -25,7 +25,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -55,7 +55,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -85,7 +85,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -115,7 +115,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -145,7 +145,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -395,7 +395,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -425,7 +425,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -847,7 +847,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -877,7 +877,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -907,7 +907,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -1165,7 +1165,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -1195,7 +1195,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -1225,7 +1225,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -1255,7 +1255,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -1285,7 +1285,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -1315,7 +1315,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -1345,7 +1345,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -1375,7 +1375,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -1405,7 +1405,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -1435,7 +1435,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -2005,7 +2005,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -2035,7 +2035,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -2661,7 +2661,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -2891,7 +2891,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -2921,7 +2921,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -2951,7 +2951,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -2981,7 +2981,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3011,7 +3011,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3041,7 +3041,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3071,7 +3071,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3101,7 +3101,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -3131,7 +3131,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -3633,7 +3633,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3663,7 +3663,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3693,7 +3693,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3723,7 +3723,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -3753,7 +3753,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "development"
         }
       ],
@@ -3847,7 +3847,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "build"
         }
       ],
@@ -3877,7 +3877,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -4187,7 +4187,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -4217,7 +4217,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -4247,7 +4247,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],
@@ -4277,7 +4277,7 @@
       ],
       "properties": [
         {
-          "name": "aisys:scope",
+          "name": "shelfsense:scope",
           "value": "runtime"
         }
       ],

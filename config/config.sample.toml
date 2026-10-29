@@ -1,15 +1,15 @@
 # Sample configuration (no secrets). Copy to config/config.toml and adjust.
-# Secrets are NEVER stored here: set AISYS_SECRET_KEY in the environment.
-# Override the file location with AISYS_CONFIG.
+# Secrets are NEVER stored here: set SHELFSENSE_SECRET_KEY in the environment.
+# Override the file location with SHELFSENSE_CONFIG.
 
 [app]
-name = "AISYS RFID Library"
+name = "ShelfSense"
 environment = "development"      # development | production
 host = "127.0.0.1"
 port = 8000
 
 [database]
-url = "sqlite:///data/aisys.db"
+url = "sqlite:///data/shelfsense.db"
 
 [security]
 session_ttl_minutes = 480
@@ -24,7 +24,7 @@ format = "json"                  # json | text
 dir = "data/backups"          # pre-migration / pre-update database backups
 
 # RFID devices. Each entry builds one adapter; "mock" is a built-in simulator. A real reader is a driver
-# class registered in code (see src/aisys/rfid/registry.py) and selected here with driver = "<name>".
+# class registered in code (see src/shelfsense/rfid/registry.py) and selected here with driver = "<name>".
 [[devices]]
 id = "staff-1"
 kind = "staff_reader"
@@ -65,7 +65,7 @@ max_fine_per_loan_cents = 1000   # one loan never costs more than 10.00
 [gate]
 duplicate_window_s = 60          # the same tag alarming again within this many seconds is a duplicate
 # Read every real gate this often while the application runs (0 = off). Simulator gates hand their passages over by
-# themselves. Alternatively run `python -m aisys.cli gate-poll --every 2` as a separate process: one or the other.
+# themselves. Alternatively run `python -m shelfsense.cli gate-poll --every 2` as a separate process: one or the other.
 poll_seconds = 2
 
 # Notification channels. "mock" providers record what they would send. A real email, SMS or print service is a class
@@ -80,21 +80,21 @@ backoff_s = 60                   # wait before a retry grows with each failure (
 reminders = true
 remind_days_before = 1           # days before the due date for the first reminder (1 to 30)
 # While the app runs, look for reminders and deliver queued messages this often. 0 = off (then run
-# `python -m aisys.cli notify-dispatch --every 60` as a separate process, or schedule it).
+# `python -m shelfsense.cli notify-dispatch --every 60` as a separate process, or schedule it).
 auto_dispatch_seconds = 60
 
 [ilms]
 # driver = "mock" is the built-in stand-in. driver = "sip2" speaks the SIP2 protocol to a real ILMS (docs/sip2.md);
-# to try it without one, run `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`.
+# to try it without one, run `python -m shelfsense.cli sip2-sim --port 6101 --user shelfsense --password demo`.
 driver = "mock"
 #endpoint = "192.168.1.50"       # host name or IP address of the ILMS server (needed by driver = "sip2")
 #port = 6001                     # the SIP2 port of the ILMS server (needed by driver = "sip2")
-#login = "aisys"                 # SIP2 login user; leave out if the ILMS needs no login
+#login = "shelfsense"                 # SIP2 login user; leave out if the ILMS needs no login
 #institution = "LIBRARY"         # SIP2 institution id (field AO)
 #location = "MAIN"               # SIP2 location code of this system (fields CP and AP)
 #timeout_s = 5                   # seconds to wait for an answer (0.1 to 120)
 #checksum = true                 # SIP2 error detection (sequence number and checksum); turn off only if the ILMS rejects it
-# The login PASSWORD is never written here: set the environment variable AISYS_ILMS_PASSWORD instead.
+# The login PASSWORD is never written here: set the environment variable SHELFSENSE_ILMS_PASSWORD instead.
 retries = 2
 backoff_s = 0.1
 

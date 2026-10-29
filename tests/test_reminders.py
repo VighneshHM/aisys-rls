@@ -11,13 +11,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from aisys import migrate
-from aisys.app import create_app
-from aisys.cli import main as cli_main
-from aisys.models import Loan, Member, Notification
-from aisys.notifications import queue, reminders, runner
-from aisys.notifications.providers import MockProvider, NotificationConfig, build_providers
 from conftest import login_card
+from shelfsense import migrate
+from shelfsense.app import create_app
+from shelfsense.cli import main as cli_main
+from shelfsense.models import Loan, Member, Notification
+from shelfsense.notifications import queue, reminders, runner
+from shelfsense.notifications.providers import MockProvider, NotificationConfig, build_providers
 from test_tagging import make_item
 
 pytestmark = pytest.mark.req("FR09")
@@ -293,7 +293,7 @@ def test_the_loop_does_nothing_while_paused():
 def test_the_running_app_delivers_reminders_by_itself(settings, tmp_path):
     cfg = dataclasses.replace(settings, notifications=NotificationConfig(auto_dispatch_s=0.1, backoff_s=0.0))
     app = create_app(cfg)
-    from aisys.cli import seed_demo
+    from shelfsense.cli import seed_demo
 
     seed_demo(cfg)
     with TestClient(app) as c:
@@ -323,7 +323,7 @@ def test_cli_one_pass_and_bad_interval(settings, client, capsys):
     assert path
     import os
 
-    os.environ["AISYS_DATABASE_URL"] = settings.database_url
+    os.environ["SHELFSENSE_DATABASE_URL"] = settings.database_url
     try:
         assert cli_main(["notify-dispatch"]) == 0
         out = capsys.readouterr().out
@@ -331,7 +331,7 @@ def test_cli_one_pass_and_bad_interval(settings, client, capsys):
         assert cli_main(["notify-dispatch", "--every", "0.2"]) == 2
         assert "at least 1 second" in capsys.readouterr().out
     finally:
-        os.environ.pop("AISYS_DATABASE_URL", None)
+        os.environ.pop("SHELFSENSE_DATABASE_URL", None)
 
 
 # ---------- member contact details ----------
@@ -480,7 +480,7 @@ def test_migration_0009_keeps_existing_members_and_notifications(tmp_path):
 
 # ---------- found by the bug hunt ----------
 def bulk_loans(client, n, due):
-    from aisys.models import BibRecord, Item
+    from shelfsense.models import BibRecord, Item
 
     with client.app.state.session_factory() as db:
         m = db.scalar(select(Member).where(Member.member_no == "M0001"))
@@ -546,13 +546,13 @@ def test_line_breaks_in_a_title_never_reach_a_subject(client, lib, db):
     [("email", "a@example.org\n"), ("email", "a@example.org\nBcc: x@y.org"), ("sms", "+15550100001\n")],
 )
 def test_addresses_must_end_where_they_end(channel, address):
-    from aisys.notifications.providers import valid_address
+    from shelfsense.notifications.providers import valid_address
 
     assert not valid_address(channel, address)
 
 
 def test_loop_interval_has_a_floor_and_zero_means_off(tmp_path):
-    from aisys.config import load_settings
+    from shelfsense.config import load_settings
 
     def interval(text):
         path = tmp_path / "c.toml"

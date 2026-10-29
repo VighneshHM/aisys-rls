@@ -26,7 +26,7 @@ upload -> STAGE (every row kept verbatim) -> MAP columns -> VALIDATE (dry run, l
 | **Single transaction** for all inserts | A failure leaves the library exactly as it was (tested by injecting a failure after the inserts) | One long write lock (about 7 s for 20k rows) |
 | **Fingerprint of pre-existing records** hashed before and after | Turns "existing data unchanged" from a claim into a check | Hashes key fields, not every column |
 | **Rollback by `batch_id`** on items and bib records | Removes exactly what the batch created; refuses (409) if items are already referenced elsewhere (FK) | Bib records still used by later batches are kept and reported |
-| **Mapping-driven columns** with alias + fuzzy matching, user-overridable | The reviewers' file layout is unknown (assumption A-01) | Fuzzy cutoff is deliberately strict; borderline headers need a manual choice |
+| **Mapping-driven columns** with alias + fuzzy matching, user-overridable | A real site's file layout is unknown (assumption A-01) | Fuzzy cutoff is deliberately strict; borderline headers need a manual choice |
 | **Warnings vs errors** | Legacy data is messy: drop a bad year but keep the book; reject only what would corrupt the catalogue | Policy choices are listed below and can be tightened |
 | **Row numbers = spreadsheet rows** (header = row 1, blanks counted) | Error reports must point at the line a person sees in Excel | CSV rows with embedded newlines are counted per record |
 
@@ -81,7 +81,7 @@ barcodes and bibliographic keys it compared against and **re-checks automaticall
 * Every automatic re-check is audited (`migration.revalidate`, with before/after counts).
 
 ## Evidence
-* Synthetic data generator: `python -m aisys.devtools.sample_data --rows 20000 --out samples` (deterministic; the manifest lists the
+* Synthetic data generator: `python -m shelfsense.devtools.sample_data --rows 20000 --out samples` (deterministic; the manifest lists the
   exact number of deliberate defects, and tests assert the importer finds exactly those).
 * 20,000-row `.xlsx` on the development laptop: **upload + validate 13.1 s, commit 7.4 s** (`docs/performance-results.md`), reconciliation balanced,
   rollback returns to the pre-migration count (`tests/test_migration.py::test_full_20000_row_xlsx_import_reconcile_and_rollback`).

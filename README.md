@@ -1,9 +1,10 @@
-# AISYS RFID Library
+# ShelfSense
 
 RFID-enabled library add-on that integrates with an existing ILMS through connector interfaces, with mock adapters for
-every device and service that is unavailable. Built for the AISYS Candidate Software Development SOP.
+every device and service that is unavailable. Built to a written specification of twelve functional and nine
+non-functional requirements and ten acceptance scenarios (`docs/requirements.csv`).
 
-**Status:** every SOP requirement (FR01 to FR12, NFR01 to NFR09) and all ten acceptance scenarios (AC01 to AC10) are
+**Status:** every requirement (FR01 to FR12, NFR01 to NFR09) and all ten acceptance scenarios (AC01 to AC10) are
 implemented and tested: spreadsheet migration, tagging, circulation through a mock ILMS or the **SIP2** protocol, blocks and
 fines, inventory, the security gate, notifications and patron reminders, reports and dashboard, full-text search and the public
 catalogue, shelves, acquisitions, serials, labels and cards, staff, **patrons**, **roles** and **Settings** administration, backup and restore,
@@ -11,16 +12,32 @@ and the signed offline install, update and rollback. NCIP 2.0 is not built (SIP2
 `docs/traceability.md` maps every requirement to its tests, `docs/assumptions.md` and `docs/decisions.md` record the decisions,
 and `docs/remaining-work.md` lists what is left for a live site.
 
+### Highlights
+
+- **Integration by interface:** every device (reader, handheld, gate, camera, card printer) and every outside service sits
+  behind a Python protocol with a mock, chosen by a name in the config. A **SIP2** client (codec, retries with the same
+  transaction id, a simulator with failure injection) talks to the library system, so a timeout never lends a book twice.
+- **Data you can trust:** a staged 20,000-row spreadsheet import with review, reconciliation and rollback; an audit log and
+  loan history kept append-only by database triggers; verified backups with a restore drill.
+- **Security:** role-based permissions on every route, hashed session tokens, lockout, patron privacy (archive and erase),
+  and a public-catalogue kiosk mode.
+- **Offline delivery:** an Ed25519-signed package installs, updates (backup, rehearsal on a copy, then switch) and rolls back
+  with no internet, proven by an automated run with the network blocked.
+- **Quality:** 864 automated tests mapped to requirements, ruff, mypy and a dependency scan in CI on Windows.
+
+**Stack:** Python 3.12+, FastAPI, SQLAlchemy 2 and Alembic on SQLite (FTS5 search), Jinja2 server-rendered pages,
+pytest, GitHub Actions.
+
 ## Clone and test it (about 5 minutes, Windows, PowerShell)
 
-For reviewers and anyone who wants to see it working. You need Windows, **Python 3.12 or newer** and Git. Only step 2 needs the
+To see it working on your own computer. You need Windows, **Python 3.12 or newer** and Git. Only step 2 needs the
 internet (to download the packages); nothing after it does.
 
 **1. Get the code**
 
 ```powershell
-git clone https://github.com/VighneshHM/aisys-rls.git
-cd aisys-rls
+git clone https://github.com/VighneshHM/shelfsense.git
+cd shelfsense
 ```
 
 **2. Install it** (a private environment inside the folder; nothing is installed system-wide)
@@ -34,20 +51,20 @@ python -m venv .venv
 **3. Load the demo library** (`seed-demo`, about 15 seconds). Do this before the first start, or every menu is empty.
 
 ```powershell
-.\.venv\Scripts\aisys seed-demo
+.\.venv\Scripts\shelfsense seed-demo
 ```
 
 It creates the database and fills it with **synthetic** data only: 259 books (241 tagged, 18 left untagged on purpose),
 20 patrons in different situations with past and current loans, 7 staff (1 administrator, 2 librarians, 3 circulation clerks,
 1 auditor), and about a hundred days of activity, so every menu in the side bar has something in it (`docs/demo-data.md`). It
 ends with a line like `demo library loaded: items 259, untagged 18, patrons 20, ...`. If it says **NOT LOADED**, the
-database already had books from an earlier try: run `.\.venv\Scripts\aisys seed-demo --reset` to start again (the old
+database already had books from an earlier try: run `.\.venv\Scripts\shelfsense seed-demo --reset` to start again (the old
 database is kept beside it as a copy). Use `--reset` whenever you want a clean demo.
 
 **4. Start it**
 
 ```powershell
-.\.venv\Scripts\aisys run
+.\.venv\Scripts\shelfsense run
 ```
 
 Open **http://127.0.0.1:8000**. On the sign-in page choose a staff card: **Librarian** (`STAFFLIB0001`) to try the catalogue,
@@ -71,38 +88,38 @@ Contents: [Clone and test](#clone-and-test-it-about-5-minutes-windows-powershell
 
 ## Install at a library (offline)
 
-A library receives one **signed package** (`aisys-<version>.zip`), a **licence file** (`licence.json`) and the vendor's
+A library receives one **signed package** (`shelfsense-<version>.zip`), a **licence file** (`licence.json`) and the vendor's
 **public key** (`vendor.pub`, which should arrive separately from the package). The package holds the application and every
 dependency, so the server needs **no internet**. Full procedure, checklist and recovery: `docs/deployment.md`.
 
 **Before you start** (the server): Windows 11 or Windows Server 2022 or later, **Python 3.12 or newer** (the only thing installed
-separately), 500 MB free disk, and a short install path such as `C:\aisys` (Windows stops at 260 characters). Unzip the package
-to a folder, for example `C:\aisys-package`.
+separately), 500 MB free disk, and a short install path such as `C:\shelfsense` (Windows stops at 260 characters). Unzip the package
+to a folder, for example `C:\shelfsense-package`.
 
 1. **Check Python and disk.** `python --version` shows 3.12 or newer and the drive has the free space. The full
    environment checklist is in `docs/deployment.md`; the installer also refuses early if Python, disk or the path length are wrong.
 2. **Install.**
 
    ```powershell
-   cd C:\aisys-package
-   python install.py --root C:\aisys --licence licence.json --trusted-key vendor.pub
+   cd C:\shelfsense-package
+   python install.py --root C:\shelfsense --licence licence.json --trusted-key vendor.pub
    ```
 
    It verifies the signature and every file, checks the licence offline, builds a private environment from the package's own
    wheels, prepares the database, starts the application once to prove it runs, and only then records the install. If anything
    fails the half-built release is removed and nothing is left behind.
-3. **Configure.** Edit `C:\aisys\config\config.toml` (copied from the sample at install): set `[app] environment = "production"`,
+3. **Configure.** Edit `C:\shelfsense\config\config.toml` (copied from the sample at install): set `[app] environment = "production"`,
    the `[ilms]` connector (`mock`, or `sip2` with the library system's host, port and login) and the device drivers. The
    secret key is generated for you in `config\secret.key`. Put the SIP2 password in the environment variable
-   `AISYS_ILMS_PASSWORD`, never in the file. Every setting is in the table under *Configuration reference* in `docs/deployment.md`.
-4. **Check, then start.** `python C:\aisys\manage.py doctor` and fix every FAIL (Python, SQLite, disk, folders, port, secret key,
-   the ILMS link; it changes nothing). Then `python C:\aisys\manage.py run` (http://127.0.0.1:8000). For everyday use run it under a service manager
+   `SHELFSENSE_ILMS_PASSWORD`, never in the file. Every setting is in the table under *Configuration reference* in `docs/deployment.md`.
+4. **Check, then start.** `python C:\shelfsense\manage.py doctor` and fix every FAIL (Python, SQLite, disk, folders, port, secret key,
+   the ILMS link; it changes nothing). Then `python C:\shelfsense\manage.py run` (http://127.0.0.1:8000). For everyday use run it under a service manager
    (NSSM or Task Scheduler on Windows) and put an HTTPS proxy in front: examples are in `docs/deployment.md`, *Running in production*.
 5. **Create the first administrator.** A new install has no staff, so make one (it asks for the password twice and never
    shows it; at least 12 characters):
 
    ```powershell
-   python C:\aisys\manage.py create-admin --username site.admin --name "Site Admin"
+   python C:\shelfsense\manage.py create-admin --username site.admin --name "Site Admin"
    ```
 
    Sign in on the sign-in page with that username and password. (`--seed-demo` at install loads the synthetic demo library
@@ -111,11 +128,11 @@ to a folder, for example `C:\aisys-package`.
    **Data migration** (`docs/migration.md`) and tags items (`docs/rfid.md`). Back up from **Backups** and copy `data\backups\`
    off the server (`docs/backup-restore.md`).
 
-**Update** (the new package goes in `C:\aisys\incoming\`; stop the application first):
+**Update** (the new package goes in `C:\shelfsense\incoming\`; stop the application first):
 
 ```powershell
-python C:\aisys\manage.py update aisys-0.2.0.zip --dry-run     # check only, changes nothing
-python C:\aisys\manage.py update aisys-0.2.0.zip
+python C:\shelfsense\manage.py update shelfsense-0.2.0.zip --dry-run     # check only, changes nothing
+python C:\shelfsense\manage.py update shelfsense-0.2.0.zip
 ```
 
 It backs up the data, installs the new version beside the old one, rehearses the migration on a copy, then switches. Any failure
@@ -124,8 +141,8 @@ before the switch leaves the old version and its data as they were.
 **Roll back** to the previous version (the data comes back from the pre-update backup when the update changed the database layout):
 
 ```powershell
-python C:\aisys\manage.py rollback --dry-run
-python C:\aisys\manage.py rollback --yes
+python C:\shelfsense\manage.py rollback --dry-run
+python C:\shelfsense\manage.py rollback --yes
 ```
 
 Other commands: `manage.py status` (versions, licence, history), `manage.py recover` (after a power cut mid-update),
@@ -144,14 +161,14 @@ where the guided tour and the import below start from.
 
 Demo staff card UIDs (synthetic), one of each role on the sign-in page: `STAFFADMIN01`, `STAFFLIB0001`, `STAFFCLERK01`,
 `STAFFAUDIT01`; the other staff (`STAFFLIB0002`, `STAFFCLERK02`, `STAFFCLERK03`) can be typed in the card box.
-Patron card `PATRON000001` is rejected at login by design. Demo admin password: see `src/aisys/cli.py`.
+Patron card `PATRON000001` is rejected at login by design. Demo admin password: see `src/shelfsense/cli.py`.
 `docs/demo-script.md` is a guided tour.
 
 ## Try the spreadsheet import (AC01)
 Sign in as `STAFFLIB0001` (librarian) and open **Data migration**, then upload `samples/library_200.xlsx` (or
 `samples/library_20000.xlsx`, the 20k-row file). Review the problems, commit, check the reconciliation, and roll back if you like.
 Details, rules and evidence: `docs/migration.md`. Regenerate samples with
-`.\.venv\Scripts\python -m aisys.devtools.sample_data --rows 20000 --out samples`.
+`.\.venv\Scripts\python -m shelfsense.devtools.sample_data --rows 20000 --out samples`.
 
 ## Try tagging (AC02)
 Sign in as `STAFFLIB0001`. In **Catalogue** add an item (or use one you imported), open it, and click **Tag this item**. On the
@@ -185,7 +202,7 @@ Sign in as `STAFFADMIN01`, open **Gate events**, type a tagged book's accession 
 gate* and click **Walk through the gate**. Because the book was never checked out its security bit is still on, so it
 raises an alarm with a CCTV snapshot and queued messages. Click **Send queued messages** to deliver them and read them
 in the mock outbox. Check the book out first and walk it through again: no alarm. In production a real gate is read by the
-gate loop (`[gate] poll_seconds`), by `python -m aisys.cli gate-poll --every 2`, or by **Read the gates now**. Details and
+gate loop (`[gate] poll_seconds`), by `python -m shelfsense.cli gate-poll --every 2`, or by **Read the gates now**. Details and
 design: `docs/gate.md`.
 
 ## Try the reports (AC08)
@@ -208,7 +225,7 @@ licence and history and can dry-run check a waiting package. How to build, insta
 
 Sign in as `STAFFADMIN01`, open **Backups**, click **Back up now**, then **Compare** (everything identical). In the
 **Disaster drill** click **Run the full drill**: it damages the data, shows which tables changed, restores the backup
-and shows every table identical again. The command line does the same (`python -m aisys.cli backup --help`). Details
+and shows every table identical again. The command line does the same (`python -m shelfsense.cli backup --help`). Details
 and the restore procedure: `docs/backup-restore.md`.
 
 ## Correct a record, withdraw a copy (FR01)
@@ -223,7 +240,7 @@ damaged, lost or withdrawn with a reason. The same rules as a new item apply, ev
 * **Shelves** shows a shelf as a row of books in call-number order; after an inventory sweep, books out of order are outlined.
 * **Add item** has **Look up the ISBN** (net cataloguing; try `9780001000032`).
 * **Acquisitions**, **Serials** and **Labels** are in the menu for librarians; **Print the card** is under a member on Circulation.
-* `python -m aisys.cli doctor` checks the computer and configuration. `python scripts/perf_report.py` measures performance at 20,000 items.
+* `python -m shelfsense.cli doctor` checks the computer and configuration. `python scripts/perf_report.py` measures performance at 20,000 items.
 
 ## Patrons (FR04)
 
@@ -235,26 +252,26 @@ section 3a.
 ## Loan reminders (FR09)
 
 Patrons with an e-mail or phone are reminded a day before a loan is due and on the due day, by a loop that runs inside the app
-(`auto_dispatch_seconds` in the config) or as `python -m aisys.cli notify-dispatch --every 60`. Set a member's contact on
+(`auto_dispatch_seconds` in the config) or as `python -m shelfsense.cli notify-dispatch --every 60`. Set a member's contact on
 **Circulation**; in the demo use **Due tomorrow / Due today** beside a loan to try it. Details: `docs/reminders.md`.
 
 ## SIP2 and the simulator (FR03)
 
 The library-system connector can speak the SIP2 protocol (3M 2.00) over TCP: set `[ilms] driver = "sip2"` with `endpoint`, `port`,
 `login`, `institution` and `location` in `config/config.toml`, and put the login password in the environment variable
-`AISYS_ILMS_PASSWORD` (never in the file). To try it without a real library system, run the simulator and point the application at it:
+`SHELFSENSE_ILMS_PASSWORD` (never in the file). To try it without a real library system, run the simulator and point the application at it:
 
 ```powershell
-python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo     # terminal 1
-$env:AISYS_ILMS_PASSWORD = "demo"                                         # terminal 2, then set [ilms] to
-                                                                          # driver sip2, endpoint 127.0.0.1, port 6101, login aisys
-python -m aisys.cli doctor                                                # the ILMS line should be OK
-python -m aisys.cli run
+python -m shelfsense.cli sip2-sim --port 6101 --user shelfsense --password demo     # terminal 1
+$env:SHELFSENSE_ILMS_PASSWORD = "demo"                                         # terminal 2, then set [ilms] to
+                                                                          # driver sip2, endpoint 127.0.0.1, port 6101, login shelfsense
+python -m shelfsense.cli doctor                                                # the ILMS line should be OK
+python -m shelfsense.cli run
 ```
 
 Honest limits: tested only against the simulator (written from the specification), not certified and not tried on any vendor
 system; a subset of SIP2; no encryption in SIP2 itself (use a VPN, stunnel or TLS proxy). NCIP 2.0 is not implemented: SIP2
-meets the SOP's protocol requirement (decision DR-13), and an NCIP connector would be one more class behind the same boundary.
+meets the specification's protocol requirement (decision DR-13), and an NCIP connector would be one more class behind the same boundary.
 Details: `docs/sip2.md`.
 
 ## The public catalogue and public terminals
@@ -280,8 +297,8 @@ drivers and certificates stay in `config/config.toml` (see `docs/administration.
 
 ## Configuration
 Copy `config/config.sample.toml` to `config/config.toml` (an installed copy already has one). Secrets come from the environment only
-(`AISYS_SECRET_KEY`, required in production; the installer generates one). Override paths with `AISYS_CONFIG`, `AISYS_DATABASE_URL`,
-`AISYS_ENV`. Every key and variable is listed in `docs/deployment.md`.
+(`SHELFSENSE_SECRET_KEY`, required in production; the installer generates one). Override paths with `SHELFSENSE_CONFIG`, `SHELFSENSE_DATABASE_URL`,
+`SHELFSENSE_ENV`. Every key and variable is listed in `docs/deployment.md`.
 
 ## Develop
 
@@ -302,7 +319,7 @@ migration reports). Dependencies are pinned with hashes in `requirements.lock` (
 
 ## Layout
 ```
-src/aisys/
+src/shelfsense/
   app.py, routes.py, deps.py      web app factory, sign-in and system API, auth/RBAC dependencies
   *_routes.py, pages.py           HTTP API per area, and the staff pages
   auth/                           password hashing, login service, permission catalogue and built-in roles
@@ -318,14 +335,14 @@ src/aisys/
   models.py, db.py, migrations/   ORM, engine, versioned Alembic migrations (0001 to 0012)
   audit.py, logging_setup.py      append-only audit trail, masked structured logs
   web/                            templates and static files (no external requests)
-src/aisys_lifecycle/              offline packages: signing, licence, install, update, rollback, SBOM
+src/shelfsense_lifecycle/              offline packages: signing, licence, install, update, rollback, SBOM
 scripts/                          release, lifecycle demo, generators for the generated documents, performance report
-docs/                             every SOP deliverable; docs/index.md maps them
+docs/                             the documentation; docs/index.md maps it
 tests/                            pytest suite, tagged with requirement IDs
 ```
 
 ## More documentation
 
-`docs/index.md` (every document against the SOP deliverable it satisfies), `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`,
+`docs/index.md` (every document, grouped by area), `docs/user-guide.md` (desk tasks), `docs/troubleshooting.md`,
 `docs/deployment.md` (install, update, rollback, service, TLS), `docs/administration.md`, `docs/sip2.md` (the SIP2 connector),
 `docs/remaining-work.md` (what is left for production) and `docs/walkthrough.md` (the whole system explained).

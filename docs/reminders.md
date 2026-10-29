@@ -46,7 +46,7 @@ Three ways, all doing the same pass (queue due reminders, then deliver what is q
    ```
    The loop starts and stops with the application, survives any error in a pass (logged, tried again next time) and does
    nothing while a restore is running.
-2. **On its own:** `python -m aisys.cli notify-dispatch --every 60` (Ctrl+C stops it). Without `--every` it does one pass.
+2. **On its own:** `python -m shelfsense.cli notify-dispatch --every 60` (Ctrl+C stops it). Without `--every` it does one pass.
    Use this if the app runs under a service manager and you prefer a separate scheduled process.
 3. **By hand:** the **Send queued messages** button on *Gate events*, `POST /api/notifications/dispatch`, and
    `POST /api/notifications/reminders/run` (administrators) which only queues the due reminders.

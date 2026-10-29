@@ -1,4 +1,4 @@
-"""Write the committed sample reports in docs/samples/ (D5).
+"""Write the committed sample reports in docs/samples/.
 
     python scripts/sample_reports.py [--check]
 
@@ -22,9 +22,9 @@ sys.path.insert(0, str(REPO / "src"))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from aisys.app import create_app  # noqa: E402
-from aisys.cli import seed_demo  # noqa: E402
-from aisys.config import Settings  # noqa: E402
+from shelfsense.app import create_app  # noqa: E402
+from shelfsense.cli import seed_demo  # noqa: E402
+from shelfsense.config import Settings  # noqa: E402
 
 SOURCE = REPO / "samples" / "library_200.xlsx"
 OUT = REPO / "docs" / "samples"
@@ -115,7 +115,7 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="compare with the committed files; write nothing")
     args = ap.parse_args()
     # Windows keeps the SQLite file open until the process ends, so a failed clean-up of the temp folder is ignored.
-    with tempfile.TemporaryDirectory(prefix="aisys-samples-", ignore_cleanup_errors=True) as d:
+    with tempfile.TemporaryDirectory(prefix="shelfsense-samples-", ignore_cleanup_errors=True) as d:
         csv_text, report = build(Path(d))
     files = {
         "validation-report.csv": csv_text,

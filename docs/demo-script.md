@@ -1,15 +1,15 @@
-# Demonstration script and presentation (D9)
+# Demonstration script
 
-A 30-minute live demonstration that walks through the ten acceptance scenarios in the SOP's order, then a short presentation
-outline and the answers to the questions a reviewer is likely to ask. Everything shown is synthetic.
+A 30-minute live demonstration that walks through the ten acceptance scenarios in order, then the answers to the
+questions an audience is likely to ask. Everything shown is synthetic.
 
 ## Before you start (5 minutes, once)
 
 ```bash
 python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock
 python -m pip install -e . --no-deps --no-build-isolation
-python -m aisys.cli seed-demo --minimal  # database, four staff, six patrons, contact details, alert settings
-python -m aisys.cli run                  # http://127.0.0.1:8000  (simulators are on in development)
+python -m shelfsense.cli seed-demo --minimal  # database, four staff, six patrons, contact details, alert settings
+python -m shelfsense.cli run                  # http://127.0.0.1:8000  (simulators are on in development)
 ```
 
 Have ready: `samples/library_200.xlsx` and `samples/library_20000.xlsx`; a second terminal for the lifecycle demo; the sign-in page
@@ -40,10 +40,10 @@ barcode); **Acquisitions** (order, place, book in); **Serials** (late issue, cla
 
 Say first: this is a SIP2 client talking to a **simulator** written from the specification, not to a real library system.
 
-1. Terminal A: `python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo`
-2. Terminal B: set `$env:AISYS_ILMS_PASSWORD = "demo"`; in `config/config.toml` set `[ilms]` to `driver = "sip2"`, `endpoint = "127.0.0.1"`,
-   `port = 6101`, `login = "aisys"`; run `python -m aisys.cli doctor` and point at the ILMS line (answered and online).
-3. Start the application (`python -m aisys.cli run`) in terminal B, sign in as the clerk, and check out a book to Priya. Show the history line.
+1. Terminal A: `python -m shelfsense.cli sip2-sim --port 6101 --user shelfsense --password demo`
+2. Terminal B: set `$env:SHELFSENSE_ILMS_PASSWORD = "demo"`; in `config/config.toml` set `[ilms]` to `driver = "sip2"`, `endpoint = "127.0.0.1"`,
+   `port = 6101`, `login = "shelfsense"`; run `python -m shelfsense.cli doctor` and point at the ILMS line (answered and online).
+3. Start the application (`python -m shelfsense.cli run`) in terminal B, sign in as the clerk, and check out a book to Priya. Show the history line.
 4. Stop the simulator and try a check-in: the clerk gets a clear "not answering" message and nothing is half-recorded. Restart the simulator
    and repeat.
 
@@ -53,27 +53,10 @@ Put `driver = "mock"` back afterwards. Details and limits: `docs/sip2.md`.
 
 | Symptom | Quick fix |
 |---|---|
-| Sign-in page shows no simulated cards | The database was not seeded: stop, `python -m aisys.cli seed-demo --minimal`, run again |
+| Sign-in page shows no simulated cards | The database was not seeded: stop, `python -m shelfsense.cli seed-demo --minimal`, run again |
 | A page looks old after a code change | Restart the application (the server keeps the old code) |
 | "Stale" or missing fields on the member panel | Same: restart |
 | A step fails | Say so, show the audit log line and `docs/troubleshooting.md`; every failure path has a message and a test |
-
-## Presentation outline (12 slides, 15 minutes)
-
-The deck is `docs/presentation.html`: one self-contained file (no network), open it in a browser; arrow keys or a click move between slides, and each slide has speaker notes. It follows this outline.
-
-1. **The problem and the scope**: add RFID to an existing library system without touching its records; what is mocked and why.
-2. **Architecture**: the layered diagram (`docs/architecture.md` section 2) and the interface/mocks rule.
-3. **What was built**: the ten scenarios as a checklist, with the requirement coverage (all 31 requirements done; FR03 rests on a SIP2 client tested only against a simulator, with NCIP 2.0 not built, and says so).
-4. **Data safety (NFR01)**: staging, backup before every change, per-table proof, restore with a safety copy.
-5. **Integration**: the connector with retries and the same transaction id; devices behind Protocols; notifications queued first.
-6. **Security**: roles and permissions, signed packages, TLS, masked logs, hostile-input tests, dependency audit.
-7. **Offline lifecycle**: install, update with a rehearsal, rollback; the SBOM and licences.
-8. **Search and shelves**: full-text index kept current by triggers; the public catalogue; the virtual bookshelf.
-9. **Testing**: 864 test cases mapped to requirements, three Windows CI images, performance at 20,000 items, the defect log.
-10. **What the testing found**: examples (the search that took 1.3 s, duplicate delivery, the restore race) and how they were fixed.
-11. **Known limits and production backlog**: `docs/remaining-work.md` (no real hardware, SIP2 tested only against a simulator and no NCIP, SQLite only, no pen test).
-12. **Questions and the live demonstration.**
 
 ## Questions to expect
 

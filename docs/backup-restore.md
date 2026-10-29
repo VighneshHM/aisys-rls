@@ -35,11 +35,11 @@ and `migration_rows` tables are the import log: after a failed import they corre
 **From the command line** (stop the application first):
 
 ```
-python -m aisys.cli backup create --label before-update
-python -m aisys.cli backup list
-python -m aisys.cli backup verify <file>
-python -m aisys.cli backup compare <file>
-python -m aisys.cli backup restore <file> --yes
+python -m shelfsense.cli backup create --label before-update
+python -m shelfsense.cli backup list
+python -m shelfsense.cli backup verify <file>
+python -m shelfsense.cli backup compare <file>
+python -m shelfsense.cli backup restore <file> --yes
 ```
 
 Without `--yes`, `restore` only explains what it would do. A `<file>` is a name in the backup folder or a path.
@@ -66,7 +66,7 @@ taken before the upgrade, so it shows the data is the backup's data). A backup f
 
 ## The drills (development only, 404 in production)
 
-The Backups page has a **Disaster drill** so a reviewer can see the whole thing without risking real data:
+The Backups page has a **Disaster drill** so anyone can see the whole thing without risking real data:
 
 - **Full drill (damaging change):** takes a backup, then imitates a faulty sync that wipes balances and blocks, blanks half the shelf locations, deletes every fifth tag link and closes every loan. It shows which tables differ, restores the backup, and shows every table identical again.
 - **Failed spreadsheet import:** *Make the next import fail* arms a fault; then commit any import on **Data migration**. It fails after inserting its rows, rolls back, and the backup it took stays. **Compare** that backup to see that all library data is unchanged. (This uses the real commit code.)

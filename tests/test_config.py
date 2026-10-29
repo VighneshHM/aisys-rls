@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from aisys.config import load_settings
-from aisys.rfid.registry import DeviceRegistry
+from shelfsense.config import load_settings
+from shelfsense.rfid.registry import DeviceRegistry
 
 pytestmark = pytest.mark.req("NFR06")
 SAMPLE = Path(__file__).resolve().parent.parent / "config" / "config.sample.toml"
@@ -47,17 +47,17 @@ def test_a_bad_ilms_port_stops_the_start_with_a_plain_message(tmp_path, port):
 
 def test_environment_variables_override_the_file(tmp_path, monkeypatch):
     path = write(tmp_path, '[app]\nport = 9000\n[database]\nurl = "sqlite:///from-file.db"\n')
-    monkeypatch.setenv("AISYS_PORT", "9100")
-    monkeypatch.setenv("AISYS_DATABASE_URL", "sqlite:///from-env.db")
-    monkeypatch.setenv("AISYS_BACKUP_DIR", "elsewhere")
+    monkeypatch.setenv("SHELFSENSE_PORT", "9100")
+    monkeypatch.setenv("SHELFSENSE_DATABASE_URL", "sqlite:///from-env.db")
+    monkeypatch.setenv("SHELFSENSE_BACKUP_DIR", "elsewhere")
     s = load_settings(path)
     assert (s.port, s.database_url, s.backup_dir) == (9100, "sqlite:///from-env.db", "elsewhere")
 
 
 def test_production_refuses_a_short_secret(tmp_path, monkeypatch):
-    monkeypatch.setenv("AISYS_ENV", "production")
-    monkeypatch.setenv("AISYS_SECRET_KEY", "short")
-    with pytest.raises(RuntimeError, match="AISYS_SECRET_KEY"):
+    monkeypatch.setenv("SHELFSENSE_ENV", "production")
+    monkeypatch.setenv("SHELFSENSE_SECRET_KEY", "short")
+    with pytest.raises(RuntimeError, match="SHELFSENSE_SECRET_KEY"):
         load_settings(write(tmp_path, ""))
 
 

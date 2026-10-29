@@ -6,12 +6,12 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys import migrate
-from aisys.app import create_app
-from aisys.circulation.connector import CirculationConfig
-from aisys.cli import DEMO_PASSWORD, seed_demo
-from aisys.config import Settings
-from aisys.notifications.providers import NotificationConfig
+from shelfsense import migrate
+from shelfsense.app import create_app
+from shelfsense.circulation.connector import CirculationConfig
+from shelfsense.cli import DEMO_PASSWORD, seed_demo
+from shelfsense.config import Settings
+from shelfsense.notifications.providers import NotificationConfig
 
 
 @pytest.fixture(scope="session")

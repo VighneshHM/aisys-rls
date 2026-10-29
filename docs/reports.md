@@ -57,6 +57,6 @@ Adding a report means writing one function and one entry in `reports/definitions
 ## Known limits
 
 - No scheduled or emailed reports, no saved filter sets, no PDF output.
-- Charts are bar charts only. Totals are computed on request (fine for the exercise's size; very large catalogues would want summary tables).
+- Charts are bar charts only. Totals are computed on request (fine for this project's size; very large catalogues would want summary tables).
 - Dates are UTC days, not the library's local midnight.
 - Patron-facing statistics (what a member borrowed) are not part of the staff reports.

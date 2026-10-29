@@ -16,11 +16,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from aisys.app import create_app
-from aisys.cli import seed_demo
-from aisys.config import load_settings
-from aisys.models import AuditEvent, AuthSession
 from conftest import login_card
+from shelfsense.app import create_app
+from shelfsense.cli import seed_demo
+from shelfsense.config import load_settings
+from shelfsense.models import AuditEvent, AuthSession
 
 pytestmark = pytest.mark.req("NFR02", "FR02")
 KIOSK = "opac.library.local"
@@ -30,7 +30,7 @@ def sign_in_browser(client, uid="STAFFLIB0001") -> str:
     hdr = login_card(client, uid)
     token = hdr["Authorization"].split()[1]
     client.cookies.clear()
-    client.cookies.set("aisys_session", token)
+    client.cookies.set("shelfsense_session", token)
     return token
 
 
@@ -79,11 +79,11 @@ def test_handing_over_ends_the_session_records_why_and_opens_the_catalogue(clien
     token = sign_in_browser(client, "STAFFADMIN01")
     r = client.post("/handover", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/opac"
-    assert "aisys_session" in r.headers.get("set-cookie", "") and "Max-Age=0" in r.headers["set-cookie"]
+    assert "shelfsense_session" in r.headers.get("set-cookie", "") and "Max-Age=0" in r.headers["set-cookie"]
     assert all(s.revoked for s in sessions(client))  # the server forgot it, not only the browser
     [ev] = logouts(client)
     assert ev.detail == {"reason": "public_catalogue"} and ev.actor == "admin"
-    client.cookies.set("aisys_session", token)  # even someone who kept the old cookie gets nowhere
+    client.cookies.set("shelfsense_session", token)  # even someone who kept the old cookie gets nowhere
     assert client.get("/api/auth/me").status_code == 401
     for path in ("/dashboard", "/circulation", "/admin", "/settings", "/audit"):
         assert client.get(path, follow_redirects=False).status_code in (302, 303, 307), path
@@ -239,7 +239,7 @@ def test_the_staff_menu_can_scroll_when_there_are_more_entries_than_the_screen_h
 def test_the_staff_menu_remembers_where_it_was_scrolled_between_pages(client):
     sign_in_browser(client)
     page = client.get("/circulation").text
-    assert "aisys.nav.scroll" in page and "sessionStorage" in page and "scrollIntoView" in page
+    assert "shelfsense.nav.scroll" in page and "sessionStorage" in page and "scrollIntoView" in page
     assert "a.active" in page  # and the page you are on is never left out of sight
     # it runs once the whole sidebar exists (so the sizes are final), and before the page content
-    assert page.index('class="ver"') < page.index("aisys.nav.scroll") < page.index('<main class="content">')
+    assert page.index('class="ver"') < page.index("shelfsense.nav.scroll") < page.index('<main class="content">')

@@ -8,13 +8,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
-from aisys.app import create_app
-from aisys.cli import main as cli_main
-from aisys.db import make_engine, make_sessionmaker
-from aisys.devtools import demo_seed
-from aisys.models import AuditEvent, Item, Loan, Member, RfidTag, User
-from aisys.timeutil import aware
 from conftest import login_card
+from shelfsense.app import create_app
+from shelfsense.cli import main as cli_main
+from shelfsense.db import make_engine, make_sessionmaker
+from shelfsense.devtools import demo_seed
+from shelfsense.models import AuditEvent, Item, Loan, Member, RfidTag, User
+from shelfsense.timeutil import aware
 
 
 @pytest.fixture(scope="module")
@@ -22,7 +22,7 @@ def demo(tmp_path_factory, migrated_db):
     """One demo library for the whole module (it takes a few seconds to replay)."""
     import shutil
 
-    from aisys.config import Settings
+    from shelfsense.config import Settings
 
     folder = tmp_path_factory.mktemp("demo")
     shutil.copyfile(migrated_db, folder / "demo.db")
@@ -148,7 +148,7 @@ def test_it_goes_only_into_an_empty_catalogue(demo, capsys, tmp_path):
 
 
 def test_reset_replaces_an_old_database_and_keeps_a_copy(tmp_path, capsys):
-    from aisys.config import load_settings
+    from shelfsense.config import load_settings
 
     cfg = tmp_path / "c.toml"
     db = tmp_path / "old.db"
@@ -164,7 +164,7 @@ def test_the_minimal_seed_is_what_the_tests_use(tmp_path, capsys):
     cfg = tmp_path / "c.toml"
     cfg.write_text(f'[database]\nurl = "sqlite:///{(tmp_path / "m.db").as_posix()}"\n', encoding="utf-8")
     assert cli_main(["--config", str(cfg), "seed-demo", "--minimal"]) == 0
-    from aisys.config import load_settings
+    from shelfsense.config import load_settings
 
     assert demo_seed.catalogue_size(load_settings(cfg)) == 0
     capsys.readouterr()

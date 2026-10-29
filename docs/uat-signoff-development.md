@@ -14,9 +14,9 @@ owner to complete.** No one has signed on anyone else's behalf.
 | Field | Entry |
 |---|---|
 | Site / library name | none: development environment (demo library, synthetic data) |
-| AISYS version (Updates page) | 0.1.0 (`main` after PR #24, then branch `fix/review-gaps` for UAT-27 to UAT-29) |
+| ShelfSense version (Updates page) | 0.1.0 (`main` after PR #24, then branch `fix/review-gaps` for UAT-27 to UAT-29) |
 | Environment (production-like, devices real or simulated) | Windows 11 developer PC; all devices simulated (mock drivers); ILMS: built-in mock, and the SIP2 simulator for UAT-25 |
-| Database seeded with (demo data / site data) | demo data (`python -m aisys.cli seed-demo`), plus the synthetic sample spreadsheets in `samples/` |
+| Database seeded with (demo data / site data) | demo data (`python -m shelfsense.cli seed-demo`), plus the synthetic sample spreadsheets in `samples/` |
 | Date(s) of the test | 2026-10-05 to 2026-10-09 (each scenario when its feature was built); UAT-23 to UAT-26 on 2026-10-09; UAT-27 to UAT-29 on 2026-10-10 |
 | Test lead (name, role) | VighneshHM, project owner and developer |
 

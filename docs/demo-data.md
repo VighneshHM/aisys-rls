@@ -1,6 +1,6 @@
 # The demo library (`seed-demo`)
 
-`python -m aisys.cli seed-demo` fills an empty database with a small working library: about a hundred days of synthetic
+`python -m shelfsense.cli seed-demo` fills an empty database with a small working library: about a hundred days of synthetic
 activity, so every page of the staff menu has something to look at and test. Everything is invented: names, card numbers,
 `.example` e-mail addresses and reserved `+1555…` test phone numbers.
 
@@ -13,11 +13,11 @@ activity, so every page of the staff menu has something to look at and test. Eve
 
 The full library only goes into an **empty catalogue**: run on a database that already has books, `seed-demo` loads
 nothing, only checks the staff and patron cards, says **NOT LOADED** and exits with an error. To replace the database with a
-fresh demo library run `seed-demo --reset`: the old database file is kept beside it as `aisys.db.before-reset-<time>`.
+fresh demo library run `seed-demo --reset`: the old database file is kept beside it as `shelfsense.db.before-reset-<time>`.
 
 ## How it is built
 
-Nothing is written straight into tables. `aisys.devtools.demo_seed` starts the application in its own process and replays
+Nothing is written straight into tables. `shelfsense.devtools.demo_seed` starts the application in its own process and replays
 the history through the same HTTP API the pages use, signed in as the member of staff who would have done each step, so
 the records, fines, audit lines and messages are exactly what the screens produce. History is replayed oldest first at the
 moment it is meant to have happened (the application clock is moved for each step, DR-22), so a loan taken seven weeks ago

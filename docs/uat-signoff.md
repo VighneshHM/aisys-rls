@@ -16,7 +16,7 @@ scenario.
 | Field | Entry |
 |---|---|
 | Site / library name | |
-| AISYS version (Updates page) | |
+| ShelfSense version (Updates page) | |
 | Environment (production-like, devices real or simulated) | |
 | Database seeded with (demo data / site data) | |
 | Date(s) of the test | |

@@ -7,8 +7,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys.reports.core import MAX_DAYS_CHART, per_day
 from conftest import login_card
+from shelfsense.reports.core import MAX_DAYS_CHART, per_day
 from test_circulation import back, out, renew, sql
 from test_fines import age, pay
 from test_tagging import make_item, place, tag
@@ -349,8 +349,8 @@ def test_reports_change_nothing(client, lib, world, settings):
 
 @pytest.mark.req("AC08", "NFR05")
 def test_dashboard_numbers_use_thousands_separators_like_the_rest_of_the_app(client, lib):
-    from aisys.db import make_engine, make_sessionmaker
-    from aisys.models import BibRecord, Item
+    from shelfsense.db import make_engine, make_sessionmaker
+    from shelfsense.models import BibRecord, Item
 
     with make_sessionmaker(make_engine(client.settings.database_url))() as db:  # 1,200 items
         db.bulk_insert_mappings(BibRecord, [{"dedupe_key": f"k{n}", "title": f"T{n}"} for n in range(1200)])

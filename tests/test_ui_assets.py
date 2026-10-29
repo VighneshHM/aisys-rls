@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from aisys import pages
 from conftest import login_card
+from shelfsense import pages
 
 TEMPLATES = Path(pages.__file__).parent / "web" / "templates"
 DOM_CALLS = ("replaceChildren(", ".append(", ".prepend(")
@@ -119,7 +119,7 @@ def test_no_page_script_declares_the_same_name_twice():
     from collections import Counter
     from pathlib import Path
 
-    templates = Path(__file__).parent.parent / "src" / "aisys" / "web" / "templates"
+    templates = Path(__file__).parent.parent / "src" / "shelfsense" / "web" / "templates"
     for path in sorted(templates.glob("*.html")):
         names = re.findall(
             r"^  (?:const|let|function|async function) ([A-Za-z_$][\w$]*)", path.read_text("utf-8"), re.M

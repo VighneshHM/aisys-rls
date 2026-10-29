@@ -5,10 +5,10 @@ It sits behind the existing connector boundary (`CirculationConnector`, `docs/ci
 application changed, and `driver = "mock"` still works as before.
 
 **What is and is not claimed.** The SIP2 client was written from the specification and has been tested **only against the
-simulator in this repository** (`python -m aisys.cli sip2-sim`), which was also written from the specification. It has **not**
+simulator in this repository** (`python -m shelfsense.cli sip2-sim`), which was also written from the specification. It has **not**
 been tested against, or certified by, any vendor ILMS. See "Limits" below.
 
-Code: `src/aisys/circulation/sip2/` (`codec.py`, `client.py`, `adapter.py`, `server.py`).
+Code: `src/shelfsense/circulation/sip2/` (`codec.py`, `client.py`, `adapter.py`, `server.py`).
 
 ## What is implemented
 
@@ -24,7 +24,7 @@ Messages:
 | Request (application to ILMS) | Answer | Used for |
 |---|---|---|
 | `93` Login | `94` | Opening a session (when a login user is configured) |
-| `99` SC status | `98` ACS status | `aisys doctor`: is the ILMS online |
+| `99` SC status | `98` ACS status | `shelfsense doctor`: is the ILMS online |
 | `23` Patron status | `24` | `patron_status`; the reason for a refusal (blocked, fines, limits) |
 | `63` Patron information | `64` | Listing the items charged to a member (verifying a checkout after a lost answer) |
 | `11` Checkout | `12` | `checkout` |
@@ -63,7 +63,7 @@ identified by the member number and the accession number the application already
 driver = "sip2"
 endpoint = "192.168.1.50"   # host name or IP address of the ILMS (required for sip2)
 port = 6001                 # the ILMS's SIP2 port (required for sip2)
-login = "aisys"             # SIP2 login user (CN); leave out if the ILMS needs no login
+login = "shelfsense"             # SIP2 login user (CN); leave out if the ILMS needs no login
 institution = "LIBRARY"     # institution id (AO)
 location = "MAIN"           # location code of this system (CP, AP)
 timeout_s = 5               # seconds to wait for an answer, 0.1 to 120
@@ -79,7 +79,7 @@ The login **password is never read from the file** (a password written there is 
 application:
 
 ```powershell
-$env:AISYS_ILMS_PASSWORD = "the-password"
+$env:SHELFSENSE_ILMS_PASSWORD = "the-password"
 ```
 
 A `sip2` driver without `endpoint` or `port` stops startup with a plain message. `timeout_s` outside 0.1 to 120 also stops startup.
@@ -92,16 +92,16 @@ checks (reference item, blocked member, fines over the limit, item already out),
 The simulator needs no real library system. In a first terminal:
 
 ```powershell
-python -m aisys.cli sip2-sim --port 6101 --user aisys --password demo
+python -m shelfsense.cli sip2-sim --port 6101 --user shelfsense --password demo
 ```
 
 Omit `--user` and `--password` for a server that needs no login. By default it listens on 127.0.0.1 and accepts any member or item
 number it has not seen (so it works behind the demo data with no set-up). Demo steps, in a second terminal:
 
-1. Set the password: `$env:AISYS_ILMS_PASSWORD = "demo"`.
-2. In `config/config.toml` set `[ilms]` to `driver = "sip2"`, `endpoint = "127.0.0.1"`, `port = 6101`, `login = "aisys"`.
-3. Check the connection: `python -m aisys.cli doctor`. The ILMS line should read OK, "SIP2 at 127.0.0.1:6101 answered and is online".
-4. Start the application (`python -m aisys.cli run`) in the same terminal, sign in, open **Circulation** and check out a book to a
+1. Set the password: `$env:SHELFSENSE_ILMS_PASSWORD = "demo"`.
+2. In `config/config.toml` set `[ilms]` to `driver = "sip2"`, `endpoint = "127.0.0.1"`, `port = 6101`, `login = "shelfsense"`.
+3. Check the connection: `python -m shelfsense.cli doctor`. The ILMS line should read OK, "SIP2 at 127.0.0.1:6101 answered and is online".
+4. Start the application (`python -m shelfsense.cli run`) in the same terminal, sign in, open **Circulation** and check out a book to a
    member. The history shows the ILMS transaction; the simulator holds the loan.
 5. Try a renewal and a check-in. Stop the simulator and try again: the clerk is told the library system is not answering and nothing is
    half-recorded.
@@ -148,8 +148,8 @@ patron status flags are asked for with `23`; if nothing explains it, the code is
 
 - SIP2 itself has **no encryption**: user name, password and patron data cross the network in clear text. Put a VPN, stunnel or a
   TLS-terminating proxy between the application and the ILMS, or keep them on an isolated network segment (`docs/site-addressing.md`).
-- The password comes only from the environment variable `AISYS_ILMS_PASSWORD`; it is not stored in the configuration file, not
-  written to the log and not shown by `aisys doctor`.
+- The password comes only from the environment variable `SHELFSENSE_ILMS_PASSWORD`; it is not stored in the configuration file, not
+  written to the log and not shown by `shelfsense doctor`.
 - Everything read from the network is treated as hostile: size limit, ASCII only, checksum verified, and every malformed input ends as
   `Sip2Error` (fuzz-tested). Values sent are refused if they contain `|`, control characters or non-ASCII characters, so a member
   or item number cannot inject extra fields.
@@ -163,17 +163,17 @@ patron status flags are asked for with `23`; if nothing explains it, the code is
 - Vendors vary in field use and wording. The keyword lists in `adapter.py` may need small changes for a given system.
 - The checksum follows the specification's definition and is verified by property tests and hand-worked examples, not against a
   published vendor trace.
-- **NCIP 2.0 is not implemented.** The SOP names SIP2 or NCIP; only SIP2 is built.
+- **NCIP 2.0 is not implemented.** The specification names SIP2 or NCIP; only SIP2 is built.
 - One session and one request at a time (a busy site would queue circulation requests).
 
 ## Adapting to a real ILMS
 
-1. Run `aisys doctor` against it (connect, log in, status). Ask the ILMS owner for the SIP2 account, the institution id and the
+1. Run `shelfsense doctor` against it (connect, log in, status). Ask the ILMS owner for the SIP2 account, the institution id and the
    location code, and whether it needs the checksum.
 2. Try a checkout, renew and check-in with test members and items; compare the ILMS's own log with the history.
-3. Where the ILMS words refusals differently, extend the keyword tuples at the top of `src/aisys/circulation/sip2/adapter.py`
+3. Where the ILMS words refusals differently, extend the keyword tuples at the top of `src/shelfsense/circulation/sip2/adapter.py`
    (`_PATRON`, `_FINES`, `_ON_LOAN`, `_LIMIT`, `_NOT_OUT`) and the patron status flag handling in `_reason_from_patron`.
 4. Where a field differs (for example how the due date or item identifier is sent), adjust `_fields` and the message-building
    methods in `adapter.py`; message layouts are in `codec.py` (`FIXED_LENGTH`).
 5. Add a test with the simulator for each change. For NCIP, write another class implementing `CirculationConnector` and register it
-   under a new driver name in `src/aisys/circulation/registry.py`, the same way `sip2` is registered.
+   under a new driver name in `src/shelfsense/circulation/registry.py`, the same way `sip2` is registered.

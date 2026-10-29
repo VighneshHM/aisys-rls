@@ -27,14 +27,14 @@ sys.path.insert(0, str(REPO / "src"))
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select, text  # noqa: E402
 
-from aisys import backup  # noqa: E402
-from aisys.app import create_app  # noqa: E402
-from aisys.cli import seed_demo  # noqa: E402
-from aisys.config import Settings  # noqa: E402
-from aisys.devtools import sample_data  # noqa: E402
-from aisys.models import Item, Loan, Member  # noqa: E402
-from aisys.notifications import runner  # noqa: E402
-from aisys.notifications.providers import NotificationConfig, build_providers  # noqa: E402
+from shelfsense import backup  # noqa: E402
+from shelfsense.app import create_app  # noqa: E402
+from shelfsense.cli import seed_demo  # noqa: E402
+from shelfsense.config import Settings  # noqa: E402
+from shelfsense.devtools import sample_data  # noqa: E402
+from shelfsense.models import Item, Loan, Member  # noqa: E402
+from shelfsense.notifications import runner  # noqa: E402
+from shelfsense.notifications.providers import NotificationConfig, build_providers  # noqa: E402
 
 rows_out: list[tuple[str, str, str]] = []
 
@@ -71,7 +71,7 @@ def main() -> None:
     ap.add_argument("--rows", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
-    tmp = Path(tempfile.mkdtemp(prefix="aisys-perf-"))
+    tmp = Path(tempfile.mkdtemp(prefix="shelfsense-perf-"))
     settings = Settings(
         database_url=f"sqlite:///{(tmp / 'perf.db').as_posix()}", backup_dir=str(tmp / "bk"), log_level="CRITICAL"
     )
@@ -277,7 +277,7 @@ def main() -> None:
 
 
 def _no_limit() -> bool:
-    from aisys import opac_routes
+    from shelfsense import opac_routes
 
     opac_routes._hits.clear()
     opac_routes.LIMIT_PER_MINUTE = 10**6  # the measurement is not a visitor

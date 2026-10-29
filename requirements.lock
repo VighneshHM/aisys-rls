@@ -1,4 +1,4 @@
-# Runtime dependencies of aisys: what the application needs to run and what every offline package ships.
+# Runtime dependencies of shelfsense: what the application needs to run and what every offline package ships.
 # Exact versions with sha256 hashes; install with: pip install --require-hashes -r requirements.lock
 # Regenerate: pip-compile --generate-hashes --strip-extras -o requirements.lock pyproject.toml
 # Development and build tools are in requirements-dev.lock. Licences: docs/third-party-licences.md

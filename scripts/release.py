@@ -4,8 +4,9 @@
     python scripts/release.py build   --key release-keys/private.key [--version 0.2.0] [--kind security] [--notes "..."]
     python scripts/release.py licence --key release-keys/private.key --customer "Demo Library" --expires 2027-12-31
 
-`build` produces dist/aisys-<version>/ and dist/aisys-<version>.zip. Everything the target needs is inside: the
-application and ALL dependency wheels, the lifecycle tools, SBOM.json, LICENSES.md, the sample config, the public key.
+`build` produces dist/shelfsense-<version>/ and dist/shelfsense-<version>.zip. Everything the target needs is inside:
+the application and ALL dependency wheels, the lifecycle tools, SBOM.json, LICENSES.md, the sample config and the
+public key.
 The private key never goes into a package; keep release-keys/ off the target machines (it is git-ignored).
 """
 
@@ -26,9 +27,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from aisys_lifecycle import bundle, sbom  # noqa: E402
+from shelfsense_lifecycle import bundle, sbom  # noqa: E402
 
-INSTALL_PY = '''"""Install AISYS: python install.py --root <dir> --licence <file> --trusted-key <file>"""
+INSTALL_PY = '''"""Install ShelfSense: python install.py --root <dir> --licence <file> --trusted-key <file>"""
 import os
 import sys
 
@@ -36,7 +37,7 @@ sys.dont_write_bytecode = True  # importing the tools must not add files to the 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "tools"))
 
-from aisys_lifecycle.__main__ import main  # noqa: E402
+from shelfsense_lifecycle.__main__ import main  # noqa: E402
 
 argv = sys.argv[1:]
 if "--root" not in argv:
@@ -76,7 +77,7 @@ def keygen(out: Path) -> None:
 
 def make_licence(key: Path, customer: str, expires: str | None, out: Path) -> None:
     priv = _private(key)
-    licence = {"product": "aisys", "customer": customer, "issued": date.today().isoformat(), "expires": expires}
+    licence = {"product": "shelfsense", "customer": customer, "issued": date.today().isoformat(), "expires": expires}
     if expires:
         date.fromisoformat(expires)
     sig = base64.b64encode(priv.sign(bundle.canonical(licence))).decode()
@@ -107,7 +108,7 @@ def _prepare_source(source: Path, version: str | None, tmp: Path) -> Path:
     if version:
         py = work / "pyproject.toml"
         py.write_text(re.sub(r'(?m)^version = ".*"', f'version = "{version}"', py.read_text("utf-8"), count=1), "utf-8")
-        init = work / "src" / "aisys" / "__init__.py"
+        init = work / "src" / "shelfsense" / "__init__.py"
         init.write_text(re.sub(r'__version__ = ".*"', f'__version__ = "{version}"', init.read_text("utf-8")), "utf-8")
     return work
 
@@ -123,7 +124,7 @@ def build(
     wheels_from: Path | None,
 ) -> Path:
     priv = _private(key)
-    with tempfile.TemporaryDirectory(prefix="aisys-build-") as t:
+    with tempfile.TemporaryDirectory(prefix="shelfsense-build-") as t:
         tmp = Path(t)
         work = _prepare_source(source, version, tmp)
         wheels = tmp / "wheels"
@@ -149,21 +150,21 @@ def build(
             cmd += ["--no-index", "--no-build-isolation", "--find-links", str(wheels_from)]
         print("building wheels (needs the internet unless --wheels-from is given)...")
         subprocess.run(cmd, check=True)  # noqa: S603
-        app = next(p for p in wheels.glob("aisys-*.whl"))
+        app = next(p for p in wheels.glob("shelfsense-*.whl"))
         ver = app.name.split("-")[1]
         items = sbom.inventory(wheels)
-        pkg = out / f"aisys-{ver}"
+        pkg = out / f"shelfsense-{ver}"
         shutil.rmtree(pkg, ignore_errors=True)
         (pkg / "wheels").mkdir(parents=True)
         for w in wheels.glob("*.whl"):
             shutil.copy2(w, pkg / "wheels" / w.name)
         shutil.copytree(
-            work / "src" / "aisys_lifecycle",
-            pkg / "tools" / "aisys_lifecycle",
+            work / "src" / "shelfsense_lifecycle",
+            pkg / "tools" / "shelfsense_lifecycle",
             ignore=shutil.ignore_patterns("__pycache__"),
         )
-        (pkg / "SBOM.json").write_text(json.dumps(sbom.cyclonedx(items, "aisys", ver), indent=2))
-        (pkg / "LICENSES.md").write_text(sbom.licences_markdown(items, "aisys", ver), encoding="utf-8")
+        (pkg / "SBOM.json").write_text(json.dumps(sbom.cyclonedx(items, "shelfsense", ver), indent=2))
+        (pkg / "LICENSES.md").write_text(sbom.licences_markdown(items, "shelfsense", ver), encoding="utf-8")
         shutil.copyfile(work / "config" / "config.sample.toml", pkg / "config.sample.toml")
         (pkg / "vendor.pub").write_text(_public_b64(priv))
         (pkg / "install.py").write_text(INSTALL_PY, encoding="utf-8")
@@ -172,7 +173,7 @@ def build(
         schema = _head_revision(work)
         files = {p.relative_to(pkg).as_posix(): bundle.sha256_file(p) for p in sorted(pkg.rglob("*")) if p.is_file()}
         manifest = {
-            "name": "aisys", "version": ver, "kind": kind, "notes": notes, "schema_revision": schema,
+            "name": "shelfsense", "version": ver, "kind": kind, "notes": notes, "schema_revision": schema,
             "python_min": "3.12", "created_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "files": files,
         }  # fmt: skip
         if min_from:
@@ -181,11 +182,11 @@ def build(
         (pkg / "manifest.json").write_bytes(payload)
         (pkg / "manifest.sig").write_text(base64.b64encode(priv.sign(payload)).decode())
 
-        archive = out / f"aisys-{ver}.zip"
+        archive = out / f"shelfsense-{ver}.zip"
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
             for p in sorted(pkg.rglob("*")):
                 if p.is_file():
-                    zf.write(p, f"aisys-{ver}/{p.relative_to(pkg).as_posix()}")
+                    zf.write(p, f"shelfsense-{ver}/{p.relative_to(pkg).as_posix()}")
         flagged = [i["name"] for i in items if i["needs_review"]]
         print(f"built {archive}  ({archive.stat().st_size / 1e6:.1f} MB, {len(items)} packages, schema {schema})")
         if flagged:
@@ -194,7 +195,7 @@ def build(
 
 
 def _head_revision(work: Path) -> str:
-    versions = work / "src" / "aisys" / "migrations" / "versions"
+    versions = work / "src" / "shelfsense" / "migrations" / "versions"
     revs, downs = {}, set()
     for f in versions.glob("*.py"):
         text = f.read_text("utf-8")
