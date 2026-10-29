@@ -1,13 +1,13 @@
-# Design decisions and design-review record (D2, Stage 1)
+# Design decisions and design-review record
 
 One entry per feature that was designed before it was built. How the review worked, stated plainly: the design was proposed by the
-AI assistant (Claude) in the working chat, with alternatives; **the project owner (VighneshHM) reviewed it and approved or changed it
-in that chat**, and only then was it built. There was no second human reviewer and no meeting. The chat itself is not stored in the
+AI assistant (Claude) with alternatives; **the project owner (VighneshHM) reviewed it and approved or changed it**, and only then
+was it built. There was no second human reviewer and no meeting. The discussion itself is not stored in the
 repository, so the **Date** column is the date of the first commit that implements the decision (from `git log`), which is the
 latest the decision can have been made; the discussion happened on or just before that day. The summary table of the same
 decisions is in `docs/architecture.md` section 9; this file adds the reviewer, date and consequence.
 
-Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
+Reviewer for every entry: **VighneshHM (project owner).**
 
 ## DR-01 Connector and mocks architecture
 
@@ -16,7 +16,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   outside catalogue) sits behind a `typing.Protocol` with a mock and a config-selected driver (registry).
 * **Proposed:** the add-on never imports a vendor SDK or a mock directly; mocks are chosen by configuration.
 * **Alternatives considered:** hard-wired mocks (quicker, but a real device would mean rewriting callers); building a full ILMS
-  (the SOP asks to integrate with an existing one, A-02).
+  (the specification asks to integrate with an existing one, A-02).
 * **Decision:** Protocol + mock + registry for everything external.
 * **Consequence:** a real device or ILMS is one class plus a config line. The mocks prove the interface, not any vendor's behaviour
   (risk R-17). FR01 acquisition and serials are reference-level only.
@@ -63,7 +63,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   protocol client.
 * **Alternatives considered:** a SIP2 client written from the spec (large, and untestable without a real ILMS or the vendor's
   variant); an NCIP 2.0 XML client (same problem).
-* **Decision:** deliberately left out, following SOP section 3 (production systems out of scope). FR03 stays `partial` in
+* **Decision:** deliberately left out, because production systems are out of scope. FR03 stays `partial` in
   `docs/requirements.csv`.
 * **Consequence:** no protocol conformance is claimed anywhere (A-11). Connecting a real ILMS is one driver class. Risk R-16.
 
@@ -74,7 +74,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   anything is installed; the installer pins the key it was installed with.
 * **Alternatives considered:** checksums only (no proof of origin); verifying with the `cryptography` library (it is not installed
   yet at first install, so trust would be checked after the code ran).
-* **Decision:** a small pure-Python Ed25519 verifier in `aisys_lifecycle/ed25519.py`, tested against the RFC 8032 vectors and against a
+* **Decision:** a small pure-Python Ed25519 verifier in `shelfsense_lifecycle/ed25519.py`, tested against the RFC 8032 vectors and against a
   real library; `cryptography` is used only in tests and for signing.
 * **Consequence:** the installer needs only Python. Verification takes about 10 ms and the verifier is my own code (risk R-10). There is no
   certificate authority and no key revocation.
@@ -150,7 +150,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   another class behind the same boundary); keeping the exclusion and the mock only (FR03 stays partial); resending blindly after a lost
   answer (risks lending or renewing twice).
 * **Decision:** SIP2 only, in the same branch. `[ilms] driver = "sip2"` selects it; `mock` stays the default. The password is read only from
-  `AISYS_ILMS_PASSWORD`.
+  `SHELFSENSE_ILMS_PASSWORD`.
 * **Consequence:** FR03 is `done`, with limits stated plainly: tested only against the simulator, **not certified and not tested against
   any vendor ILMS**; a subset of SIP2; NCIP 2.0 not implemented; SIP2 is unencrypted so a tunnel is needed; vendor wording may need keyword
   changes in `adapter.py`. Risk R-16 was reworded accordingly. Details: `docs/sip2.md`.
@@ -158,13 +158,13 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 ## DR-13 NCIP 2.0 is not implemented; SIP2 is the protocol
 
 * **Date:** 2026-10-09 (`791ce55`, merged in PR #23); recorded as C-10 and A-41.
-* **Context:** SOP FR03 reads "Support NCIP 2.0 and an SIP2 adapter boundary", and AC03 asks for "a mocked NCIP or SIP2 flow". After
+* **Context:** FR03 reads "Support NCIP 2.0 and an SIP2 adapter boundary", and AC03 asks for "a mocked NCIP or SIP2 flow". After
   DR-12 the SIP2 client was real, and the final coverage review asked whether an NCIP 2.0 adapter was still needed.
 * **Proposed:** treat the protocol requirement as met by SIP2; keep NCIP as a documented extension point only.
 * **Alternatives considered:** an NCIP 2.0 XML adapter with its own simulator (another protocol of the same size as SIP2, with no
   real NCIP responder to test against either); an NCIP message model with no transport (looks like support but is not).
-* **Decision:** the project owner decided that **SIP2 satisfies the "NCIP 2.0 / SIP2" protocol requirement for this exercise and NCIP
-  2.0 is not to be built.** AC03 is met through SIP2 ("NCIP or SIP2"). Nothing in the repository claims NCIP support (SOP section 3).
+* **Decision:** the project owner decided that **SIP2 satisfies the "NCIP 2.0 / SIP2" protocol requirement for this project and NCIP
+  2.0 is not to be built.** AC03 is met through SIP2 ("NCIP or SIP2"). Nothing in the repository claims NCIP support.
 * **Consequence:** an NCIP 2.0 connector stays future work behind the same `CirculationConnector` boundary (one class plus a
   `register_driver` line, `docs/remaining-work.md`). The mock ILMS can still word its replies NCIP-style for demonstrations; that is
   wording, not protocol. A site whose ILMS speaks only NCIP needs that connector first (risk R-16). **Update
@@ -247,7 +247,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
   call it.
 * **Decision:** `gate.service.poll_all` reads every configured gate that is not a simulator, once. It is run by a
   background loop inside the application (`[gate] poll_seconds`, 0 = off, 2 in the sample file), by
-  `python -m aisys.cli gate-poll [--every N]` as a separate process (one or the other, since each passage is handed over
+  `python -m shelfsense.cli gate-poll [--every N]` as a separate process (one or the other, since each passage is handed over
   only once), and by `POST /api/gate/poll` (**Read the gates now** on Gate events). An offline gate is reported and the
   others are still read. The loop pauses during a restore, like the notification loop.
 * **Alternative considered:** a push interface (the gate calls the server). Gates differ: polling through the existing
@@ -269,7 +269,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-20 Patrons page: remove, restore and erase members
 
-* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner ("go" after the design in chat).
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner (approved the design).
 * **Context:** members could only be added. There was no list of all members and no way to remove one; staff could be
   seen on the Administration page but a library cannot keep every patron for ever (people leave, ask to be forgotten).
 * **Decision:** a **Patrons** page (`/members`, menu entry for anyone with `member.read`) lists every member with search,
@@ -300,11 +300,11 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 
 ## DR-21 First administrator: `create-admin`
 
-* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner ("go" after the gap was reported).
+* **Date:** 2026-10-10 (branch `fix/review-gaps`). **Reviewer:** the project owner (approved after the gap was reported).
 * **Context:** an install without `--seed-demo` has no staff, and the only way to create one was the demo seed, which loads
   synthetic users and a published demo password.
-* **Decision:** `python manage.py create-admin --username U [--name N]` (and `aisys create-admin`) creates one administrator
-  with a username and password. The password is asked twice without echo, or read from `AISYS_ADMIN_PASSWORD` for scripts,
+* **Decision:** `python manage.py create-admin --username U [--name N]` (and `shelfsense create-admin`) creates one administrator
+  with a username and password. The password is asked twice without echo, or read from `SHELFSENSE_ADMIN_PASSWORD` for scripts,
   never from the command line (it would show in process lists and shell history) and never printed or audited. 12 to 256
   characters (256 is what the sign-in form accepts), not only spaces, not the demo password, not the username; the username is
   3 to 32 lower-case letters, digits, dots, dashes or underscores (the Administration page's rule), not `system` (the audit
@@ -318,7 +318,7 @@ Reviewer for every entry: **VighneshHM (project owner), approved in chat.**
 * **Context:** `seed-demo` loaded four staff and six patrons and nothing else, so most pages were empty until someone worked
   through the tour. Testers need a library with history: patrons who borrowed and returned weeks ago, overdue loans, fines,
   passages, sweeps, orders and serials in every state, an audit trail by several people.
-* **Decision:** `aisys.devtools.demo_seed` builds that library by calling the application's own HTTP API in-process, signed
+* **Decision:** `shelfsense.devtools.demo_seed` builds that library by calling the application's own HTTP API in-process, signed
   in as the member of staff who would act, so every record, fine, message and audit line is what the screens produce, never
   rows written by hand. To give history real dates, the application's single clock (`timeutil.utcnow`, used by
   `models.utcnow`, the readers' events and `library_today`) can be moved by `timeutil.clock_at(moment)`; the seed replays

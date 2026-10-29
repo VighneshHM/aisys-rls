@@ -6,7 +6,7 @@
 > address is needed in a command or a file, use `192.0.2.x` (192.0.2.0/24, reserved for documentation by RFC 5737); it never
 > routes anywhere.
 
-AISYS runs with every device and external service simulated. No real reader, gate, camera, printer, ILMS or mail relay was
+ShelfSense runs with every device and external service simulated. No real reader, gate, camera, printer, ILMS or mail relay was
 connected during development, so the ports and protocols in the table are the **usual ones for that kind of equipment**, to be
 confirmed against the actual product's manual. They are not measured facts about any supplier's device.
 
@@ -14,7 +14,7 @@ confirmed against the actual product's manual. They are not measured facts about
 
 | Role | Example address | Port | Protocol | VLAN suggestion | Firewall rule (example) |
 |---|---|---|---|---|---|
-| AISYS server | 10.99.10.10 | 443 (TLS proxy in front) or 8000 (application on loopback) | HTTPS | 10 Servers | Allow staff desks and handhelds to 10.99.10.10:443; deny everything else inbound; no outbound internet needed |
+| ShelfSense server | 10.99.10.10 | 443 (TLS proxy in front) or 8000 (application on loopback) | HTTPS | 10 Servers | Allow staff desks and handhelds to 10.99.10.10:443; deny everything else inbound; no outbound internet needed |
 | Staff desks (browsers and staff card readers) | 10.99.20.0/24 (DHCP) | client side | HTTPS to the server | 20 Staff | Allow to server :443 only |
 | Handhelds (inventory) | 10.99.30.0/24 | client side | HTTPS to the server over Wi-Fi | 30 Handheld Wi-Fi | Allow to server :443 only; isolate from other VLANs |
 | RFID readers (desk, self-service) | 10.99.40.11 to 10.99.40.19 (fixed) | vendor-specific | vendor protocol | 40 Devices | Server may open connections to the readers' port; readers may not initiate anything |
@@ -39,12 +39,12 @@ Notes on the example:
 
 | What | Setting in `config/config.toml` | In the sample file | Notes |
 |---|---|---|---|
-| The application's own listening address | `[app] host`, `[app] port` (also `AISYS_HOST`, `AISYS_PORT`) | `127.0.0.1`, `8000` | Keep on loopback behind a proxy; use `0.0.0.0` or the server's address only if staff browsers connect straight to it |
-| Serving HTTPS directly | `[server] tls_certfile`, `[server] tls_keyfile` (also `AISYS_TLS_CERTFILE`, `AISYS_TLS_KEYFILE`) | both empty | Both or neither; PEM files kept outside the repository |
+| The application's own listening address | `[app] host`, `[app] port` (also `SHELFSENSE_HOST`, `SHELFSENSE_PORT`) | `127.0.0.1`, `8000` | Keep on loopback behind a proxy; use `0.0.0.0` or the server's address only if staff browsers connect straight to it |
+| Serving HTTPS directly | `[server] tls_certfile`, `[server] tls_keyfile` (also `SHELFSENSE_TLS_CERTFILE`, `SHELFSENSE_TLS_KEYFILE`) | both empty | Both or neither; PEM files kept outside the repository |
 | ILMS host and port | `[ilms] endpoint` (host name or IP), `[ilms] port`, `[ilms] driver` (`mock` or `sip2`) | commented out (`#endpoint`, `#port = 6001`), driver `mock` | Used only by a real connector; the mock ignores the address. The Settings page shows the value read-only |
 | Public terminals | `[opac] kiosk_hosts` (host names, e.g. `opac.library.local`) | empty | A DNS or hosts-file name for the same server; on it only the public catalogue exists (`docs/deployment.md`, *Public terminals*) |
 | ILMS retries | `[ilms] retries`, `[ilms] backoff_s` | `2`, `0.1` | How often a failed request is retried |
-| Staff reader, handheld, gate, camera, card printer | one `[[devices]]` block each: `id`, `kind` (`staff_reader`, `handheld`, `gate`, `camera`, `card_printer`), `driver` | five blocks, all `driver = "mock"` | **Today a `[[devices]]` block carries only these three keys. It has no address field.** The address of a real device belongs to the driver written for it (code registered in `src/aisys/rfid/registry.py`), which is where its host and port would be read. Record the device's address in section 1 and in the site's own notes until that driver exists |
+| Staff reader, handheld, gate, camera, card printer | one `[[devices]]` block each: `id`, `kind` (`staff_reader`, `handheld`, `gate`, `camera`, `card_printer`), `driver` | five blocks, all `driver = "mock"` | **Today a `[[devices]]` block carries only these three keys. It has no address field.** The address of a real device belongs to the driver written for it (code registered in `src/shelfsense/rfid/registry.py`), which is where its host and port would be read. Record the device's address in section 1 and in the site's own notes until that driver exists |
 | E-mail relay | `[notifications] email` (driver name) | `"mock"` | Likewise: the setting that names a real relay's host and port belongs to the real e-mail driver, which does not exist yet |
 | Backup folder | `[backup] dir` | `data/backups` | A local path; copy it off the server |
 
@@ -67,11 +67,11 @@ the file and need a restart.
 - [ ] Confirm each device's real port and protocol from its manual; replace the "usual" ports in section 1.
 - [ ] Give the fixed devices static addresses or DHCP reservations; write them into the network documentation.
 - [ ] Set `[app] host` and `port`, and the TLS proxy or `[server] tls_certfile` and `tls_keyfile`, for the real server.
-- [ ] Set `[ilms] driver = "sip2"`, `endpoint`, `port`, `login`, `institution` and `location`; set `AISYS_ILMS_PASSWORD` in the service's environment; agree the SIP2 account with the ILMS owner and run `aisys doctor` (the SIP2 client has only been tested against a simulator).
+- [ ] Set `[ilms] driver = "sip2"`, `endpoint`, `port`, `login`, `institution` and `location`; set `SHELFSENSE_ILMS_PASSWORD` in the service's environment; agree the SIP2 account with the ILMS owner and run `shelfsense doctor` (the SIP2 client has only been tested against a simulator).
 - [ ] For each real device, register its driver and set `driver = "<name>"` in its `[[devices]]` block (see `rfid.md`).
 - [ ] Agree the mail relay's address, port and sender with the site's IT; set up the real e-mail driver.
 - [ ] Write the firewall rules from section 1 into the real firewall; test that a staff PC reaches only the server's HTTPS port.
 - [ ] Check that no device and no application port is reachable from outside the site.
-- [ ] Run `python -m aisys.cli doctor` on the server and fix every FAIL (`deployment.md`).
+- [ ] Run `python -m shelfsense.cli doctor` on the server and fix every FAIL (`deployment.md`).
 - [ ] Keep a copy of the final plan with the backups, and put the date and the person who approved it on it.
 - [ ] Delete this example's values, or mark the file as replaced, so nobody mistakes them for the real plan.

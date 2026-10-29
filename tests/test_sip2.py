@@ -1,8 +1,9 @@
 """FR03 / AC03 / AC04: the SIP2 connector talking to a SIP2 server over a real TCP socket.
 
-The server is the simulator in `aisys.circulation.sip2.server` (its own patrons, items and loans). Every test here sends
-real SIP2 text over a real connection: the same rules as the mock, but through the wire protocol, the retry logic, and
-the failure modes of a network (timeouts, dropped connections, lost answers, damaged answers, hostile servers).
+The server is the simulator in `shelfsense.circulation.sip2.server` (its own patrons, items and loans). Every test here
+sends real SIP2 text over a real connection: the same rules as the mock, but through the wire protocol, the retry
+logic, and the failure modes of a network (timeouts, dropped connections, lost answers, damaged answers, hostile
+servers).
 """
 
 from __future__ import annotations
@@ -17,9 +18,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys import doctor
-from aisys.app import create_app
-from aisys.circulation.connector import (
+from conftest import login_card
+from shelfsense import doctor
+from shelfsense.app import create_app
+from shelfsense.circulation.connector import (
     CirculationConfig,
     CirculationConnector,
     ConnectorError,
@@ -27,15 +29,14 @@ from aisys.circulation.connector import (
     ItemView,
     MemberView,
 )
-from aisys.circulation.registry import ConnectorConfigError, build_connector
-from aisys.circulation.resilience import ResilientConnector
-from aisys.circulation.sip2 import codec
-from aisys.circulation.sip2.adapter import Sip2Connector
-from aisys.circulation.sip2.client import RESENDS, Sip2Client, Sip2Unsure
-from aisys.circulation.sip2.server import Sip2Server
-from aisys.cli import seed_demo
-from aisys.config import load_settings
-from conftest import login_card
+from shelfsense.circulation.registry import ConnectorConfigError, build_connector
+from shelfsense.circulation.resilience import ResilientConnector
+from shelfsense.circulation.sip2 import codec
+from shelfsense.circulation.sip2.adapter import Sip2Connector
+from shelfsense.circulation.sip2.client import RESENDS, Sip2Client, Sip2Unsure
+from shelfsense.circulation.sip2.server import Sip2Server
+from shelfsense.cli import seed_demo
+from shelfsense.config import load_settings
 from test_circulation import book, events, out, renew
 
 pytestmark = pytest.mark.req("FR03", "AC03", "AC04")
@@ -492,16 +493,21 @@ def test_the_driver_is_registered_and_needs_an_address():
 def test_the_settings_read_the_sip2_options_and_the_password_only_from_the_environment(tmp_path, monkeypatch):
     cfg = tmp_path / "c.toml"
     cfg.write_text(
-        '[ilms]\ndriver = "sip2"\nendpoint = "ils.example.org"\nport = 6001\nlogin = "aisys"\n'
+        '[ilms]\ndriver = "sip2"\nendpoint = "ils.example.org"\nport = 6001\nlogin = "shelfsense"\n'
         'password = "from-the-file"\ninstitution = "MAIN"\nlocation = "DESK1"\ntimeout_s = 3\nchecksum = false\n',
         encoding="utf-8",
     )
-    monkeypatch.delenv("AISYS_ILMS_PASSWORD", raising=False)
+    monkeypatch.delenv("SHELFSENSE_ILMS_PASSWORD", raising=False)
     c = load_settings(cfg).circulation
-    assert (c.ilms_driver, c.ilms_endpoint, c.ilms_port, c.ilms_login) == ("sip2", "ils.example.org", 6001, "aisys")
+    assert (c.ilms_driver, c.ilms_endpoint, c.ilms_port, c.ilms_login) == (
+        "sip2",
+        "ils.example.org",
+        6001,
+        "shelfsense",
+    )
     assert (c.ilms_institution, c.ilms_location, c.ilms_timeout_s, c.ilms_checksum) == ("MAIN", "DESK1", 3.0, False)
     assert c.ilms_password == ""  # a password written in the file is ignored
-    monkeypatch.setenv("AISYS_ILMS_PASSWORD", "from-the-environment")
+    monkeypatch.setenv("SHELFSENSE_ILMS_PASSWORD", "from-the-environment")
     assert load_settings(cfg).circulation.ilms_password == "from-the-environment"
 
 
@@ -537,7 +543,7 @@ def test_the_simulator_program_starts_and_answers():
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
     proc = subprocess.Popen(  # noqa: S603
-        [sys.executable, "-m", "aisys.cli", "sip2-sim", "--port", str(port), "--user", "u", "--password", "p"],
+        [sys.executable, "-m", "shelfsense.cli", "sip2-sim", "--port", str(port), "--user", "u", "--password", "p"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
@@ -697,7 +703,7 @@ def test_the_memory_of_unsure_requests_cannot_grow_without_limit(sim):
             with pytest.raises(ConnectorError):
                 c.patron_status(f"never-retried-{n}", member())
         assert len(c._unsure) == 30  # fine at this size...
-        from aisys.circulation.sip2 import adapter
+        from shelfsense.circulation.sip2 import adapter
 
         for n in range(adapter.REMEMBER + 50):
             c._unsure[f"x{n}"] = None

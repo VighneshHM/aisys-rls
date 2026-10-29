@@ -8,10 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from aisys import migrate
-from aisys.app import create_app
-from aisys.db import make_engine
-from aisys.logging_setup import mask
+from shelfsense import migrate
+from shelfsense.app import create_app
+from shelfsense.db import make_engine
+from shelfsense.logging_setup import mask
 
 
 # ---------- AC07: staff smart-card login + RBAC ----------

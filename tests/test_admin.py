@@ -78,7 +78,7 @@ def test_pages_render_for_the_right_roles(client, admin, aud, clerk):
         (clerk, "/audit", 403),
         (clerk, "/admin", 403),
     ):
-        client.cookies.set("aisys_session", headers["Authorization"].split()[1])
+        client.cookies.set("shelfsense_session", headers["Authorization"].split()[1])
         assert client.get(path).status_code == status, (path, status)
     client.cookies.clear()
     assert client.get("/audit", follow_redirects=False).status_code in (302, 303, 307)
@@ -388,8 +388,8 @@ def test_role_changes_are_audited_and_only_for_administrators(client, admin, aud
 
 
 def test_built_in_roles_are_restored_at_start(client, admin):
-    from aisys.auth.permissions import sync_rbac
-    from aisys.models import Role
+    from shelfsense.auth.permissions import sync_rbac
+    from shelfsense.models import Role
 
     with client.app.state.session_factory() as db:
         db.query(Role).filter_by(name="auditor").one().permissions = []

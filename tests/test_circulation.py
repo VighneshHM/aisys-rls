@@ -7,12 +7,12 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys.app import create_app
-from aisys.circulation.connector import CirculationConfig, CirculationConnector
-from aisys.circulation.registry import ConnectorConfigError, build_connector
-from aisys.cli import seed_demo
-from aisys.config import Settings
 from conftest import login_card
+from shelfsense.app import create_app
+from shelfsense.circulation.connector import CirculationConfig, CirculationConnector
+from shelfsense.circulation.registry import ConnectorConfigError, build_connector
+from shelfsense.cli import seed_demo
+from shelfsense.config import Settings
 from test_tagging import make_item, place, tag
 
 

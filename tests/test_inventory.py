@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys.rfid.devices import DeviceError
-from aisys.rfid.registry import DeviceConfig, DeviceConfigError, DeviceRegistry
 from conftest import login_card
+from shelfsense.rfid.devices import DeviceError
+from shelfsense.rfid.registry import DeviceConfig, DeviceConfigError, DeviceRegistry
 from test_tagging import make_item, place, tag
 
 SHELF = "Shelf-1"

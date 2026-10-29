@@ -39,7 +39,7 @@ import socket
 import subprocess
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
-_LOG = os.environ.get("AISYS_NETGUARD_LOG", "")
+_LOG = os.environ.get("SHELFSENSE_NETGUARD_LOG", "")
 _LOCAL = ("127.", "::1", "localhost", "0.0.0.0", "::")
 
 
@@ -84,7 +84,7 @@ def _popen(self, *args, **kwargs):
     env = dict(os.environ if kwargs.get("env") is None else kwargs["env"])
     paths = [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
     env["PYTHONPATH"] = os.pathsep.join([_DIR, *[p for p in paths if p != _DIR]])
-    env["AISYS_NETGUARD_LOG"] = _LOG
+    env["SHELFSENSE_NETGUARD_LOG"] = _LOG
     kwargs["env"] = env
     _popen_init(self, *args, **kwargs)
 
@@ -166,7 +166,9 @@ def main() -> None:
     ap.add_argument("--wheels-from", type=Path)
     ap.add_argument("--work", type=Path)
     a = ap.parse_args()
-    work = (a.work or Path(tempfile.mkdtemp(prefix="aisys-demo-"))).resolve()  # steps run in it, so no relative paths
+    work = (
+        a.work or Path(tempfile.mkdtemp(prefix="shelfsense-demo-"))
+    ).resolve()  # steps run in it, so no relative paths
     if a.wheels_from:
         a.wheels_from = a.wheels_from.resolve()
     work.mkdir(parents=True, exist_ok=True)
@@ -213,7 +215,7 @@ def main() -> None:
             "*.db",
         ),
     )
-    versions = src2 / "src" / "aisys" / "migrations" / "versions"
+    versions = src2 / "src" / "shelfsense" / "migrations" / "versions"
     head = max(
         int(f.name[:4]) for f in versions.glob("[0-9][0-9][0-9][0-9]_*.py")
     )  # the demo change comes after the last real one
@@ -262,7 +264,7 @@ def main() -> None:
     guard_dir, guard_log = work / "netguard", work / "netguard.log"
     guard_dir.mkdir()
     (guard_dir / "sitecustomize.py").write_text(NETGUARD, encoding="utf-8")
-    GUARD.update(PYTHONPATH=str(guard_dir), AISYS_NETGUARD_LOG=str(guard_log))
+    GUARD.update(PYTHONPATH=str(guard_dir), SHELFSENSE_NETGUARD_LOG=str(guard_log))
     print(run([sys.executable, "-c", PROBE], offline=True))
     guard_log.unlink()  # the probe's two refusals; from here on the log must stay empty
 
@@ -271,7 +273,7 @@ def main() -> None:
         run(
             [
                 sys.executable,
-                str(dist / "aisys-0.1.0" / "install.py"),
+                str(dist / "shelfsense-0.1.0" / "install.py"),
                 "--root",
                 str(root),
                 "--licence",
@@ -283,22 +285,22 @@ def main() -> None:
             offline=True,
         )
     )
-    db = root / "data" / "aisys.db"
+    db = root / "data" / "shelfsense.db"
     users, cards = count(db, "users"), count(db, "cards")
     print(f"data after install: {users} users, {cards} cards")
 
     step("Refusals (nothing may change)")
     tampered = work / "tampered"
-    shutil.copytree(dist / "aisys-0.2.0", tampered)
+    shutil.copytree(dist / "shelfsense-0.2.0", tampered)
     with (tampered / "config.sample.toml").open("a") as fh:
         fh.write("\n# tampered\n")
     print("tampered :", run([*manage, "update", str(tampered)], offline=True, expect_fail=True))
-    print("foreign  :", run([*manage, "update", str(foreign / "aisys-0.3.0.zip")], offline=True, expect_fail=True))
-    print("downgrade:", run([*manage, "update", str(dist / "aisys-0.1.0.zip")], offline=True, expect_fail=True))
+    print("foreign  :", run([*manage, "update", str(foreign / "shelfsense-0.3.0.zip")], offline=True, expect_fail=True))
+    print("downgrade:", run([*manage, "update", str(dist / "shelfsense-0.1.0.zip")], offline=True, expect_fail=True))
 
     step("Dry run, then apply 0.2.0 (offline)")
-    print(run([*manage, "update", str(dist / "aisys-0.2.0.zip"), "--dry-run"], offline=True))
-    print(run([*manage, "update", str(dist / "aisys-0.2.0.zip")], offline=True))
+    print(run([*manage, "update", str(dist / "shelfsense-0.2.0.zip"), "--dry-run"], offline=True))
+    print(run([*manage, "update", str(dist / "shelfsense-0.2.0.zip")], offline=True))
     assert has_table(db, "update_marker") and count(db, "users") == users and count(db, "cards") == cards
     print(f"after update: update_marker table present, still {users} users and {cards} cards")
 
@@ -314,7 +316,7 @@ def main() -> None:
     print(f"after rollback: schema back to {down}, {users} users and {cards} cards as before the update")
     print(run([*manage, "status"], offline=True))
     step("A real site has no demo users: create the first administrator from the command line")
-    env_pw = "AISYS_ADMIN_PASSWORD"
+    env_pw = "SHELFSENSE_ADMIN_PASSWORD"
     os.environ[env_pw] = "demo-site-password-1"  # read by manage.py, passed on to the application, never printed
     try:
         print(run([*manage, "create-admin", "--username", "site.admin", "--name", "Site Admin"], offline=True))
@@ -328,7 +330,7 @@ def main() -> None:
     print("network log empty: no target-machine step tried to reach the network")
     print("\nALL CHECKS PASSED")
     if a.keep:
-        shutil.copyfile(dist / "aisys-0.2.0.zip", root / "incoming" / "aisys-0.2.0.zip")
+        shutil.copyfile(dist / "shelfsense-0.2.0.zip", root / "incoming" / "shelfsense-0.2.0.zip")
         print(f"\nkept in {work}\nstart it:  python {root / 'manage.py'} run   (0.2.0 is waiting in incoming/)")
     else:
         shutil.rmtree(work, ignore_errors=True)

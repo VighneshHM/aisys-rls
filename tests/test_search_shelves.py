@@ -9,13 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select, text
 
-from aisys import backup, migrate
-from aisys.app import create_app
-from aisys.catalogue import fts
-from aisys.integrations.netcat import SAMPLE
-from aisys.models import InventoryScan, InventorySession, Item
-from aisys.shelves import service as shelves
 from conftest import login_card
+from shelfsense import backup, migrate
+from shelfsense.app import create_app
+from shelfsense.catalogue import fts
+from shelfsense.integrations.netcat import SAMPLE
+from shelfsense.models import InventoryScan, InventorySession, Item
+from shelfsense.shelves import service as shelves
 from test_tagging import make_item
 
 pytestmark = pytest.mark.req("FR01", "FR02", "FR06")
@@ -368,7 +368,7 @@ def test_the_opac_wants_a_real_search(client, q):
 
 def test_the_opac_count_and_paging_cover_every_match(client, lib, monkeypatch):
     """D-074: the search read only the first 200 copies, so total stopped at 200 and later pages were empty."""
-    from aisys import opac_routes
+    from shelfsense import opac_routes
 
     opac_routes._hits.clear()
     for i in range(230):
@@ -386,7 +386,7 @@ def test_the_opac_count_and_paging_cover_every_match(client, lib, monkeypatch):
 
 
 def test_the_opac_limits_how_fast_one_visitor_can_search(client, lib, monkeypatch):
-    from aisys import opac_routes
+    from shelfsense import opac_routes
 
     opac_routes._hits.clear()
     monkeypatch.setattr(opac_routes, "LIMIT_PER_MINUTE", 5)
@@ -452,7 +452,7 @@ def test_isbn_lookup_needs_catalogue_write(client):
 
 
 def test_the_sample_records_are_valid_and_synthetic():
-    from aisys.migration import validation
+    from shelfsense.migration import validation
 
     assert len(SAMPLE) >= 10 and all(validation.isbn_valid(i) for i in SAMPLE)
     assert Item  # imported for the type checkers of the readers of this file
@@ -466,8 +466,8 @@ def test_a_bad_netcat_driver_stops_the_app_at_start(settings):
 
 
 def test_pages_render(client, lib):
-    client.cookies.set("aisys_session", lib["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", lib["Authorization"].split()[1])
     assert client.get("/shelves").status_code == 200
     clerk = login_card(client, "STAFFCLERK01")
-    client.cookies.set("aisys_session", clerk["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", clerk["Authorization"].split()[1])
     assert client.get("/shelves").status_code == 200

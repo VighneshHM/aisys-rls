@@ -15,8 +15,8 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from aisys_lifecycle import bundle, ed25519, licence, ops, sbom
-from aisys_lifecycle.bundle import LifecycleError
+from shelfsense_lifecycle import bundle, ed25519, licence, ops, sbom
+from shelfsense_lifecycle.bundle import LifecycleError
 
 pytestmark = pytest.mark.req("AC09", "FR12")
 
@@ -37,10 +37,10 @@ def make_package(
     where: Path, priv, version="0.2.0", schema=SCHEMA_NEW, kind="release", extra: dict | None = None, **manifest_extra
 ) -> Path:
     """A signed package folder. The wheels are placeholders: tests that install patch out the pip step."""
-    pkg = where / f"aisys-{version}"
+    pkg = where / f"shelfsense-{version}"
     shutil.rmtree(pkg, ignore_errors=True)
     (pkg / "wheels").mkdir(parents=True)
-    (pkg / "wheels" / f"aisys-{version}-py3-none-any.whl").write_bytes(b"not a real wheel " + version.encode())
+    (pkg / "wheels" / f"shelfsense-{version}-py3-none-any.whl").write_bytes(b"not a real wheel " + version.encode())
     (pkg / "config.sample.toml").write_text("[app]\nname = 'x'\n")
     (pkg / "vendor.pub").write_text(base64.b64encode(pub_bytes(priv)).decode())
     for rel, content in (extra or {}).items():
@@ -48,7 +48,7 @@ def make_package(
         (pkg / rel).write_bytes(content)
     files = {p.relative_to(pkg).as_posix(): bundle.sha256_file(p) for p in sorted(pkg.rglob("*")) if p.is_file()}
     manifest = {
-        "name": "aisys", "version": version, "kind": kind, "notes": "test", "schema_revision": schema,
+        "name": "shelfsense", "version": version, "kind": kind, "notes": "test", "schema_revision": schema,
         "python_min": "3.12", "files": files, **manifest_extra,
     }  # fmt: skip
     payload = json.dumps(manifest, indent=2, sort_keys=True).encode()
@@ -57,7 +57,7 @@ def make_package(
     return pkg
 
 
-def make_licence(path: Path, priv, expires: str | None = "2999-12-31", product="aisys") -> Path:
+def make_licence(path: Path, priv, expires: str | None = "2999-12-31", product="shelfsense") -> Path:
     lic = {"product": product, "customer": "Test Library", "issued": "2026-01-01", "expires": expires}
     sig = base64.b64encode(priv.sign(bundle.canonical(lic))).decode()
     path.write_text(json.dumps({"licence": lic, "signature": sig}))
@@ -66,7 +66,7 @@ def make_licence(path: Path, priv, expires: str | None = "2999-12-31", product="
 
 @pytest.fixture
 def fake_release(monkeypatch):
-    """Skip the venv and pip step (slow, needs wheels): every 'release' runs the test environment's own aisys."""
+    """Skip the venv and pip step (slow, needs wheels): every 'release' runs the test environment's own shelfsense."""
 
     def create(root, b, log):
         d = root.release_dir(b.version)
@@ -149,7 +149,7 @@ def test_a_zip_package_opens_and_is_cleaned_up(tmp_path, vendor):
     with zipfile.ZipFile(archive, "w") as zf:
         for f in pkg.rglob("*"):
             if f.is_file():
-                zf.write(f, f"aisys-0.2.0/{f.relative_to(pkg).as_posix()}")
+                zf.write(f, f"shelfsense-0.2.0/{f.relative_to(pkg).as_posix()}")
     b = bundle.open_bundle(archive, [pub_bytes(vendor)])
     tmp = b._tmp
     assert tmp and tmp.exists()
@@ -161,7 +161,7 @@ def test_a_zip_package_opens_and_is_cleaned_up(tmp_path, vendor):
     "tamper, message",
     [
         (lambda p: (p / "config.sample.toml").write_text("changed"), "checksum"),
-        (lambda p: (p / "wheels" / "aisys-0.2.0-py3-none-any.whl").write_bytes(b"swapped"), "checksum"),
+        (lambda p: (p / "wheels" / "shelfsense-0.2.0-py3-none-any.whl").write_bytes(b"swapped"), "checksum"),
         (lambda p: (p / "manifest.sig").unlink(), "not signed"),
         (lambda p: (p / "manifest.sig").write_text("!!notbase64!!"), "signature"),
         (lambda p: (p / "evil.py").write_text("print(1)"), "does not list"),
@@ -183,7 +183,7 @@ def test_a_package_signed_by_someone_else_is_refused(tmp_path, vendor):
 
 
 def test_a_manifest_with_wrong_shapes_is_refused_not_crashed(tmp_path, vendor):
-    for bad in ({"name": "aisys", "version": 3}, {"name": "other"}, []):
+    for bad in ({"name": "shelfsense", "version": 3}, {"name": "other"}, []):
         pkg = tmp_path / "bad"
         shutil.rmtree(pkg, ignore_errors=True)
         pkg.mkdir()
@@ -220,7 +220,7 @@ def test_not_a_package_gives_plain_messages(tmp_path, vendor):
     with pytest.raises(LifecycleError, match="not a readable zip"):
         bundle.open_bundle(junk, keys)
     (tmp_path / "empty").mkdir()
-    with pytest.raises(LifecycleError, match="not an AISYS"):
+    with pytest.raises(LifecycleError, match="not an ShelfSense"):
         bundle.open_bundle(tmp_path / "empty", keys)
 
 
@@ -271,10 +271,10 @@ def test_sbom_lists_licences_and_flags_copyleft(tmp_path):
     assert by["alpha"]["licence"] == "MIT" and not by["alpha"]["needs_review"]
     assert by["beta"]["needs_review"], "copyleft needs a legal look"
     assert by["gamma"]["licence"] == "UNKNOWN" and by["gamma"]["needs_review"]
-    bom = sbom.cyclonedx(items, "aisys", "1.0")
+    bom = sbom.cyclonedx(items, "shelfsense", "1.0")
     assert bom["bomFormat"] == "CycloneDX" and len(bom["components"]) == 3
     assert bom["components"][0]["purl"] == "pkg:pypi/alpha@1.0"
-    text = sbom.licences_markdown(items, "aisys", "1.0")
+    text = sbom.licences_markdown(items, "shelfsense", "1.0")
     assert "beta" in text and "needs review" in text
 
 
@@ -417,7 +417,7 @@ def damaging_runner(real, bad_version, wipe: bool = True):
 
     def run(root, version, args, env=None, timeout=ops.STEP_TIMEOUT_S):
         proc = real(root, version, args, env=env, timeout=timeout)
-        live = env is None or env.get("AISYS_DATABASE_URL") == root.db_url
+        live = env is None or env.get("SHELFSENSE_DATABASE_URL") == root.db_url
         if version == bad_version and args == ["migrate"] and live:
             if wipe:
                 con = sqlite3.connect(root.db_file)
@@ -592,7 +592,7 @@ def test_state_file_damage_reads_as_not_installed(tmp_path):
 
 # ---------- real processes: the smoke test and the command line ----------
 def test_the_smoke_test_really_starts_the_application(installed, monkeypatch):
-    monkeypatch.undo()  # use the real smoke() here, with the test environment's own aisys
+    monkeypatch.undo()  # use the real smoke() here, with the test environment's own shelfsense
     monkeypatch.setattr(ops, "_release_python", lambda root, version: Path(sys.executable))
     ops.run_release(installed, "0.1.0", ["migrate"])
     ops.smoke(installed, "0.1.0", installed.db_url)
@@ -624,13 +624,13 @@ def test_the_smoke_test_reports_a_release_that_crashes(installed, monkeypatch, t
 
 
 def test_cli_status_and_verify_and_errors(installed, tmp_path, vendor, capsys):
-    from aisys_lifecycle.__main__ import main
+    from shelfsense_lifecycle.__main__ import main
 
     assert main(["--root", str(installed.path), "status"]) == 0
-    assert "AISYS 0.1.0" in capsys.readouterr().out
+    assert "ShelfSense 0.1.0" in capsys.readouterr().out
     pkg = new_pkg(tmp_path, vendor)
     assert main(["--root", str(installed.path), "verify", str(pkg)]) == 0
-    assert "OK: aisys 0.2.0" in capsys.readouterr().out
+    assert "OK: shelfsense 0.2.0" in capsys.readouterr().out
     (pkg / "config.sample.toml").write_text("x")
     assert main(["--root", str(installed.path), "verify", str(pkg)]) == 1
     assert "altered" in capsys.readouterr().err
@@ -660,7 +660,7 @@ def _run_entry_script(tmp_path: Path, name: str, text: str) -> list[Path]:
 
     pkg = tmp_path / "pkg"
     shutil.rmtree(pkg, ignore_errors=True)
-    tools = pkg / "tools" / "aisys_lifecycle"
+    tools = pkg / "tools" / "shelfsense_lifecycle"
     tools.mkdir(parents=True)
     (tools / "__init__.py").write_text("")
     (tools / "__main__.py").write_text("def main(argv):\n    return 0\n")

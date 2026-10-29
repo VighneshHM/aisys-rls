@@ -10,16 +10,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from aisys.app import create_app
-from aisys.config import load_settings
-from aisys.db import make_engine
-from aisys.models import RfidTag
-from aisys.rfid import tagging
-from aisys.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
-from aisys.rfid.events import is_valid_tag_uid, normalize_tag_uid
-from aisys.rfid.mock import MockStaffReader
-from aisys.rfid.registry import DeviceConfig, DeviceConfigError, DeviceRegistry
 from conftest import login_card
+from shelfsense.app import create_app
+from shelfsense.config import load_settings
+from shelfsense.db import make_engine
+from shelfsense.models import RfidTag
+from shelfsense.rfid import tagging
+from shelfsense.rfid.devices import DeviceError, DeviceUnavailable, StaffReader
+from shelfsense.rfid.events import is_valid_tag_uid, normalize_tag_uid
+from shelfsense.rfid.mock import MockStaffReader
+from shelfsense.rfid.registry import DeviceConfig, DeviceConfigError, DeviceRegistry
 
 
 @pytest.fixture
@@ -446,7 +446,7 @@ def test_clerk_can_look_up_but_not_tag_or_create(client, lib, clerk):
 def test_simulator_endpoints_do_not_exist_in_production(settings):
     prod = replace(settings, environment="production", secret_key="x" * 40)
     with TestClient(create_app(prod)) as c:
-        from aisys.cli import seed_demo
+        from shelfsense.cli import seed_demo
 
         seed_demo(prod)
         hdr = login_card(c, "STAFFLIB0001")
@@ -499,7 +499,7 @@ def test_tagging_page_hides_the_simulator_in_production(settings):
     prod = replace(settings, environment="production", secret_key="x" * 40)
     # production cookies are Secure, so the client must speak https for the session cookie to be sent back
     with TestClient(create_app(prod), base_url="https://testserver") as c:
-        from aisys.cli import seed_demo
+        from shelfsense.cli import seed_demo
 
         seed_demo(prod)
         login_card(c, "STAFFLIB0001")

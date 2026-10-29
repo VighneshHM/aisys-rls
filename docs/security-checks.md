@@ -1,4 +1,4 @@
-# Security checks (D6, NFR02)
+# Security checks (NFR02)
 
 What was checked, how, and what is left. Each row can be re-run.
 
@@ -9,11 +9,11 @@ What was checked, how, and what is left. Each row can be re-run.
 | Static analysis for security defects (Bandit rules) | `ruff check` with the `S` rule set, on every pull request | clean; the few intentional exceptions (subprocess with a fixed argument list, the demo password, constant SQL in migrations) carry a comment saying why |
 | Known vulnerabilities in dependencies | `pip-audit` on `requirements.lock` and `requirements-dev.lock` on every pull request | found 7 in the signing library `cryptography` 48.0.0 during this work; fixed by pinning 50.0.2; clean now |
 | Secrets in the repository | review of `git ls-files`, `.gitignore` (keys, `.env`, `config/config.toml`, databases, `release-keys/` ignored) | none committed; the only credentials are the synthetic demo cards and the documented demo administrator password |
-| Every administrative action recorded (SOP section 10) | the audit log | staff, cards, roles, settings, backups, restores, catalogue corrections and status changes, and the hand-run notification actions (send queued messages, run reminders, retry: added for D-058) each write an audit line with the actor; circulation goes to the append-only history |
+| Every administrative action recorded | the audit log | staff, cards, roles, settings, backups, restores, catalogue corrections and status changes, and the hand-run notification actions (send queued messages, run reminders, retry: added for D-058) each write an audit line with the actor; circulation goes to the append-only history |
 | Permissions on every endpoint | `docs/api-reference.md` is generated from the routes and lists the permission each needs; tests call the sensitive ones with the wrong role | a role without the permission gets 403 and an audit line; no endpoint but sign-in, health and the public catalogue is public |
 | Passwords and sign-in | `test_foundation`: scrypt hashing, lockout after repeated failures, patron card cannot sign in, disabled person or card refused | passes |
 | Session handling | `test_admin`: deactivating a person ends their open sessions at once; tokens are stored hashed | passes |
-| ILMS password | `test_sip2`: `AISYS_ILMS_PASSWORD` is the only source (a password in the file is ignored) and it does not appear in a printout of the settings | passes; also not shown by `aisys doctor` |
+| ILMS password | `test_sip2`: `SHELFSENSE_ILMS_PASSWORD` is the only source (a password in the file is ignored) and it does not appear in a printout of the settings | passes; also not shown by `shelfsense doctor` |
 
 ## Removing and erasing members
 

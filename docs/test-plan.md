@@ -1,11 +1,11 @@
-# Test plan (D6)
+# Test plan
 
 ## 1. Purpose and scope
 
 Show, with evidence that can be re-run, that the delivered add-on meets the requirements in `docs/requirements.csv`: the ten
 acceptance scenarios (AC01 to AC10), the functional requirements (FR01 to FR12) and the non-functional requirements (NFR01 to
 NFR09). In scope: the web application, its API, the RFID middleware through mock devices, the ILMS connector through a mock, the
-migration utility, backup and restore, the offline lifecycle tools, the generated documents. Out of scope (SOP section 3): real
+migration utility, backup and restore, the offline lifecycle tools, the generated documents. Out of scope: real
 hardware, a live ILMS or mail server, certification of any protocol.
 
 ## 2. Test levels and types
@@ -38,7 +38,7 @@ hardware, a live ILMS or mail server, certification of any protocol.
 * **Exit (merge)**: formatter, linter, all tests and the dependency scan pass in CI; the requirement, design document and
   traceability matrix are updated; any defect found while testing is fixed or logged.
 * **Exit (release)**: the whole suite passes on the final `main`; `scripts/lifecycle_demo.py` passes with the network blocked (every connection off the machine refused and logged; the log must stay empty);
-  `docs/uat.md` has no open failure; `docs/defect-log.md` has no open defect of high severity; the evaluation tag is created.
+  `docs/uat.md` has no open failure; `docs/defect-log.md` has no open defect of high severity; the release tag is created.
 
 ## 5. Traceability
 

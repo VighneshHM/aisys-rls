@@ -1,6 +1,6 @@
-# Performance results (D6, NFR05)
+# Performance results (NFR05)
 
-The SOP leaves performance targets to the candidate ("we will define and publish our own"). These are the targets, how they were
+The specification leaves performance targets to the developer ("we will define and publish our own"). These are the targets, how they were
 measured, and the results.
 
 ## Method

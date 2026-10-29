@@ -9,12 +9,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys import backup, migrate
-from aisys.app import create_app
-from aisys.backup import BackupError
-from aisys.cli import main as cli_main
-from aisys.cli import seed_demo
 from conftest import login_card
+from shelfsense import backup, migrate
+from shelfsense.app import create_app
+from shelfsense.backup import BackupError
+from shelfsense.cli import main as cli_main
+from shelfsense.cli import seed_demo
 from test_circulation import book, out, sql
 from test_migration import sample_csv, upload
 from test_tagging import make_item, place, tag
@@ -257,7 +257,7 @@ def test_a_backup_from_an_older_version_is_restored_and_brought_up_to_date(clien
 @pytest.mark.req("AC10", "NFR02")
 def test_only_plain_backup_names_are_accepted(client, admin_h, settings):
     create(client, admin_h)
-    for bad in ("..%2f..%2faisys.db", "a%2fb.db", "..%5cx.db", "nothere.db", "x.txt", "%2e%2e%2f%2e%2e%2fetc"):
+    for bad in ("..%2f..%2fshelfsense.db", "a%2fb.db", "..%5cx.db", "nothere.db", "x.txt", "%2e%2e%2f%2e%2e%2fetc"):
         for path in ("verify", "compare"):
             assert client.get(f"/api/backups/{bad}/{path}", headers=admin_h).status_code in (404, 405), bad
         assert restore(client, admin_h, bad).status_code in (404, 405), bad

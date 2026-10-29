@@ -3,10 +3,10 @@ requires = ["setuptools>=84.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aisys"
+name = "shelfsense"
 version = "0.1.0"
-description = "RFID-enabled library integration layer (AISYS candidate exercise)"
-license = "LicenseRef-AISYS-Candidate-Exercise"
+description = "RFID add-on for libraries: tagging, circulation, inventory and a security gate beside an existing ILMS"
+license = "LicenseRef-ShelfSense"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.142.2",
@@ -22,13 +22,13 @@ dependencies = [
 dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.16.10", "mypy==2.4.0"]
 
 [project.scripts]
-aisys = "aisys.cli:main"
+shelfsense = "shelfsense.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-aisys = ["migrations/*.mako", "migrations/versions/*.py", "web/templates/*.html", "web/static/*"]
+shelfsense = ["migrations/*.mako", "migrations/versions/*.py", "web/templates/*.html", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -40,7 +40,7 @@ markers = [
 files = ["src"]
 ignore_missing_imports = true  # alembic and a few others ship no type information
 warn_unused_ignores = true
-exclude = ["src/aisys/migrations/"]  # generated-style migration scripts
+exclude = ["src/shelfsense/migrations/"]  # generated-style migration scripts
 
 [tool.ruff]
 line-length = 120
@@ -52,8 +52,8 @@ select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["S101"]
 
 [tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = ["fastapi.Depends", "aisys.deps.require"]
+extend-immutable-calls = ["fastapi.Depends", "shelfsense.deps.require"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106", "S608"]
-"src/aisys/devtools/*" = ["S311"]  # synthetic data, not cryptography
+"src/shelfsense/devtools/*" = ["S311"]  # synthetic data, not cryptography

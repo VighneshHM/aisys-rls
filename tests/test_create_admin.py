@@ -6,16 +6,16 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from aisys import cli
-from aisys.app import create_app
-from aisys.db import make_engine, make_sessionmaker
-from aisys.models import AuditEvent, User
+from shelfsense import cli
+from shelfsense.app import create_app
+from shelfsense.db import make_engine, make_sessionmaker
+from shelfsense.models import AuditEvent, User
 
 PASSWORD = "a-long-site-password"  # noqa: S105 - test value
 
 
 def _run(settings, monkeypatch, *argv, password=PASSWORD):
-    monkeypatch.setenv("AISYS_ADMIN_PASSWORD", password)
+    monkeypatch.setenv("SHELFSENSE_ADMIN_PASSWORD", password)
     monkeypatch.setattr(cli, "load_settings", lambda _path=None: settings)
     return cli.main(["create-admin", *argv])
 
@@ -73,11 +73,11 @@ def test_a_taken_username_is_refused_and_the_first_account_is_unchanged(settings
 
 @pytest.mark.req("NFR04")
 def test_it_will_not_prompt_without_a_terminal_or_the_variable(settings, monkeypatch, capsys):
-    monkeypatch.delenv("AISYS_ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("SHELFSENSE_ADMIN_PASSWORD", raising=False)
     monkeypatch.setattr(cli, "load_settings", lambda _path=None: settings)
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
     assert cli.main(["create-admin", "--username", "site.admin"]) == 1
-    assert "AISYS_ADMIN_PASSWORD" in capsys.readouterr().err
+    assert "SHELFSENSE_ADMIN_PASSWORD" in capsys.readouterr().err
 
 
 @pytest.mark.req("NFR04")

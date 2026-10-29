@@ -1,11 +1,11 @@
-# Project management and issue tracking (Stage 1, D4)
+# Project management and issue tracking
 
 ## Tracker
 
-The tracker is the **GitHub repository `VighneshHM/aisys-rls`**: its pull requests, its Actions runs and (available for any
+The tracker is the **GitHub repository `VighneshHM/shelfsense`**: its pull requests, its Actions runs and (available for any
 future item) its Issues.
 
-To be plain about what was actually done: this was a single-developer, five-day exercise (5 to 9 October 2026), and work was
+To be plain about what was actually done: this was a single-developer, five-day project (5 to 9 October 2026), and work was
 **tracked by pull requests and by the requirements table** (`docs/requirements.csv`, one row per FR, NFR and AC with a status),
 not by a long list of GitHub Issues. Each pull request is the work item: its branch name says what it is for, its merge commit
 records its number, and the requirement IDs it delivered are in the table below. Defects are not in GitHub Issues either; they
@@ -41,11 +41,11 @@ listed and nothing is claimed about them.
 | #17 | `docs/final-walkthrough` | Walkthrough | 2026-10-08 | NFR08, NFR09 |
 | #18 | `feature/audit-admin-pages` | Audit log, administration and production docs | 2026-10-08 | FR11, NFR02, NFR07 |
 | #19 | `feature/patron-reminders` | Patron loan reminders and notification loop | 2026-10-08 | FR09 (reminders, A-25) |
-| #21 | `overall-fixes` | Remaining requirements, search, shelves, acquisitions, serials, labels, deliverable documents, doc-generator ordering, parallel CI tests | 2026-10-09 | FR01, FR02, NFR03 to NFR09 (documents), NFR05 (CI speed-up) |
-| #22 | `overall-fixes` | Settings page, type check, hashed lock file, SBOM, remaining deliverable documents, SIP2 wire protocol, bytecode fix for the signed package | 2026-10-09 | FR11 (Settings page), FR03 (SIP2), NFR04, NFR06, AC09 |
-| #23 | `fix/sop-gaps` | First SOP coverage review: custom roles, one member-card check, network-blocked offline rehearsal, split lock files, full licence inventory, stage timeline, UAT additions; UI patches (public catalogue session, scrolling menu) | 2026-10-09 | FR03 (NCIP decision, DR-13), FR05, FR11, NFR02, NFR04, NFR05, NFR09, AC09 |
+| #21 | `overall-fixes` | Remaining requirements, search, shelves, acquisitions, serials, labels, documentation, doc-generator ordering, parallel CI tests | 2026-10-09 | FR01, FR02, NFR03 to NFR09 (documents), NFR05 (CI speed-up) |
+| #22 | `overall-fixes` | Settings page, type check, hashed lock file, SBOM, remaining documentation, SIP2 wire protocol, bytecode fix for the signed package | 2026-10-09 | FR11 (Settings page), FR03 (SIP2), NFR04, NFR06, AC09 |
+| #23 | `fix/sop-gaps` | First coverage review: custom roles, one member-card check, network-blocked offline rehearsal, split lock files, full licence inventory, stage timeline, UAT additions; UI patches (public catalogue session, scrolling menu) | 2026-10-09 | FR03 (NCIP decision, DR-13), FR05, FR11, NFR02, NFR04, NFR05, NFR09, AC09 |
 | #24 | `fix/sop-gaps` | Public catalogue fix (D-052 amended) | 2026-10-09 | NFR02, FR02 |
-| (next) | `fix/review-gaps` | Second SOP coverage review: public-catalogue hand-over and kiosk hosts, production gate reading, catalogue corrections and status, audited notification actions, NCIP option removed, documents brought up to date | open at the time of writing | NFR02, FR02 (DR-17), FR07 (DR-18), FR01 (DR-19), FR03 (DR-13), SOP section 10 |
+| (next) | `fix/review-gaps` | Second coverage review: public-catalogue hand-over and kiosk hosts, production gate reading, catalogue corrections and status, audited notification actions, NCIP option removed, documents brought up to date | open at the time of writing | NFR02, FR02 (DR-17), FR07 (DR-18), FR01 (DR-19), FR03 (DR-13), specification section 10 |
 
 Note on #21 and #22: both merged the same branch, `overall-fixes`. #21 (`3b11886`) carried `ad8a3b6`, `51c4a1b` and `f38be77`;
 #22 (`2a1681c`) carried `39d38fe`, `d777380` and `6ef3588`. #23 (`841e3f4`) and #24 (`ded36b9`) both merged
@@ -54,16 +54,15 @@ second coverage review; its pull-request number is given by GitHub when it is op
 The requirement mapping above is by feature area and the notes column of `docs/requirements.csv`; the full test-level mapping
 is the generated `docs/traceability.md`.
 
-## Stage timeline, D0 to D10 (SOP section 9, NFR09)
+## Stage timeline, D0 to D10 (NFR09)
 
-SOP section 9 labels its stages with working days, D0 to D8, and NFR09 asks for the exercise to run from D0 to D10 (A-43: these are
-days, not the deliverables D1 to D9 of section 7). The exercise ran over five calendar days, 5 to 9 October 2026, with the
+The plan labels its stages by working day, D0 to D10 (A-43). The project ran over five calendar days, 5 to 9 October 2026, with the
 deadline on 10 October. The days of the plan were therefore compressed, and the work was built in **vertical slices**, one
 acceptance scenario per branch from design to test, rather than finishing every stage for every feature before starting the next.
 That is a deviation from "follow the stages in order", stated here rather than hidden. Each stage's reviewable output still exists,
 and the dates below come from `git log`.
 
-| SOP day | Stage | Reviewable output | Where | Actual dates |
+| Plan day | Stage | Reviewable output | Where | Actual dates |
 |---|---|---|---|---|
 | D0 | 1 Initiation and controls | Repository and tracker; first requirements table; assumptions, questions, risks, dependencies, exclusions; synthetic data confirmed | `1ccefb4`; `docs/requirements.csv`; `docs/assumptions.md` (C-03 to C-06); `docs/risks.md` | 2026-10-05 |
 | D1 to D2 | 2 Requirements and design | Use cases and acceptance criteria; domain model, schema, APIs, events, integration contracts, security, topology; mock contracts; design decisions | `docs/use-cases.md`; `docs/architecture.md`; `docs/decisions.md` DR-01 to DR-05 | 2026-10-05 to 2026-10-06 |
@@ -72,8 +71,8 @@ and the dates below come from `git log`.
 | D6 | 5 RFID middleware and integrations | Device-neutral interfaces; ILMS boundary (SIP2 wire protocol added later); tagging, inventory, gate, notifications, smart card, camera; retries, timeouts, duplicates, offline behaviour | PR #7, #8, #10, #12, #19, #22 | 2026-10-06 to 2026-10-09 |
 | D7 | 6 Migration and resilience | Profiling, validation, dry run, reconciliation, migration into the test database, rollback and restore | PR #1, #6, #14; `docs/samples/` | 2026-10-05 to 2026-10-08 |
 | D8 | 7 Verification | Functional, integration, regression, performance, security, migration, backup, restore, offline-update and rollback tests; every result mapped to a requirement; defects triaged and retested | PR #16, #21, #22; `docs/traceability.md`, `docs/test-plan.md`, `docs/defect-log.md`, `docs/uat.md` | 2026-10-08 to 2026-10-09 |
-| D9 | Demonstration (deliverable D9) | Demo script, presentation, known limitations, production backlog | `docs/demo-script.md`, `docs/presentation.html`, `docs/remaining-work.md` | 2026-10-09 |
-| D10 | Hand-over | Two coverage reviews against the SOP and their gap closures; evaluation release tag `v0.1.0` (the package version), **to be created on `main` by the project owner once the last pull request is merged** | PR #23, #24, branch `fix/review-gaps` | 2026-10-09 to 2026-10-10 |
+| D9 | Demonstration | Demo script, known limitations, production backlog | `docs/demo-script.md`, `docs/remaining-work.md` | 2026-10-09 |
+| D10 | Release | Two coverage reviews against the specification and their gap closures; release tag `v0.1.0` (the package version), **to be created on `main` by the project owner once the last pull request is merged** | PR #23, #24, branch `fix/review-gaps` | 2026-10-09 to 2026-10-10 |
 
 Work remaining for production readiness is listed in `docs/remaining-work.md`.
 

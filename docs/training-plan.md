@@ -1,4 +1,4 @@
-# Training plan (D8)
+# Training plan
 
 How the people who will use and look after the system learn it, using the system itself with synthetic data. Everything is
 hands-on; nobody trains on real members.

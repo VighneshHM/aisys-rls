@@ -1,6 +1,6 @@
-# Administrator's guide (D8, FR11, NFR07, NFR08)
+# Administrator's guide (FR11, NFR07, NFR08)
 
-This is the one document an administrator needs to run AISYS day to day. It covers the routine, the people, the audit log, the
+This is the one document an administrator needs to run ShelfSense day to day. It covers the routine, the people, the audit log, the
 Settings page, backups, updates, health and lock-outs. It gives the key steps and points to the detailed documents
 (`deployment.md`, `backup-restore.md`, `troubleshooting.md`) where the full procedure lives; section 10 is an index from each
 operations task to the right section.
@@ -166,7 +166,7 @@ API (same permission): `GET /api/admin/settings`, `PUT /api/admin/settings` with
 
 Page `/backups`, permission `admin.config`; the same actions exist on the command line. Full detail: `backup-restore.md`.
 
-1. **Make a backup** (a button, or `python -m aisys.cli backup create --label before-change`). It is verified when made. Backups are also
+1. **Make a backup** (a button, or `python -m shelfsense.cli backup create --label before-change`). It is verified when made. Backups are also
    taken automatically before every spreadsheet import and every restore. Nothing is deleted automatically.
 2. **Copy the backup folder off the machine** regularly (the folder is `[backup] dir`, by default `data/backups`). A nightly job is
    described in `deployment.md` ("Scheduled jobs").
@@ -196,12 +196,12 @@ Page `/updates` (read and check only) and the command `manage.py` in the install
 5. After a crash or power loss mid-update: `manage.py recover`. Check state any time with `manage.py status`.
 6. Updates and rollback are command-line only, because they restart the application.
 
-An update with an expired licence is refused unless it is a security update. Windows install folders must be short (`C:\aisys`).
+An update with an expired licence is refused unless it is a security update. Windows install folders must be short (`C:\shelfsense`).
 
 ## 8. Monitoring and health
 
 - `/health` answers when the application is up; `/health/ready` checks the database and reports the schema revision.
-- `python -m aisys.cli doctor` (or `python manage.py doctor`) checks the computer and configuration and prints OK, WARN or FAIL
+- `python -m shelfsense.cli doctor` (or `python manage.py doctor`) checks the computer and configuration and prints OK, WARN or FAIL
   for each item; it changes nothing. Run it after any change to the server.
 - The structured JSON log (console, `[logging]`) records requests and errors without secrets; the **Audit log** records who did
   what; `manage.py status` shows versions, history and interrupted updates; the **Updates** page shows the same plus the licence.

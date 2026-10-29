@@ -9,21 +9,21 @@ from dataclasses import replace
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys import migrate
-from aisys.app import create_app
-from aisys.cli import main as cli_main
-from aisys.cli import seed_demo
-from aisys.config import load_settings
-from aisys.gate.config import GateConfig
-from aisys.gate.service import classify
-from aisys.notifications.providers import (
+from conftest import login_card
+from shelfsense import migrate
+from shelfsense.app import create_app
+from shelfsense.cli import main as cli_main
+from shelfsense.cli import seed_demo
+from shelfsense.config import load_settings
+from shelfsense.gate.config import GateConfig
+from shelfsense.gate.service import classify
+from shelfsense.notifications.providers import (
     NotificationConfig,
     ProviderConfigError,
     build_providers,
 )
-from aisys.rfid.mock import MockGate
-from aisys.rfid.registry import DeviceConfig, DeviceRegistry
-from conftest import login_card
+from shelfsense.rfid.mock import MockGate
+from shelfsense.rfid.registry import DeviceConfig, DeviceRegistry
 from test_circulation import out, sql
 from test_tagging import make_item, place, tag
 
@@ -267,7 +267,7 @@ def test_a_message_is_marked_failed_after_the_attempt_limit_and_can_be_retried(c
     assert client.post(f"/api/notifications/{row['id']}/retry", headers=admin_h).status_code == 409  # no longer failed
     assert client.post("/api/notifications/99999/retry", headers=admin_h).status_code == 404  # D-078
     assert client.post("/api/notifications/dispatch", headers=admin_h).json()["sent"] == 1
-    # every one of these hand-run administrative actions is in the audit log (SOP section 10)
+    # every one of these hand-run administrative actions is in the audit log
     log = client.get("/api/audit/events?action=notification.&limit=50", headers=admin_h).json()["events"]
     kinds = [e["action"] for e in log]
     assert kinds.count("notification.dispatch") == 4 and kinds.count("notification.retry") == 1, kinds
@@ -422,9 +422,9 @@ def test_unfinished_messages_are_listed_first_and_a_waiting_retry_is_explained(c
 
 @pytest.mark.req("FR09")
 def test_dispatch_says_when_the_next_retry_is_due(tmp_path):
-    from aisys.db import make_engine, make_sessionmaker
-    from aisys.notifications import queue as nq
-    from aisys.notifications.providers import NotificationConfig, build_providers
+    from shelfsense.db import make_engine, make_sessionmaker
+    from shelfsense.notifications import queue as nq
+    from shelfsense.notifications.providers import NotificationConfig, build_providers
 
     url = f"sqlite:///{(tmp_path / 'w.db').as_posix()}"
     migrate.upgrade(url)
@@ -560,7 +560,7 @@ def test_a_driver_that_raises_anything_is_reported_and_the_other_gates_are_still
 
 @pytest.mark.req("AC06", "NFR06")
 def test_a_camera_that_raises_anything_still_records_the_alarm(client, lib):
-    from aisys.gate.service import pick_camera
+    from shelfsense.gate.service import pick_camera
 
     tagged(client, lib, "C2")
     camera = pick_camera(client.app.state.devices)

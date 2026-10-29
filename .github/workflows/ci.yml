@@ -1,6 +1,6 @@
 name: CI
 
-# Runs on every pull request and on pushes to main. Mirrors the checks in SOP section 10:
+# Runs on every pull request and on pushes to main. Mirrors the engineering checks:
 # formatter, linter + static analysis (ruff incl. bandit "S" rules), automated tests, dependency scan.
 on:
   pull_request:
@@ -17,7 +17,7 @@ concurrency:
 jobs:
   test:
     name: Lint + tests (Python ${{ matrix.python }}, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}      # the SOP targets Windows 11 / Windows Server 2022
+    runs-on: ${{ matrix.os }}      # the specification targets Windows 11 / Windows Server 2022
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -25,7 +25,7 @@ jobs:
         os: [windows-latest]
         python: ["3.12", "3.13"]
         include:
-          - os: windows-2022   # Windows Server 2022, the SOP's server target
+          - os: windows-2022   # Windows Server 2022, the specification's server target
             python: "3.12"
     steps:
       - uses: actions/checkout@v7
@@ -47,7 +47,7 @@ jobs:
       - name: Tests
         run: python -m pytest -q -n auto --durations=10
         env:
-          AISYS_ENV: development
+          SHELFSENSE_ENV: development
 
   lifecycle-demo:
     name: Offline install, update and rollback (real run)

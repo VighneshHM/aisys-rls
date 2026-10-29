@@ -11,7 +11,7 @@ call it, and there are three ways, all using `gate.service.poll_all` (every conf
 | Way | How | When to use |
 |---|---|---|
 | The gate loop inside the application | `[gate] poll_seconds = 2` (0 = off); pauses during a restore | the normal set-up |
-| A separate process | `python -m aisys.cli gate-poll --every 2` (once without `--every`; exit code 1 if a gate could not be read) | if the web application is restarted often, or runs on another machine |
+| A separate process | `python -m shelfsense.cli gate-poll --every 2` (once without `--every`; exit code 1 if a gate could not be read) | if the web application is restarted often, or runs on another machine |
 | On demand | **Read the gates now** on Gate events, or `POST /api/gate/poll` (`gate.view`) | checking a gate after maintenance |
 
 Use the loop **or** the separate process, not both: each passage is handed over once, to whoever reads it first. An offline
@@ -50,14 +50,14 @@ If the camera fails, the alarm is still recorded and announced, and the message 
 
 - `NotificationProvider` interface with mock **email**, **SMS** and **print** providers. A real service is a class registered with `register_provider(channel, name, factory)` and chosen under `[notifications]`.
 - **Per-user preferences:** each staff user ticks the channels they want and gives a contact (email address, phone number or printer name). Addresses are validated for the channel.
-- **Queue, then deliver:** an alarm only adds rows (status `queued`), so a broken mail server can never delay or fail the alarm. Delivery is a separate step: the **Send queued messages** button, `POST /api/notifications/dispatch`, or `python -m aisys.cli notify-dispatch`.
+- **Queue, then deliver:** an alarm only adds rows (status `queued`), so a broken mail server can never delay or fail the alarm. Delivery is a separate step: the **Send queued messages** button, `POST /api/notifications/dispatch`, or `python -m shelfsense.cli notify-dispatch`.
 - **Retries:** a failed send waits (`backoff_s` x attempts so far) and tries again, up to `max_attempts` (3), then the message is `failed`. A failed message can be retried by hand.
 
 ## Design decisions
 
 | Decision | Why | Cost |
 |---|---|---|
-| Alarm from the tag's own bit, never from the ILMS | Works when the library system is down; the SOP asks for exactly that | `armed_on_loan` shows when check-out could not switch the bit off |
+| Alarm from the tag's own bit, never from the ILMS | Works when the library system is down; the specification asks for exactly that | `armed_on_loan` shows when check-out could not switch the bit off |
 | Gate events, passages and snapshots are append-only (DB triggers) | An alarm record must not be editable | Corrections are new records |
 | Snapshot stored in the database, served with `nosniff`, a restrictive CSP and `sandbox`, and shown only in an image tag; text drawn on it is escaped | A stored image must never be able to run code in the browser (tested) | Fine for a demo; a real site would keep photos on disk or object storage |
 | Queue first, deliver separately | Delivery trouble must not touch the event that caused the message | Needs the button, the CLI, or (later) a scheduled job |

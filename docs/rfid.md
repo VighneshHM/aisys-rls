@@ -12,10 +12,10 @@ Staff reader (mock)  <-- encode / set_security / clear / indicate --   Tagging s
  DeviceRegistry (built from [[devices]] in config.toml)                                   rfid_tags, tag_events, audit_events
 ```
 
-## Layers (SOP section 6)
+## Layers
 | Layer | Where | Status |
 |---|---|---|
-| RFID middleware: device-neutral commands/events | `src/aisys/rfid/devices.py`, `events.py` | Staff reader done; handheld, gate, camera, printer pending |
+| RFID middleware: device-neutral commands/events | `src/shelfsense/rfid/devices.py`, `events.py` | Staff reader done; handheld, gate, camera, printer pending |
 | Device adapters | `rfid/mock.py` (simulator), `rfid/registry.py` | Mock done; real vendor driver = one class + `register_driver` |
 | Application services | `rfid/tagging.py`, `catalogue/service.py` | Done for tagging |
 | API | `rfid_routes.py`, `catalogue_routes.py` | Done |
@@ -24,7 +24,7 @@ Staff reader (mock)  <-- encode / set_security / clear / indicate --   Tagging s
 ## Technical decisions (and why)
 | Decision | Why | Trade-off |
 |---|---|---|
-| **Protocol interfaces** for devices; the app never imports a vendor SDK | The SOP's device boundary; a real reader needs one class; tests use the same contract | A little indirection |
+| **Protocol interfaces** for devices; the app never imports a vendor SDK | The specification's device boundary; a real reader needs one class; tests use the same contract | A little indirection |
 | **Devices come from `[[devices]]` config** (id, kind, driver); bad config fails at startup | NFR06 (config outside code); a typo is caught at boot, not at the first scan | Drivers are registered in code, not discovered as plugins |
 | **Tag binds to the item (copy)**, not the title | Each physical copy has its own tag; circulation and the gate work per copy | Member-card tagging is separate (needs member records, AC03/04) |
 | **One active tag per item** enforced by a *partial unique index* in the database | Cannot be broken even by code that bypasses the service (tested) | SQLite/Postgres partial-index syntax only |
@@ -34,7 +34,7 @@ Staff reader (mock)  <-- encode / set_security / clear / indicate --   Tagging s
 | **Validate (dry run) then re-validate inside the real call** | Users see every problem at once; races are still caught | Two cheap checks |
 | **Device first, then database; undo the device write if the save fails** | Never store an association the hardware did not accept; a reader cannot join a DB transaction, so compensation is the honest equivalent | Between the two steps a crash could leave a tag written but unsaved (visible as "carries ACC-x, not linked" on the pad) |
 | **`tag_events` separate from the audit log** | Device sightings are high-volume; the audit log records who did what | Two tables with some overlap |
-| **Simulator endpoints exist only outside production** and answer 404 in production | A "place a tag" button is a test tool, not a feature | Reviewers use it to demo hardware |
+| **Simulator endpoints exist only outside production** and answer 404 in production | A "place a tag" button is a test tool, not a feature | Used to demo hardware |
 | **Simulator = one tag on the reader at a time in the UI** ("Generate new tag" replaces the tag on the pad; the API can still add several tags) | Matches a real staff station and stops tags piling up; several tags stay possible for bulk reads (inventory) | The UI hides multi-tag fields from the simulator buttons |
 | **"Read reader" never changes anything**; simulator controls live in a collapsed box, with a one-click shortcut in the empty-reader message | Reads must be repeatable and identical in development and production; the real workflow stays uncluttered | One extra click to reach the simulator in general |
 | **Taking a tag off an item is a choice: Remove (reusable) or Retire (permanent)**; the reader erases the tag first if it is on the reader. Never blocked by hardware | A tag that is still armed could set off the gate later, so we switch it off when we can; the tag may already be off the book or the reader down, so the library record is updated regardless and staff are told what still needs doing (amber message) | A retired tag can never come back; a removed one can be retired later (found damaged) |

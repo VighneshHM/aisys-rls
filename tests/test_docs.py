@@ -39,17 +39,17 @@ def test_every_requirement_marked_done_has_test_evidence():
     assert not missing, f"marked done with no test evidence: {missing}"
 
 
-DELIVERABLES = {
-    "D1 requirements package": [
+DOC_AREAS = {
+    "requirements": [
         "assumptions.md",
         "use-cases.md",
         "data-dictionary.md",
         "requirements.csv",
         "traceability.md",
     ],
-    "D2 architecture package": ["architecture.md"],
-    "D4 repository": ["engineering.md", "third-party-licences.md", "project-management.md", "decisions.md"],
-    "D6 test package": [
+    "architecture": ["architecture.md"],
+    "engineering": ["engineering.md", "third-party-licences.md", "project-management.md", "decisions.md"],
+    "testing": [
         "test-plan.md",
         "uat.md",
         "uat-signoff.md",
@@ -58,29 +58,29 @@ DELIVERABLES = {
         "security-checks.md",
         "defect-log.md",
     ],
-    "D7 deployment package": ["deployment.md", "backup-restore.md"],
-    "D8 operational documentation": [
+    "deployment": ["deployment.md", "backup-restore.md"],
+    "operations": [
         "administration.md",
         "user-guide.md",
         "api-reference.md",
         "troubleshooting.md",
         "training-plan.md",
     ],
-    "D9 demonstration": ["demo-script.md", "remaining-work.md"],
+    "demo and roadmap": ["demo-script.md", "remaining-work.md"],
 }
 
 
 @pytest.mark.req("NFR08", "NFR09")
-def test_every_mandatory_deliverable_has_its_document():
+def test_every_documentation_area_has_its_documents():
     missing = []
-    for deliverable, files in DELIVERABLES.items():
+    for area, files in DOC_AREAS.items():
         for name in files:
             path = ROOT / "docs" / name
             if not path.is_file() or len(path.read_text(encoding="utf-8").split()) < 150:
-                missing.append(f"{deliverable}: docs/{name}")
+                missing.append(f"{area}: docs/{name}")
     assert not missing, "missing or empty: " + ", ".join(missing)
     index = (ROOT / "docs" / "index.md").read_text(encoding="utf-8")
-    for files in DELIVERABLES.values():
+    for files in DOC_AREAS.values():
         for name in files:
             assert name in index, f"docs/index.md does not list {name}"
 

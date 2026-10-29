@@ -7,10 +7,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from aisys import migrate
-from aisys.circulation.connector import CirculationConfig
-from aisys.circulation.fines import assess
 from conftest import login_card
+from shelfsense import migrate
+from shelfsense.circulation.connector import CirculationConfig
+from shelfsense.circulation.fines import assess
 from test_circulation import back, book, events, out, renew, sql
 
 

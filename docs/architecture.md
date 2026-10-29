@@ -1,4 +1,4 @@
-# Architecture package (D2)
+# Architecture
 
 Sections: 1 context, 2 layers, 3 components, 4 deployment, 5 database, 6 interfaces, 7 event model and key flows,
 8 security design, 9 decisions and alternatives. The code walk-through is `docs/walkthrough.md`; tables and endpoints are in the
@@ -11,7 +11,7 @@ flowchart LR
   staff([Library staff<br/>browser]) --> app
   visitor([Visitor<br/>browser /opac]) --> app
   subgraph site[Library site, isolated network]
-    app[AISYS add-on<br/>web app + RFID middleware]
+    app[ShelfSense add-on<br/>web app + RFID middleware]
     db[(SQLite data file<br/>+ backups)]
     app --- db
   end
@@ -22,10 +22,10 @@ flowchart LR
   app -- "CredentialProvider" --> cards[Smart-card service]
 ```
 
-Everything outside the dashed site boundary is **mocked** in this delivery behind an interface (SOP section 3). The add-on never
+Everything outside the dashed site boundary is **mocked** in this delivery behind an interface. The add-on never
 writes the ILMS's records: all ILMS access goes through the connector.
 
-## 2. Layers (SOP section 6)
+## 2. Layers
 
 | Layer | Responsibility | Where it lives |
 |---|---|---|
@@ -35,7 +35,7 @@ writes the ILMS's records: all ILMS access goes through the connector.
 | Interoperability | ILMS adapter boundary, a mock, and a SIP2 client (`docs/sip2.md`); no NCIP | `circulation/connector.py`, `mock_ilms.py`, `resilience.py`, `registry.py`, `sip2/` |
 | Data layer | Transactional database, search index, audit log, migration staging, backup and restore | `models.py`, `migrations/`, `catalogue/fts.py`, `audit.py`, `migration/`, `backup.py` |
 | Integration layer | E-mail, SMS, print, CCTV photo, ILMS, net-cataloguing connectors | `notifications/providers.py`, `integrations/`, `rfid/mock.py` (camera) |
-| Operations layer | Configuration, secrets, offline installer, logs, health checks, updates, backups, rollback | `config.py`, `logging_setup.py`, `doctor.py`, `aisys_lifecycle/`, `backup.py` |
+| Operations layer | Configuration, secrets, offline installer, logs, health checks, updates, backups, rollback | `config.py`, `logging_setup.py`, `doctor.py`, `shelfsense_lifecycle/`, `backup.py` |
 
 Dependencies point downward only: routes call services; services call the data layer and the interfaces; nothing in the
 application layer imports a vendor SDK or a mock directly (mocks are chosen by configuration).
@@ -74,10 +74,10 @@ flowchart TB
   end
   UI --> API --> APP --> PORTS
   APP --> DB[(SQLite)]
-  LIFE[aisys_lifecycle<br/>install · update · rollback] -. runs .-> API
+  LIFE[shelfsense_lifecycle<br/>install · update · rollback] -. runs .-> API
 ```
 
-Each unit has one purpose and talks to others through a small interface; `aisys_lifecycle` is standard-library only so it works
+Each unit has one purpose and talks to others through a small interface; `shelfsense_lifecycle` is standard-library only so it works
 before anything is installed and when a release is broken.
 
 ## 4. Deployment
@@ -92,7 +92,7 @@ flowchart LR
   end
   subgraph server[Server - Windows Server 2022 or later]
     proxy[TLS proxy or built-in TLS<br/>:443]
-    app[AISYS :8000]
+    app[ShelfSense :8000]
     data[(data/ + backups/)]
     proxy --> app --> data
   end
@@ -110,11 +110,11 @@ version), `state.json` (current and previous), `config/` (config, secret, licenc
 | Interface | Direction | Protocol / transport | Default / config key | Notes |
 |---|---|---|---|---|
 | Staff and public browsers | in | HTTPS (or HTTP behind a proxy) | `[app] host`, `port` = 127.0.0.1:8000; `[server] tls_certfile`, `tls_keyfile` | Bind to the LAN address only when TLS is on |
-| ILMS | out | SIP2 over TCP (no encryption: VPN, stunnel or TLS proxy) | `[ilms] driver`, `endpoint` (*site*), `port` (*site*), `login`, `institution`, `location`, `timeout_s`, `checksum`, `retries`, `backoff_s`; password from `AISYS_ILMS_PASSWORD` only | `mock` by default; `sip2` tested against a simulator only; NCIP would be one more class (`register_driver`) |
+| ILMS | out | SIP2 over TCP (no encryption: VPN, stunnel or TLS proxy) | `[ilms] driver`, `endpoint` (*site*), `port` (*site*), `login`, `institution`, `location`, `timeout_s`, `checksum`, `retries`, `backoff_s`; password from `SHELFSENSE_ILMS_PASSWORD` only | `mock` by default; `sip2` tested against a simulator only; NCIP would be one more class (`register_driver`) |
 | Staff reader, handheld, gate, camera, card printer | out | Vendor SDK or TCP/serial, per driver | `[[devices]] id, kind, driver` + driver options (*site*) | Mock here |
 | Mail, SMS, print | out | SMTP / gateway API / print queue, per driver | `[notifications] email, sms, print` drivers | Mock here |
 | Outside catalogue | out | Per driver (Z39.50, SRU, HTTP API) | `[netcat] driver` | Mock here |
-| Database | local | SQLite file, WAL | `[database] url` / `AISYS_DATABASE_URL` | One writer at a time |
+| Database | local | SQLite file, WAL | `[database] url` / `SHELFSENSE_DATABASE_URL` | One writer at a time |
 | Backups | local | Files + JSON manifests | `[backup] dir` | Copy off the machine regularly |
 
 Offline: the whole system installs and updates from a signed package with no internet (`docs/deployment.md`).
@@ -225,10 +225,10 @@ test; the credential provider is a mock).
 
 | Decision | Why | Alternatives considered | Cost |
 |---|---|---|---|
-| Add-on with connector, not an ILMS replacement | The SOP asks to integrate with an existing ILMS without changing its records | Build a full ILMS | FR01 acquisition and serials are a reference implementation, not an ILMS |
+| Add-on with connector, not an ILMS replacement | The specification asks to integrate with an existing ILMS without changing its records | Build a full ILMS | FR01 acquisition and serials are a reference implementation, not an ILMS |
 | Python, FastAPI, server-rendered pages | Small, readable, works offline, no build chain | SPA front end; Java or .NET | Less interactive pages |
 | SQLite + SQLAlchemy + Alembic | Zero-install database for an isolated site; versioned migrations; FTS5 built in | PostgreSQL | One writer at a time |
-| Protocol + mock + registry for everything external | Required by the SOP; real hardware is a class and a config line | Hard-wired mocks | Mocks prove the interface, not a vendor |
+| Protocol + mock + registry for everything external | Required by the specification; real hardware is a class and a config line | Hard-wired mocks | Mocks prove the interface, not a vendor |
 | Database-enforced invariants | Bugs cannot corrupt core rules | Application checks only | SQLite-specific syntax |
 | FTS5 index maintained by triggers | Real-time indexing without a separate service | External search engine (Elasticsearch, Whoosh) | Index lives in the same file |
 | Ed25519-signed packages, pure-Python verification | Trust checkable before anything is installed | Checksums only | A small verifier of my own, tested against RFC 8032 |

@@ -10,11 +10,11 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from aisys.db import make_engine
-from aisys.devtools import sample_data
-from aisys.migration import mapping, validation
-from aisys.migration import service as mig_service
 from conftest import login_card
+from shelfsense.db import make_engine
+from shelfsense.devtools import sample_data
+from shelfsense.migration import mapping, validation
+from shelfsense.migration import service as mig_service
 
 
 @pytest.fixture
@@ -417,8 +417,8 @@ def test_a_date_of_today_east_of_utc_is_not_called_a_future_date():
     """D-060: just after midnight east of UTC the person's today is tomorrow in UTC; it must still be accepted."""
     from datetime import UTC, datetime, timedelta
 
-    from aisys.migration.validation import validate_row
-    from aisys.timeutil import library_today
+    from shelfsense.migration.validation import validate_row
+    from shelfsense.timeutil import library_today
 
     utc_today = datetime.now(UTC).date()
     assert library_today() == utc_today

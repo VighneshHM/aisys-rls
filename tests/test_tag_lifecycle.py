@@ -9,10 +9,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from aisys import migrate
-from aisys.db import make_engine
-from aisys.models import RfidTag
 from conftest import login_card
+from shelfsense import migrate
+from shelfsense.db import make_engine
+from shelfsense.models import RfidTag
 from test_tagging import codes, count, make_item, place, tag
 
 

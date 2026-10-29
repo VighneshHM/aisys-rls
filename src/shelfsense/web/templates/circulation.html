@@ -1,0 +1,481 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Circulation · {{ app_name }}{% endblock %}
+{% block heading %}Circulation{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Check out, renew and check in</h2>
+  <p>Scan the patron's card to see who is borrowing, then name the item (accession number, barcode or tag). Every action goes to the library system over {{ protocol }} and is recorded in the history below. A patron card only identifies the member: it never signs anyone in.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>1 · Patron</h3><span id="member-badge" class="badge">none chosen</span></header>
+      <div class="body">
+        <div class="field" style="margin-bottom:10px">
+          <label for="card">Patron card</label>
+          <div class="toolbar" style="margin:0">
+            <div class="grow"><input id="card" class="uid" placeholder="Scan or type the card number" autocomplete="off" spellcheck="false"></div>
+            <button class="btn" id="card-btn" type="button">Identify</button>
+          </div>
+        </div>
+        {% if simulator %}
+        <div class="field" style="margin-bottom:10px">
+          <label for="demo-cards">Simulated patron card</label>
+          <select id="demo-cards"><option value="">Pick a demo card…</option></select>
+        </div>
+        {% endif %}
+        <div class="field" style="margin-bottom:10px">
+          <label for="member-q">Or find a member by name or number</label>
+          <input id="member-q" type="search" placeholder="e.g. Nair, or M0007" autocomplete="off" spellcheck="false">
+          <div class="picklist" id="member-results" style="margin-top:8px"></div>
+        </div>
+        {% if can_block %}<div class="actions" style="margin:0 0 10px"><button class="btn ghost small" id="add-member-btn" type="button">Add a new member</button></div>{% endif %}
+        <div id="member-form"></div>
+        <div id="member-notice" class="notice" role="alert"></div>
+        <div id="member"></div>
+        <div id="card-face"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h3>2 · Item</h3><span id="item-badge" class="badge">none chosen</span></header>
+      <div class="body">
+        <div class="toolbar" style="margin-bottom:0">
+          <div class="grow"><input id="item-ref" placeholder="Accession no., barcode or tag UID" autocomplete="off" spellcheck="false" aria-label="Item"></div>
+          <button class="btn ghost" id="item-btn" type="button">Look up</button>
+        </div>
+        <div id="item" style="margin-top:12px"></div>
+        <div class="actions">
+          <button class="btn" id="out-btn" type="button" disabled>Check out</button>
+          {% if can_renew %}<button class="btn ghost" id="renew-btn" type="button" disabled>Renew</button>{% endif %}
+          {% if can_checkin %}<button class="btn ghost" id="in-btn" type="button" disabled>Check in</button>{% endif %}
+          <button class="btn ghost" id="due-btn" type="button" disabled>Due date</button>
+        </div>
+        {% if simulator %}
+        <details class="sim" style="margin-top:14px">
+          <summary>Simulator controls <span class="sub">· development only</span></summary>
+          <p class="sub" style="margin:10px 0 8px">Each action first holds the item's tag up to the simulated reader, as staff would with the book in hand. You can also make the mock library system misbehave to see retries.</p>
+          <div class="toolbar" style="margin:0">
+            <div class="grow"><select id="fail-mode" aria-label="Failure to simulate">
+              <option value="timeout">Library system times out</option>
+              <option value="error">Library system is down</option>
+              <option value="lost_reply">Reply is lost (request was processed)</option>
+            </select></div>
+            <select id="fail-times" aria-label="How many requests fail"><option value="1">next 1 request</option><option value="2">next 2</option><option value="3">next 3 (all tries)</option></select>
+            <button class="btn ghost small" id="fail-btn" type="button">Make it fail</button>
+            <button class="btn ghost small" id="fail-clear" type="button">Clear</button>
+          </div>
+          <div id="fail-note" class="sub" style="margin-top:8px"></div>
+        </details>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel hidden" id="result-panel">
+      <header><h3 id="result-title">Result</h3><span id="result-badge"></span></header>
+      <div class="body" id="result-body"></div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Transaction history</h3><button class="btn ghost small" id="refresh" type="button">Refresh</button></header>
+      <div class="table-wrap" id="events"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }}, CAN_BLOCK = {{ 'true' if can_block else 'false' }};
+  const money = c => (c / 100).toFixed(2);
+  const day = iso => iso ? new Date(iso).toLocaleDateString([], {day: "2-digit", month: "short", year: "numeric"}) : "—";
+  let member = null, item = null, askingReason = false, fineMode = null, issuing = false, editingContact = false, faceFor = null;
+
+  // ------------------------------------------------------------------ patron
+  // the card box and the demo-card list always describe the member shown, however they were chosen
+  function syncCardFields(m) {
+    if (m.card === undefined) return;  // an older server that does not send the card: leave the fields alone
+    const uid = m.card ? m.card.uid : "";
+    $("card").value = uid;
+    const sel = $("demo-cards");
+    if (sel) sel.value = [...sel.options].some(o => o.value === uid) ? uid : "";
+  }
+
+  // simulator only: the list of cards the demo can "scan" (reloaded when a member or card is added)
+  async function loadDemoCards() {
+    const sel = $("demo-cards");
+    if (!sel) return;
+    try {
+      const cards = await api("/api/circulation/mock/patron-cards");
+      const keep = sel.value;
+      fill(sel, h("option", {value: ""}, cards.length ? "Pick a demo card…" : "No members yet: add one, or run  python -m shelfsense.cli seed-demo"),
+        cards.map(c => h("option", {value: c.uid}, c.name + " · " + c.member_no + " · " + c.uid + (c.status === "blocked" ? " · blocked" : ""))));
+      sel.value = [...sel.options].some(o => o.value === keep) ? keep : "";
+      if (member) syncCardFields(member);
+    } catch (e) { /* the list is a convenience */ }
+  }
+
+  function renderMember() {
+    const m = member;
+    $("member-badge").className = "badge " + (!m ? "" : m.can_borrow ? "good" : "warn");
+    $("member-badge").textContent = !m ? "none chosen" : m.can_borrow ? "Can borrow" : m.status === "blocked" ? "Blocked" : "Fines over limit";
+    if (faceFor !== (m ? m.member_no : null)) { fill($("card-face")); faceFor = null; }  // a card preview belongs to one member
+    if (!m) { fill($("member")); return; }
+    syncCardFields(m);
+    fill($("member"),
+      h("dl", {class: "kv tight", style: "margin:4px 0 12px"},
+        h("dt", {}, "Member"), h("dd", {}, h("b", {}, m.name), " · ", h("span", {class: "mono"}, m.member_no)),
+        h("dt", {}, "Card"), h("dd", {}, m.card ? [h("span", {class: "mono"}, m.card.uid), m.card.issued_at ? h("span", {class: "sub"}, " · issued " + day(m.card.issued_at)) : null,
+          m.cards_withdrawn ? h("div", {class: "sub"}, m.cards_withdrawn + " earlier card" + (m.cards_withdrawn === 1 ? "" : "s") + " withdrawn") : null]
+          : m.card === undefined ? [h("span", {class: "sub"}, "Not shown: restart the app to load the latest version")]
+          : [h("span", {class: "sub"}, "No card issued yet"), m.cards_withdrawn ? h("div", {class: "sub"}, m.cards_withdrawn + " earlier card" + (m.cards_withdrawn === 1 ? "" : "s") + " withdrawn") : null]),
+        h("dt", {}, "Status"), h("dd", {}, m.status === "blocked" ? "Blocked" + (m.block_reason ? " · " + m.block_reason : "") : "Active"),
+        h("dt", {}, "Fines"), h("dd", {}, money(m.fines_cents) + " (limit " + money(m.fine_limit_cents) + ")" + (m.fines_over_limit ? " · over the limit" : "")),
+        h("dt", {}, "Loans"), h("dd", {}, m.open_loans + " of " + m.max_loans),
+        h("dt", {}, "Reminders"), h("dd", {}, reminderSummary(m))),
+      CAN_BLOCK && m.fines_cents > 0 ? fineControls(m) : null,
+      m.loans.length ? h("div", {class: "table-wrap", style: "margin:0 -4px"}, h("table", {},
+        h("thead", {}, h("tr", {}, ["Item", "Due", ""].map(t => h("th", {}, t)))),
+        h("tbody", {}, m.loans.map(l => h("tr", {},
+          h("td", {}, h("b", {}, l.accession_no), h("div", {class: "sub"}, l.title)),
+          h("td", {}, day(l.due_at), l.overdue ? h("div", {}, h("span", {class: "badge warn"}, l.days_overdue + " d overdue")) : null,
+            l.fine_so_far_cents ? h("div", {class: "sub"}, "fine so far " + money(l.fine_so_far_cents)) : null,
+            l.renewals ? h("div", {class: "sub"}, "renewed ×" + l.renewals) : null),
+          h("td", {}, h("div", {class: "actions", style: "margin:0;gap:6px;flex-wrap:wrap"},
+            h("button", {class: "btn ghost small", type: "button", onclick: () => pick(l.accession_no)}, "Select"),
+            SIM ? [h("button", {class: "btn ghost small", type: "button", title: "Demo: make this loan due tomorrow, to try the reminder", onclick: () => setDue(l.id, 1)}, "Due tomorrow"),
+              h("button", {class: "btn ghost small", type: "button", title: "Demo: make this loan due today", onclick: () => setDue(l.id, 0)}, "Due today")] : null)))))))
+        : h("div", {class: "sub"}, "No items on loan."),
+      m.reminders && m.reminders.length ? h("details", {class: "sim", style: "margin-top:12px"}, h("summary", {}, "Reminders sent to this member (" + m.reminders.length + ")"),
+        h("ul", {class: "timeline", style: "margin-top:8px"}, m.reminders.map(r => h("li", {}, h("time", {}, when(r.created_at)),
+          h("span", {}, h("b", {}, REMINDER_KIND[r.kind] || r.kind), " by " + r.channel + " · due " + day(r.due_on),
+            " · ", h("span", {class: "badge " + (r.status === "sent" ? "good" : r.status === "failed" ? "bad" : "")}, r.status), r.note ? h("div", {class: "sub"}, r.note) : null))))) : null,
+      m.fine_entries.length ? h("details", {class: "sim", style: "margin-top:12px"}, h("summary", {}, "Fine history"),
+        h("ul", {class: "timeline", style: "margin-top:8px"}, m.fine_entries.map(e => h("li", {}, h("time", {}, when(e.ts)),
+          h("span", {}, h("b", {}, FINE_KIND[e.kind] + " " + money(e.amount_cents)), e.note && e.note !== FINE_KIND[e.kind] ? " · " + e.note : "", e.actor && e.actor !== "system" ? " · " + e.actor : ""))))) : null,
+      CAN_BLOCK && askingReason ? h("div", {class: "confirm", style: "margin-top:14px"},
+        h("label", {for: "block-reason"}, "Why is " + m.name + " being blocked? (shown to staff)"),
+        h("input", {id: "block-reason", maxlength: "200", placeholder: "e.g. lost card, overdue items"}),
+        h("div", {class: "actions"}, h("button", {class: "btn small danger", type: "button", onclick: () => setBlocked(true, $("block-reason").value.trim())}, "Block member"),
+          h("button", {class: "btn ghost small", type: "button", onclick: () => { askingReason = false; renderMember(); }}, "Cancel")))
+      : CAN_BLOCK && issuing ? cardForm(m)
+      : CAN_BLOCK && editingContact ? contactForm(m)
+      : CAN_BLOCK ? h("div", {class: "actions"}, h("button", {class: "btn ghost small " + (m.status === "blocked" ? "" : "danger-text"), type: "button", onclick: toggleBlock},
+        m.status === "blocked" ? "Unblock member" : "Block member"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = true; renderMember(); }}, "Issue or replace card"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = true; renderMember(); }}, "Contact and reminders"),
+        m.card ? h("button", {class: "btn ghost small", type: "button", onclick: personaliseCard}, "Print the card") : null) : null);
+    if (askingReason && $("block-reason")) $("block-reason").focus();
+    if (issuing && $("new-card")) $("new-card").focus();
+    if (editingContact && $("ct-email")) $("ct-email").focus();
+    sync();
+  }
+
+  // ------------------------------------------------------------------ reminders: contact details
+  const REMINDER_KIND = {due_soon: "Due tomorrow", due_today: "Due today"};
+  function reminderSummary(m) {
+    const c = m.contact;
+    if (!c) return h("span", {class: "sub"}, "Not shown: restart the app to load the latest version");
+    if (!c.reminders_on) return h("span", {class: "sub"}, "Switched off for this member");
+    const where = [c.email, c.phone].filter(Boolean);
+    return where.length ? [where.join(" · "), h("div", {class: "sub"}, "A message a day before each due date and on it")]
+      : h("span", {class: "sub"}, "No e-mail or phone, so no reminders");
+  }
+  function contactForm(m) {
+    const c = m.contact || {};
+    return h("div", {class: "confirm neutral", style: "margin-top:14px"},
+      h("label", {for: "ct-email"}, "E-mail for reminders"), h("input", {id: "ct-email", type: "email", value: c.email || "", maxlength: "200", autocomplete: "off", placeholder: "name@example.org"}),
+      h("label", {for: "ct-phone", style: "margin-top:8px"}, "Phone for text reminders"), h("input", {id: "ct-phone", value: c.phone || "", maxlength: "40", autocomplete: "off", placeholder: "+441234567890"}),
+      h("label", {style: "display:flex;gap:8px;align-items:center;margin-top:10px"}, h("input", {id: "ct-on", type: "checkbox", checked: c.reminders_on !== false ? "" : false}), "Send this member loan reminders"),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: saveContact}, "Save"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { editingContact = false; renderMember(); }}, "Cancel")));
+  }
+  // print the member's name and number on their card, and show the card face (which the browser can also print)
+  async function personaliseCard() {
+    clear("member-notice");
+    try {
+      const [job, face] = await Promise.all([api("/api/circulation/members/" + member.member_no + "/card/personalise", {json: {}}), api("/api/circulation/members/" + member.member_no + "/card/face")]);
+      say("member-notice", "ok", "Sent to " + job.printer + " (job " + job.job + "). The card number was written to its chip.");
+      faceFor = member.member_no;
+      fill($("card-face"), h("div", {class: "cardface print-area"},
+        h("div", {class: "cf-lib"}, face.library), h("div", {class: "cf-name"}, face.name), h("div", {class: "cf-no mono"}, face.member_no),
+        face.modules ? barcodeSvg(face.modules) : null, h("div", {class: "cf-uid mono"}, face.card_uid)),
+        h("div", {class: "actions"}, h("button", {class: "btn ghost small", type: "button", onclick: printCardFace}, "Print this card from the browser")));
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+  function printCardFace() {
+    document.body.classList.add("printing-card");
+    window.addEventListener("afterprint", () => document.body.classList.remove("printing-card"), {once: true});
+    window.print();
+  }
+  function barcodeSvg(modules) {
+    const NS = "http://www.w3.org/2000/svg", total = [...modules].reduce((n, d) => n + +d, 0), svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + (total + 20) + " 40"); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("class", "cf-bars"); svg.setAttribute("role", "img");
+    let x = 10;
+    [...modules].forEach((d, i) => { if (i % 2 === 0) { const r = document.createElementNS(NS, "rect"); r.setAttribute("x", x); r.setAttribute("width", +d); r.setAttribute("height", 40); r.setAttribute("fill", "#000"); svg.appendChild(r); } x += +d; });
+    return svg;
+  }
+
+  async function saveContact() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/contact", {method: "PATCH", json: {email: $("ct-email").value, phone: $("ct-phone").value, reminders_on: $("ct-on").checked}});
+      editingContact = false; renderMember();
+      say("member-notice", "ok", "Saved the reminder settings for " + member.name + ".");
+    } catch (e) { say("member-notice", "bad", e.problems && e.problems.length ? e.problems.map(p => p.message).join("; ") : e.message); }
+  }
+  async function setDue(loanId, days) {
+    clear("member-notice");
+    try {
+      await api("/api/circulation/mock/loans/" + loanId + "/due", {json: {days_from_today: days}});
+      await loadMember(member.member_no);
+      say("member-notice", "ok", "Demo: that loan is now due " + (days === 0 ? "today" : "tomorrow") + ". Reminders go out on the next pass of the notification loop (or press Send queued messages on Gate events).");
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ members: find, add, issue a card
+  const newCardNo = () => "PATRON" + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 90) + 10);
+  const cardField = id => h("div", {class: "toolbar", style: "margin:0"},
+    h("div", {class: "grow"}, h("input", {id, class: "uid", placeholder: "Scan or type the card number", autocomplete: "off", spellcheck: "false"})),
+    SIM ? h("button", {class: "btn ghost small", type: "button", onclick: () => { $(id).value = newCardNo(); }}, "Generate") : null);
+
+  function cardForm(m) {
+    return h("div", {class: "confirm neutral", style: "margin-top:14px"},
+      h("label", {for: "new-card"}, "New card for " + m.name + (m.status === "blocked" ? "" : ". Any card they had before stops working.")),
+      cardField("new-card"),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: submitCard}, "Issue card"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { issuing = false; renderMember(); }}, "Cancel")));
+  }
+
+  async function submitCard() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/card", {json: {uid: $("new-card").value}});
+      issuing = false; renderMember(); loadDemoCards();
+      say("member-notice", "ok", "Card issued to " + member.name + ".");
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  function memberForm() {
+    return h("div", {class: "confirm neutral", style: "margin:0 0 12px"},
+      h("label", {for: "nm-name"}, "Full name"), h("input", {id: "nm-name", maxlength: "200", autocomplete: "off"}),
+      h("label", {for: "nm-no", style: "margin-top:8px"}, "Member number (leave empty for the next one)"), h("input", {id: "nm-no", maxlength: "32", placeholder: "automatic", autocomplete: "off"}),
+      h("label", {for: "nm-card", style: "margin-top:8px"}, "Patron card (optional, can be issued later)"), cardField("nm-card"),
+      h("label", {for: "nm-email", style: "margin-top:8px"}, "E-mail for loan reminders (optional)"), h("input", {id: "nm-email", type: "email", maxlength: "200", autocomplete: "off"}),
+      h("label", {for: "nm-phone", style: "margin-top:8px"}, "Phone for text reminders (optional)"), h("input", {id: "nm-phone", maxlength: "40", autocomplete: "off"}),
+      h("div", {class: "actions"}, h("button", {class: "btn small", type: "button", onclick: submitMember}, "Add member"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => fill($("member-form"))}, "Cancel")));
+  }
+
+  async function submitMember() {
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members", {json: {name: $("nm-name").value, member_no: $("nm-no").value, card_uid: $("nm-card").value, email: $("nm-email").value, phone: $("nm-phone").value}});
+      fill($("member-form")); askingReason = fineMode = issuing = editingContact = false; $("result-panel").classList.add("hidden"); renderMember(); loadDemoCards();
+      say("member-notice", "ok", member.name + " was added as " + member.member_no + ".");
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  let findTimer = null;
+  async function findMembers() {
+    const q = $("member-q").value.trim();
+    if (!q) { fill($("member-results")); return; }
+    try {
+      const r = await api("/api/circulation/members?q=" + encodeURIComponent(q));
+      fill($("member-results"), r.members.length ? r.members.map(m => h("button", {type: "button", class: "pick", onclick: async () => {
+          clear("member-notice"); askingReason = fineMode = issuing = editingContact = false; $("result-panel").classList.add("hidden");
+          await loadMember(m.member_no); fill($("member-results")); $("member-q").value = "";
+        }}, h("b", {}, m.name), h("span", {}, m.member_no + " · " + (m.card ? "card " + m.card : "no card") + (m.status === "blocked" ? " · blocked" : "") + (m.fines_cents ? " · owes " + money(m.fines_cents) : ""))))
+        : h("div", {class: "sub"}, "No member matches."));
+    } catch (e) { fill($("member-results"), h("div", {class: "sub"}, e.message)); }
+  }
+
+  const FINE_KIND = {opening: "Opening balance", charge: "Fine charged", payment: "Paid", waiver: "Waived"};
+
+  function fineControls(m) {
+    if (!fineMode) {
+      return h("div", {class: "actions", style: "margin:10px 0 0"},
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = "payment"; renderMember(); }}, "Record payment"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = "waiver"; renderMember(); }}, "Waive fine"));
+    }
+    const paying = fineMode === "payment";
+    return h("div", {class: "confirm neutral", style: "margin-top:12px"},
+      h("label", {for: "fine-amount"}, paying ? "Amount paid" : "Amount to waive"),
+      h("input", {id: "fine-amount", inputmode: "decimal", value: money(m.fines_cents), autocomplete: "off"}),
+      h("label", {for: "fine-note", style: "margin-top:8px"}, paying ? "Note (optional)" : "Why is it being waived? (required)"),
+      h("input", {id: "fine-note", maxlength: "200", placeholder: paying ? "e.g. paid at the desk" : "e.g. library error"}),
+      h("div", {class: "actions"},
+        h("button", {class: "btn small", type: "button", onclick: submitFine}, paying ? "Record payment" : "Waive fine"),
+        h("button", {class: "btn ghost small", type: "button", onclick: () => { fineMode = null; renderMember(); }}, "Cancel")));
+  }
+
+  async function submitFine() {
+    const cents = Math.round(parseFloat($("fine-amount").value.replace(",", ".")) * 100);
+    if (!(cents > 0)) { say("member-notice", "bad", "Enter an amount more than zero, like 2.50"); return; }
+    clear("member-notice");
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/fines/" + fineMode, {json: {amount_cents: cents, note: $("fine-note").value.trim()}});
+      fineMode = null; renderMember(); loadEvents();
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  async function loadMember(no) {
+    member = await api("/api/circulation/members/" + encodeURIComponent(no));
+    renderMember();
+  }
+
+  async function identify() {
+    const uid = $("card").value.trim();
+    if (!uid) return;
+    clear("member-notice"); askingReason = false; fineMode = null; issuing = false;
+    try {
+      const next = await api("/api/circulation/members/identify", {json: {uid}});
+      if (!member || member.member_no !== next.member_no) $("result-panel").classList.add("hidden");  // not this patron's result
+      member = next;
+      renderMember();
+    } catch (e) { member = null; renderMember(); say("member-notice", "bad", e.message); }
+  }
+
+  function toggleBlock() {
+    if (member.status === "blocked") setBlocked(false, "");
+    else { askingReason = true; renderMember(); }
+  }
+
+  async function setBlocked(blocked, reason) {
+    try {
+      member = await api("/api/circulation/members/" + member.member_no + "/block", {json: {blocked, reason}});
+      askingReason = false; renderMember(); loadEvents();
+    } catch (e) { say("member-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ item
+  function sync() {
+    const have = !!item;
+    $("out-btn").disabled = !(have && member);
+    for (const id of ["renew-btn", "in-btn", "due-btn"]) { const b = $(id); if (b) b.disabled = !have; }
+  }
+
+  async function lookup(ref) {
+    ref = (ref ?? $("item-ref").value).trim();
+    if (!ref) return;
+    try {
+      item = await api("/api/circulation/items/resolve?ref=" + encodeURIComponent(ref));
+      $("item-ref").value = item.accession_no;
+      $("item-badge").className = "badge " + (item.loan ? "warn" : item.is_reference ? "" : "good");
+      $("item-badge").textContent = item.loan ? "On loan" : item.is_reference ? "Reference" : "Available";
+      fill($("item"), h("dl", {class: "kv tight", style: "margin:0"},
+        h("dt", {}, "Title"), h("dd", {}, h("b", {}, item.title), item.author ? " · " + item.author : ""),
+        h("dt", {}, "Accession"), h("dd", {class: "mono"}, item.accession_no),
+        h("dt", {}, "Status"), h("dd", {}, item.loan
+          ? "On loan to " + item.loan.member_name + " (" + item.loan.member_no + "), due " + day(item.loan.due_at) + (item.loan.overdue ? " · overdue" : "")
+          : item.is_reference ? "Reference item: cannot be borrowed" : item.status)));
+    } catch (e) {
+      item = null; $("item-badge").className = "badge"; $("item-badge").textContent = "none chosen";
+      fill($("item"), h("div", {class: "notice show bad"}, e.message));
+    }
+    sync();
+  }
+  const pick = ref => { $("item-ref").value = ref; lookup(ref); };
+
+  // ------------------------------------------------------------------ actions
+  const TITLES = {checkout: "Checked out", renew: "Renewed", checkin: "Checked in"};
+
+  function showResult(kind, title, lines, badge) {
+    $("result-panel").classList.remove("hidden");
+    $("result-title").textContent = title;
+    fill($("result-badge"), h("span", {class: "badge " + kind}, badge));
+    fill($("result-body"), h("div", {class: "notice show " + (kind === "good" ? "ok" : kind === "warn" ? "warn" : "bad"), style: "margin:0 0 12px"}, lines[0]), lines.slice(1));
+  }
+
+  async function act(action) {
+    if (!item) return;
+    const ref = item.accession_no;
+    if (SIM) { try { await api("/api/circulation/mock/present", {json: {item_ref: ref}}); } catch (e) { /* no tag to hold up: fine */ } }
+    const body = action === "checkout" ? {member_no: member.member_no, item_ref: ref} : {item_ref: ref};
+    try {
+      const r = await api("/api/circulation/" + action, {json: body});
+      const sec = r.security;
+      showResult(sec.ok && !r.fine ? "good" : "warn", TITLES[action] + " · " + r.loan.accession_no,
+        [action === "checkin" ? (r.was_overdue ? "Returned late: " : "Returned on time: ") + r.loan.title : (action === "renew" ? "New due date " : "Due ") + day(r.loan.due_at) + " · " + r.loan.member_name,
+         h("p", {class: "sub", style: "margin:0 0 6px"}, r.protocol.toUpperCase() + " · " + r.message + (r.replayed ? " (repeated answer: the first reply was lost, nothing was done twice)" : "")),
+         sec.message ? h("p", {class: sec.ok ? "sub" : "", style: "margin:0 0 6px" + (sec.ok ? "" : ";color:var(--warn-ink,#8a5a00)")}, sec.message) : null,
+         r.fine ? h("p", {style: "margin:0 0 6px"}, "Fine charged: " + money(r.fine.amount_cents) + " (" + r.fine.note + "). Balance now " + money(r.fine.balance_cents) + ".") : null,
+         h("p", {class: "sub mono", style: "margin:0"}, r.txn_id)],
+        r.fine ? "Done · fine charged" : sec.ok ? "Done" : "Done · check tag");
+    } catch (e) {
+      showResult(e.status === 503 ? "warn" : "bad", e.status === 503 ? "Library system unavailable" : "Not allowed", [e.message,
+        h("p", {class: "sub", style: "margin:0"}, e.status === 503 ? "Nothing was changed. Try again in a moment." : "Nothing was changed. This attempt is recorded in the history.")],
+        e.status === 503 ? "Not done" : "Refused");
+    }
+    if (member) await loadMember(member.member_no).catch(() => {});
+    await lookup(ref); loadEvents();
+    if (SIM) api("/api/circulation/mock/ilms/fail").then(r => $("fail-note").textContent = r.pending ? r.pending + " simulated failure(s) still waiting." : "").catch(() => {});
+  }
+
+  async function dueDate() {
+    if (!item) return;
+    try {
+      const r = await api("/api/circulation/due?item_ref=" + encodeURIComponent(item.accession_no));
+      showResult(r.on_loan && r.ok ? "good" : "", "Due date · " + r.accession_no,
+        [r.on_loan ? (r.ok ? "Due " + day(r.due_at) + " (member " + r.member_no + ")" : r.message) : "This item is not on loan.",
+         r.protocol ? h("p", {class: "sub", style: "margin:0"}, r.protocol.toUpperCase() + " · " + r.message) : null], r.on_loan ? "On loan" : "Available");
+    } catch (e) { showResult("bad", "Due date", [e.message], "Error"); }
+  }
+
+  // ------------------------------------------------------------------ history
+  const OUTCOME = {ok: ["good", "Done"], refused: ["warn", "Refused"], failed: ["bad", "Failed"]};
+  const ACTION = {checkout: "Check out", renew: "Renew", checkin: "Check in"};
+  async function loadEvents() {
+    let d;
+    try { d = await api("/api/circulation/events?limit=12"); } catch (e) { fill($("events"), h("div", {class: "empty"}, e.message)); return; }
+    fill($("events"), d.events.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["When", "Action", "Item", "Member", "Result"].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.events.map(e => h("tr", {},
+        h("td", {class: "time"}, when(e.ts)),
+        h("td", {}, ACTION[e.action] || e.action),
+        h("td", {class: "mono"}, e.accession_no || "—"),
+        h("td", {class: "mono"}, e.member_no || "—"),
+        h("td", {title: e.txn_id + " · " + e.actor}, h("span", {class: "badge " + (OUTCOME[e.outcome] || ["", ""])[0]}, (OUTCOME[e.outcome] || ["", e.outcome])[1]),
+          h("div", {class: "sub"}, e.message))))))
+      : h("div", {class: "empty"}, "No transactions yet."));
+  }
+
+  // ------------------------------------------------------------------ wiring
+  $("card-btn").onclick = identify;
+  $("member-q").addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(findMembers, 250); });
+  if ($("add-member-btn")) $("add-member-btn").onclick = () => { fill($("member-form"), memberForm()); $("nm-name").focus(); };
+  $("card").addEventListener("keydown", e => { if (e.key === "Enter") identify(); });
+  $("item-btn").onclick = () => lookup();
+  $("item-ref").addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });
+  $("out-btn").onclick = () => act("checkout");
+  if ($("renew-btn")) $("renew-btn").onclick = () => act("renew");
+  if ($("in-btn")) $("in-btn").onclick = () => act("checkin");
+  $("due-btn").onclick = dueDate;
+  $("refresh").onclick = loadEvents;
+
+  if (SIM) {
+    $("demo-cards").onchange = () => { if ($("demo-cards").value) { $("card").value = $("demo-cards").value; identify(); } };
+    loadDemoCards();
+    const pending = n => $("fail-note").textContent = n
+      ? n + " simulated failure(s) waiting: they hit the next requests of any kind (check-out, renew, check-in, due date). Each retry uses one."
+      : "No simulated failures waiting.";
+    $("fail-btn").onclick = async () => {
+      try { pending((await api("/api/circulation/mock/ilms/fail", {json: {mode: $("fail-mode").value, times: +$("fail-times").value}})).pending); }
+      catch (e) { $("fail-note").textContent = e.message; }
+    };
+    $("fail-clear").onclick = async () => {
+      try { pending((await api("/api/circulation/mock/ilms/fail", {method: "DELETE"})).pending); }
+      catch (e) { $("fail-note").textContent = e.message; }
+    };
+    api("/api/circulation/mock/ilms/fail").then(r => pending(r.pending)).catch(() => {});
+    window.addEventListener("focus", () => api("/api/circulation/mock/ilms/fail").then(r => pending(r.pending)).catch(() => {}));
+  }
+  renderMember(); sync(); loadEvents();
+})();
+</script>
+{% endblock %}

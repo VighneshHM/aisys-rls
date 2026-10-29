@@ -22,8 +22,8 @@ sys.path.insert(0, str(REPO / "src"))
 
 from fastapi.routing import APIRoute  # noqa: E402
 
-from aisys import models  # noqa: E402,F401  (imports register every table)
-from aisys.db import Base  # noqa: E402
+from shelfsense import models  # noqa: E402,F401  (imports register every table)
+from shelfsense.db import Base  # noqa: E402
 
 # links that exist in the data but are plain numbers in the database (see migration 0009)
 SOFT_LINKS = [("notifications", "member_id", "members"), ("notifications", "loan_id", "loans")]
@@ -108,7 +108,7 @@ def data_dictionary() -> str:
 
 
 def roles_matrix() -> list[str]:
-    from aisys.auth.permissions import PERMISSIONS, ROLES
+    from shelfsense.auth.permissions import PERMISSIONS, ROLES
 
     names = list(ROLES)
     out = [
@@ -148,8 +148,8 @@ def _needs_login(dependant) -> bool:
 
 
 def api_reference() -> str:
-    from aisys.app import create_app
-    from aisys.config import Settings
+    from shelfsense.app import create_app
+    from shelfsense.config import Settings
 
     with tempfile.TemporaryDirectory() as tmp:
         settings = Settings(

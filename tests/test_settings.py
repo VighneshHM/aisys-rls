@@ -7,9 +7,9 @@ import datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from aisys.app import create_app
-from aisys.config import Settings
 from conftest import login_card
+from shelfsense.app import create_app
+from shelfsense.config import Settings
 from test_circulation import book, out
 
 pytestmark = pytest.mark.req("FR11")
@@ -51,19 +51,19 @@ def test_only_administrators_may_use_settings(client, admin, lib, clerk):
 
 
 def test_the_page_renders_for_the_administrator_only(client, admin, lib):
-    client.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     page = client.get("/settings")
     assert page.status_code == 200 and "Library rules" in page.text and "Settings" in page.text
-    client.cookies.set("aisys_session", lib["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", lib["Authorization"].split()[1])
     assert client.get("/settings").status_code == 403
     client.cookies.clear()
     assert client.get("/settings", follow_redirects=False).status_code in (302, 303, 307, 401)
 
 
 def test_the_page_is_in_the_menu_for_admins_only(client, admin, lib):
-    client.cookies.set("aisys_session", admin["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", admin["Authorization"].split()[1])
     assert 'href="/settings"' in client.get("/audit").text
-    client.cookies.set("aisys_session", lib["Authorization"].split()[1])
+    client.cookies.set("shelfsense_session", lib["Authorization"].split()[1])
     assert 'href="/settings"' not in client.get("/circulation").text
 
 

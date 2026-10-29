@@ -1,13 +1,13 @@
-# AISYS RFID library add-on: final technical walkthrough
+# ShelfSense RFID library add-on: final technical walkthrough
 
 Everything below describes what is in the repository now. Where something is a simulation, a limit or not built, it says so
 (sections 8, 10 and 12 are the honest ones). Detail per feature lives in the other files under `docs/`; this document is the map.
 
 ## 1. Requirements: what was asked, what was delivered
 
-The SOP asks for an **RFID add-on that works with an existing library system (ILMS)** through connector interfaces, with
-mocks for every device and service that is not available. It is an individual exercise, deadline 10 Oct 2026, judged by
-ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and documented.
+The specification asks for an **RFID add-on that works with an existing library system (ILMS)** through connector interfaces, with
+mocks for every device and service that is not available. It is a solo project, built in five days and measured
+against ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and documented.
 
 | AC | Scenario | Delivered | Where to look |
 |---|---|---|---|
@@ -19,7 +19,7 @@ ten acceptance scenarios (AC01 to AC10). All ten are implemented, tested and doc
 | AC06 | Security gate, CCTV, queued e-mail | Alarm decided from the tag's security bit only; unissued / armed-on-loan / bit-off events; footfall; camera snapshot; queued notifications with retry | `gate/`, `notifications/`, `docs/gate.md` |
 | AC07 | Staff card login | Staff card = login; patron card = identifies a member only and can never log in | `auth/`, `integrations/credentials.py` |
 | AC08 | Dashboard and reports | Reports with filters and CSV export, dashboard charts | `reports/`, `docs/reports.md` |
-| AC09 | Offline install, update, rollback | Signed packages, install, update with rehearsal, rollback, recover, SBOM and licence inventory, Updates page | `aisys_lifecycle/`, `scripts/release.py`, `docs/deployment.md` |
+| AC09 | Offline install, update, rollback | Signed packages, install, update with rehearsal, rollback, recover, SBOM and licence inventory, Updates page | `shelfsense_lifecycle/`, `scripts/release.py`, `docs/deployment.md` |
 | AC10 | Restore after a failed migration or integration change, proving the original data is intact | Verified backups, table-by-table fingerprint proof, guided restore with safety copy | `backup.py`, `docs/backup-restore.md` |
 
 Beyond the scenarios: full-text search with a public catalogue (OPAC), shelves and a virtual bookshelf, acquisitions, serials, barcode and spine labels, net cataloguing by ISBN, patron card printing, patron loan reminders, member management and a fines ledger, role-based access, an append-only audit log with a searchable page, staff and card administration, health endpoints,
@@ -37,7 +37,7 @@ flowchart LR
   subgraph Browser
     UI[Server-rendered pages + small JS helpers]
   end
-  subgraph App["aisys (FastAPI)"]
+  subgraph App["shelfsense (FastAPI)"]
     PAGES[pages.py] --> SVC
     API[*_routes.py] --> SVC[Services: circulation, catalogue, inventory, gate, reports, migration, backup]
     SVC --> DB[(SQLite via SQLAlchemy)]
@@ -50,10 +50,10 @@ flowchart LR
   CONN --> ILMS[Mock ILMS, or SIP2 over TCP to an ILMS / the simulator]
   DEV --> RF[Mock staff reader / handheld / gate / camera]
   NOTIF --> MAIL[Mock e-mail / SMS / print]
-  subgraph Lifecycle["aisys_lifecycle (standard library only)"]
+  subgraph Lifecycle["shelfsense_lifecycle (standard library only)"]
     INST[install / update / rollback / recover]
   end
-  INST -. runs python -m aisys.cli .-> App
+  INST -. runs python -m shelfsense.cli .-> App
   INST --> BK[backup + restore]
 ```
 
@@ -64,17 +64,17 @@ flowchart LR
   (`rfid/devices.py`), notification channels (`notifications/providers.py`), credential provider
   (`integrations/credentials.py`). Real hardware or a real ILMS means writing one class and naming it in config.
 - **Config over code**: `config/config.sample.toml` builds the device list, ILMS driver, retries, fine rule, gate
-  window and backup folder. Secrets come only from the environment (`AISYS_SECRET_KEY`).
+  window and backup folder. Secrets come only from the environment (`SHELFSENSE_SECRET_KEY`).
 - **The add-on never writes ILMS tables.** It keeps its own tables and talks to the ILMS through the connector.
   (A small reference catalogue exists only so the demo has books.)
 
 ## 3. Codebase map
 
 ```
-src/aisys/
+src/shelfsense/
   app.py            create_app(): wiring, maintenance-mode middleware (503 during a restore)
-  config.py         Settings from TOML + env (AISYS_CONFIG, AISYS_ENV, AISYS_DATABASE_URL, AISYS_PORT, ...)
-  cli.py            aisys migrate | seed-demo | run | backup ... | notify-dispatch | version
+  config.py         Settings from TOML + env (SHELFSENSE_CONFIG, SHELFSENSE_ENV, SHELFSENSE_DATABASE_URL, SHELFSENSE_PORT, ...)
+  cli.py            shelfsense migrate | seed-demo | run | backup ... | notify-dispatch | version
   models.py         every table (23 models + one link table)
   migrate.py        programmatic Alembic; migrations/versions/0001-0008
   deps.py, auth/    sessions, RBAC (permissions.py), card/password login (service.py), hashing (security.py)
@@ -91,11 +91,11 @@ src/aisys/
   admin_routes.py   Audit log search/export and staff/card administration (pages /audit and /admin)
   opac_routes.py    the public catalogue (no sign-in), shelves_routes.py, acquisitions_routes.py (+ serials), labels_routes.py
   catalogue/fts.py  full-text search (FTS5) helpers;  shelves/, acquisitions/, serials/, labels/ (Code 128)  services
-  integrations/netcat.py   net cataloguing by ISBN (interface + mock);  doctor.py   `aisys doctor` environment check
+  integrations/netcat.py   net cataloguing by ISBN (interface + mock);  doctor.py   `shelfsense doctor` environment check
   backup_routes.py, lifecycle_routes.py   HTTP for backups and the Updates page
   pages.py, web/    templates (Jinja) and static (app.css, ui.js), no CDN
   devtools/         drill.py, sample_data.py  (simulators, 404 in production)
-src/aisys_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
+src/shelfsense_lifecycle/   ed25519.py, bundle.py, licence.py, sbom.py, ops.py, __main__.py   (AC09)
 scripts/            release.py (build/sign), lifecycle_demo.py, trace.py
 tests/              30 test files, 864 test cases
 scripts/            release.py, lifecycle_demo.py, trace.py, gen_docs.py (data dictionary + API reference), perf_report.py
@@ -161,7 +161,7 @@ Patron loan reminders reuse the same queue (`notifications/reminders.py`, `runne
 
 The alarm comes only from the tag's security bit, so the gate works while the ILMS is down. A repeat alarm for the same tag
 inside a window (default 60 s) is recorded but not re-sent. Notifications are queued first and delivered by a button, the
-API or `aisys notify-dispatch`; failures retry with back-off.
+API or `shelfsense notify-dispatch`; failures retry with back-off.
 
 ### 4.7 Reports (AC08)
 `reports/definitions.py` declares each report (columns, filters); `reports/core.py` builds queries safely (parameterised,
@@ -193,7 +193,7 @@ flowchart TD
   F -. fail .-> Y[restore backup, delete new release]
   G -. fail .-> Y
 ```
-`aisys_lifecycle/ops.py` implements `install`, `update`, `rollback`, `recover`, `prune`, `status`; `bundle.py` opens and
+`shelfsense_lifecycle/ops.py` implements `install`, `update`, `rollback`, `recover`, `prune`, `status`; `bundle.py` opens and
 verifies packages; `ed25519.py` verifies signatures in pure Python so a first install needs only Python; `licence.py`
 checks the signed licence; `sbom.py` builds the CycloneDX SBOM and licence table from the shipped wheels. Rollback restores
 the pre-update backup only when the update changed the database layout; otherwise only the pointer moves.
@@ -202,7 +202,7 @@ the pre-update backup only when the update changed the database layout; otherwis
 
 - **Sources:** a spreadsheet (`.csv` or `.xlsx`; samples of 200 and 20,000 rows in `samples/`, all synthetic), the mock
   readers/gate/handheld, the mock ILMS, and the user interface.
-- **Storage:** one SQLite file (`data/aisys.db`, WAL mode). 30 tables plus the full-text index. Migrations `0001` to `0011` ship inside the package.
+- **Storage:** one SQLite file (`data/shelfsense.db`, WAL mode). 30 tables plus the full-text index. Migrations `0001` to `0011` ship inside the package.
 - **Lifecycle of important data:** import rows are staged then `migrated`; items are inserted only; tags have intervals
   (a re-tag creates a new row, history kept); loans stay forever (open while `returned_at` is null); the audit log,
   circulation events, fine ledger and gate events are append-only (database triggers reject UPDATE and DELETE).
@@ -239,7 +239,7 @@ Every endpoint other than login and health needs a session and a named permissio
 - **ILMS integration:** `CirculationConnector` (checkout, checkin, renew, patron status) with `ResilientConnector` on top.
   The default mock answers in SIP2 wording (it speaks no protocol). With `[ilms] driver = "sip2"` the **SIP2 protocol (3M 2.00) is spoken
   over TCP** (`circulation/sip2/`, `docs/sip2.md`), verified before any repeat so a lost answer never lends or renews twice.
-  It was tested only against the simulator in the repository (`python -m aisys.cli sip2-sim`): **no certification is claimed and no
+  It was tested only against the simulator in the repository (`python -m shelfsense.cli sip2-sim`): **no certification is claimed and no
   vendor ILMS was used. NCIP 2.0 is not implemented.** SIP2 is unencrypted, so use a tunnel to the ILMS.
 - **Devices:** `StaffReader`, `Handheld`, `Gate`, `Camera` Protocols; mock drivers; `register_driver(name, factory, kind)`.
 - **Notifications:** `NotificationProvider` per channel (email, sms, print), all mocks that record what they would send.
@@ -250,7 +250,7 @@ Every endpoint other than login and health needs a session and a named permissio
 |---|---|---|---|
 | Python + FastAPI, server-rendered Jinja pages, no front-end build, no CDN | Works offline, tiny deploy, easy to read | React SPA | Less interactive UI |
 | SQLite (WAL) + SQLAlchemy + Alembic | Zero-install database for an isolated site; migrations are versioned | PostgreSQL | One writer at a time; fine for one site |
-| Protocol + mock + config-driven registry for every device and service | Real hardware is a class plus a config line; required by the SOP | Hard-wired mocks | Mocks only prove the interface |
+| Protocol + mock + config-driven registry for every device and service | Real hardware is a class plus a config line; required by the specification | Hard-wired mocks | Mocks only prove the interface |
 | Database enforces core rules (partial unique indexes, triggers, check constraints) | Bugs in code cannot corrupt the invariants | Application checks only | Needs SQLite-specific syntax |
 | Device write first, then DB, with compensating undo | A reader cannot join a DB transaction | Two-phase commit | Rare double failure needs manual care |
 | ILMS first, local commit second; retries reuse the transaction id | Never show a loan the ILMS refused; no double counting | Local first | A crash between the two is reconciled by retry |
@@ -274,7 +274,7 @@ Every endpoint other than login and health needs a session and a named permissio
   their folder (no path traversal for backups, packages, uploads); SQL is parameterised and `LIKE` wildcards are escaped;
   CSV exports neutralise formulas; HTML from notes is shown as text.
 - **Audit:** every sensitive action is written to the append-only `audit_events` (triggers block edits).
-- **Secrets:** only from the environment; production refuses to start without a 32-character `AISYS_SECRET_KEY`. The
+- **Secrets:** only from the environment; production refuses to start without a 32-character `SHELFSENSE_SECRET_KEY`. The
   installer generates one. Dev-only simulators return 404 in production.
 - **Failure behaviour:** bounded retries for the ILMS; notification retry with back-off; a restore waits at most 20 s for a
   busy database and then changes nothing; a failed import rolls back and keeps its backup; a failed update restores the data
@@ -309,15 +309,15 @@ Every endpoint other than login and health needs a session and a named permissio
 ## 11. Deployment
 
 - **Run from source (development):** `python -m pip install --require-hashes -r requirements.lock -r requirements-dev.lock`,
-  `python -m pip install -e . --no-deps --no-build-isolation`, `python -m aisys.cli seed-demo`,
-  `python -m aisys.cli run`, open http://127.0.0.1:8000. Demo staff cards and the admin password are in the README.
+  `python -m pip install -e . --no-deps --no-build-isolation`, `python -m shelfsense.cli seed-demo`,
+  `python -m shelfsense.cli run`, open http://127.0.0.1:8000. Demo staff cards and the admin password are in the README.
 - **Offline installation (the delivered way):** build a signed package on a machine with internet once
   (`scripts/release.py`), copy the `.zip` and the vendor public key to the target, `python install.py --root <short folder>
   --licence licence.json --trusted-key vendor.pub`, then `python <root>/manage.py run`. Update and rollback commands are in
   `docs/deployment.md`.
 - **Configuration:** `config/config.toml` (copy of the sample) for devices, ILMS driver, fine rule, gate, notifications,
-  backup folder. Environment: `AISYS_CONFIG`, `AISYS_ENV` (`development` or `production`), `AISYS_DATABASE_URL`,
-  `AISYS_BACKUP_DIR`, `AISYS_SECRET_KEY` (required in production), `AISYS_HOST`, `AISYS_PORT`.
+  backup folder. Environment: `SHELFSENSE_CONFIG`, `SHELFSENSE_ENV` (`development` or `production`), `SHELFSENSE_DATABASE_URL`,
+  `SHELFSENSE_BACKUP_DIR`, `SHELFSENSE_SECRET_KEY` (required in production), `SHELFSENSE_HOST`, `SHELFSENSE_PORT`.
 - **Dependencies:** Python 3.12+, FastAPI, Uvicorn, SQLAlchemy, Alembic, Jinja2, python-multipart, openpyxl (runtime);
   pytest, httpx, ruff, cryptography (development only).
 - **Infrastructure:** one process, one SQLite file, one backup folder. TLS is expected from a reverse proxy. Service wrappers, scheduled delivery of notifications and example proxy configuration are in `docs/deployment.md` (untested examples). Guides: `docs/user-guide.md`, `docs/troubleshooting.md`, `docs/remaining-work.md`.

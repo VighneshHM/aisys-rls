@@ -19,12 +19,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from aisys import doctor
-from aisys.app import create_app
-from aisys.auth.security import card_hint
-from aisys.cli import main as cli_main
-from aisys.cli import serve_options
 from conftest import login_card
+from shelfsense import doctor
+from shelfsense.app import create_app
+from shelfsense.auth.security import card_hint
+from shelfsense.cli import main as cli_main
+from shelfsense.cli import serve_options
 
 pytestmark = pytest.mark.req("NFR02", "NFR03")
 
@@ -72,7 +72,7 @@ def test_session_cookies_are_secure_in_production(settings):
     prod = dataclasses.replace(settings, environment="production", secret_key="k" * 40)
     from fastapi.testclient import TestClient
 
-    from aisys.cli import seed_demo
+    from shelfsense.cli import seed_demo
 
     app = create_app(prod)  # creates the tables
     seed_demo(prod)
@@ -159,13 +159,13 @@ def test_tls_settings_are_checked_before_starting(settings, tmp_path):
 
 
 def test_tls_comes_from_the_environment_too(tmp_path, monkeypatch):
-    from aisys.config import load_settings
+    from shelfsense.config import load_settings
 
-    monkeypatch.setenv("AISYS_TLS_CERTFILE", "/etc/aisys/cert.pem")
-    monkeypatch.setenv("AISYS_TLS_KEYFILE", "/etc/aisys/key.pem")
+    monkeypatch.setenv("SHELFSENSE_TLS_CERTFILE", "/etc/shelfsense/cert.pem")
+    monkeypatch.setenv("SHELFSENSE_TLS_KEYFILE", "/etc/shelfsense/key.pem")
     s = load_settings(str(tmp_path / "none.toml"))
-    assert s.tls_certfile == "/etc/aisys/cert.pem" and s.tls_keyfile == "/etc/aisys/key.pem"
-    monkeypatch.setenv("AISYS_TLS_CERTFILE", "")
+    assert s.tls_certfile == "/etc/shelfsense/cert.pem" and s.tls_keyfile == "/etc/shelfsense/key.pem"
+    monkeypatch.setenv("SHELFSENSE_TLS_CERTFILE", "")
     assert load_settings(str(tmp_path / "none.toml")).tls_certfile == "", "an empty value switches it off"
 
 
@@ -209,11 +209,11 @@ def test_the_doctor_notices_a_busy_port_and_plain_http_in_production(settings):
 
 
 def test_the_doctor_command_sets_its_exit_code(settings, tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AISYS_DATABASE_URL", settings.database_url)
-    monkeypatch.setenv("AISYS_BACKUP_DIR", settings.backup_dir)
+    monkeypatch.setenv("SHELFSENSE_DATABASE_URL", settings.database_url)
+    monkeypatch.setenv("SHELFSENSE_BACKUP_DIR", settings.backup_dir)
     assert cli_main(["doctor"]) == 0
     assert "Ready to run." in capsys.readouterr().out
-    monkeypatch.setenv("AISYS_TLS_CERTFILE", "half.pem")
+    monkeypatch.setenv("SHELFSENSE_TLS_CERTFILE", "half.pem")
     assert cli_main(["doctor"]) == 1
     assert "problem(s) to fix" in capsys.readouterr().out
 

@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from aisys.circulation.sip2 import codec
-from aisys.circulation.sip2.codec import MAX_FRAME, Message, Sip2Error, decode, encode
+from shelfsense.circulation.sip2 import codec
+from shelfsense.circulation.sip2.codec import MAX_FRAME, Message, Sip2Error, decode, encode
 
 pytestmark = pytest.mark.req("FR03")
 

@@ -1,13 +1,13 @@
-# Remaining production work and known limitations (NFR09, D9)
+# Remaining production work and known limitations (NFR09)
 
-The ten acceptance scenarios (AC01 to AC10) and every deliverable (D1 to D9) are complete and tested. This is what remains before
+The ten acceptance scenarios (AC01 to AC10) are complete and tested. This is what remains before
 a live site, and what the prototype deliberately does not do. Nothing here blocks a scenario.
 
 ## Not built, by decision
 
 | Area | Requirement | What is missing |
 |---|---|---|
-| NCIP 2.0 | FR03 | An NCIP 2.0 client, only if a site's ILMS speaks NCIP and not SIP2. The project owner decided SIP2 meets the SOP's protocol requirement (DR-13, C-10); an NCIP adapter would be another class registered under a new driver name |
+| NCIP 2.0 | FR03 | An NCIP 2.0 client, only if a site's ILMS speaks NCIP and not SIP2. The project owner decided SIP2 meets the specification's protocol requirement (DR-13, C-10); an NCIP adapter would be another class registered under a new driver name |
 | Real devices and services | FR03, FR07, FR09 | Drivers for a real reader, handheld, gate, camera, card printer, e-mail, SMS and print service, and the outside catalogue. Each is one class behind an existing interface plus a config line; a real gate driver is read by the gate loop that already runs in production (DR-18) |
 | Full ILMS depth | FR01 | Budgets, invoices and claim letters in acquisitions; serial binding and prediction patterns; holds and reservations; an inter-library loan. The add-on is not an ILMS replacement (A-02) |
 | Patron notices | FR09 | Overdue repeat notices and hold-ready notices (the day-before and due-day reminders are built); a combined digest; patron language and quiet hours |
