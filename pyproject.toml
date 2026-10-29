@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=84.0.0"]
+requires = ["setuptools>=84.2.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,17 +9,17 @@ description = "RFID add-on for libraries: tagging, circulation, inventory and a 
 license = "LicenseRef-ShelfSense"
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi==0.142.2",
+  "fastapi==0.161.1",
   "uvicorn==0.54.0",
-  "SQLAlchemy==2.1.3",
-  "alembic==1.20.0",
+  "SQLAlchemy==2.1.6",
+  "alembic==1.20.1",
   "Jinja2==3.1.6",
   "python-multipart==0.0.32",
   "openpyxl==3.1.5",
 ]
 
 [project.optional-dependencies]
-dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.16.10", "mypy==2.4.0"]
+dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.17.2", "mypy==2.4.0"]
 
 [project.scripts]
 shelfsense = "shelfsense.cli:main"

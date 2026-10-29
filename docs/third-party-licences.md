@@ -12,13 +12,13 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 
 | Package | Version | Scope | Licence | Review |
 |---|---|---|---|---|
-| alembic | 1.20.0 | runtime | MIT | ok |
+| alembic | 1.20.1 | runtime | MIT | ok |
 | annotated-doc | 0.0.5 | runtime | MIT | ok |
 | annotated-types | 0.8.0 | runtime | MIT | ok |
 | anyio | 4.15.1 | runtime | MIT | ok |
 | click | 8.5.0 | runtime | BSD-3-Clause | ok |
 | et-xmlfile | 2.0.0 | runtime | MIT License | ok |
-| fastapi | 0.142.2 | runtime | MIT | ok |
+| fastapi | 0.161.1 | runtime | MIT | ok |
 | h11 | 0.16.0 | runtime | MIT License | ok |
 | idna | 3.20 | runtime | BSD-3-Clause | ok |
 | jinja2 | 3.1.6 | runtime | BSD License | ok |
@@ -29,7 +29,7 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 | pydantic | 2.13.5 | runtime | MIT | ok |
 | pydantic-core | 2.46.5 | runtime | MIT | ok |
 | python-multipart | 0.0.32 | runtime | Apache-2.0 | ok |
-| sqlalchemy | 2.1.3 | runtime | MIT | ok |
+| sqlalchemy | 2.1.6 | runtime | MIT | ok |
 | starlette | 1.7.0 | runtime | BSD-3-Clause | ok |
 | typing-extensions | 4.16.0 | runtime | PSF-2.0 | ok |
 | typing-inspection | 0.4.4 | runtime | MIT | ok |
@@ -53,5 +53,5 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 | pygments | 2.21.0 | development | BSD-2-Clause | ok |
 | pytest | 9.1.1 | development | MIT | ok |
 | pytest-xdist | 3.8.0 | development | MIT | ok |
-| ruff | 0.16.10 | development | MIT | ok |
-| setuptools | 84.1.0 | build | MIT | ok |
+| ruff | 0.17.2 | development | MIT | ok |
+| setuptools | 84.2.1 | build | MIT | ok |
