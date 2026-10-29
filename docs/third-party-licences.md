@@ -25,7 +25,7 @@ Redistribution and offline-use obligations: `docs/deployment.md`, section *Redis
 | mako | 1.4.3 | runtime | MIT | ok |
 | markupsafe | 3.0.4 | runtime | BSD-3-Clause | ok |
 | openpyxl | 3.1.5 | runtime | MIT License | ok |
-| opentelemetry-api | 1.45.0 | runtime | Apache-2.0 | ok |
+| opentelemetry-api | 1.45.1 | runtime | Apache-2.0 | ok |
 | pydantic | 2.13.5 | runtime | MIT | ok |
 | pydantic-core | 2.46.5 | runtime | MIT | ok |
 | python-multipart | 0.0.32 | runtime | Apache-2.0 | ok |
