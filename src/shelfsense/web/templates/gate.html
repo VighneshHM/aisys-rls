@@ -1,0 +1,280 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Gate events · {{ app_name }}{% endblock %}
+{% block heading %}Gate events{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>What passes the gate</h2>
+  <p>The gate reads the security bit on every tag. A tag whose bit is still on and that is not on loan raises an alarm: the accession number is recorded, a CCTV snapshot is taken, and a message is queued for each person who asked for alerts. The decision comes from the tag itself, so the gate works even when the library system is down.</p>
+</div>
+
+<div class="grid stats" id="tiles"></div>
+
+<div class="grid two" style="margin-top:18px">
+  <div class="grid">
+    {% if simulator %}
+    <section class="panel">
+      <header><h3>Simulate a walk through the gate</h3><span class="badge">development only</span></header>
+      <div class="body">
+        <div class="field" style="margin-bottom:10px">
+          <label for="sim-items">Items being carried (accession numbers, barcodes or tag UIDs, separated by commas)</label>
+          <input id="sim-items" placeholder="e.g. INV-003, INV-004" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="toolbar" style="margin:0 0 10px">
+          <div class="field grow" style="margin:0"><label for="sim-bit">Security bit on the items</label>
+            <select id="sim-bit">
+              <option value="as_recorded">As the system recorded it (check-out switches it off)</option>
+              <option value="on">Force on (not switched off)</option>
+              <option value="off">Force off (switched off by hand)</option>
+            </select></div>
+          <div class="field" style="margin:0;width:110px"><label for="sim-people">People</label><input id="sim-people" type="number" min="1" max="50" value="1"></div>
+          <div class="field" style="margin:0;width:150px"><label for="sim-unreg">Unregistered tags</label><input id="sim-unreg" type="number" min="0" max="10" value="0"></div>
+        </div>
+        <div class="actions" style="margin-top:0">
+          <button class="btn" id="walk-btn" type="button">Walk through the gate</button>
+          <button class="btn ghost small" id="cam-fail" type="button">Camera fails next snapshot</button>
+        </div>
+        <div id="walk-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if can_admin %}
+    <section class="panel">
+      <header><h3>Alert recipients</h3><span class="badge">per user</span></header>
+      <div class="body">
+        <p class="sub" style="margin:0 0 12px">Each person chooses how they want to hear about a gate alarm: email, SMS, or a printed slip. An alarm queues one message per ticked channel.</p>
+        <div id="prefs"></div>
+        <div id="prefs-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h3>Gate events</h3><span class="badge" id="count-badge"></span></header>
+      <div class="body" style="padding-bottom:4px">
+        <div class="toolbar">
+          <div class="grow"><input id="q" type="search" placeholder="Search accession no., title or tag…" autocomplete="off" aria-label="Search gate events"></div>
+          <select id="filter" aria-label="Show"><option value="">All events</option><option value="alarms">Alarms only</option></select>
+          <button class="btn ghost small" id="poll-btn" type="button" title="Read every real gate now (the gate loop also does this by itself when it is switched on)">Read the gates now</button>
+        </div>
+        <div id="poll-notice" class="notice" role="status"></div>
+      </div>
+      <div class="table-wrap" id="events"></div>
+    </section>
+
+    <section class="panel hidden" id="detail">
+      <header><h3 id="detail-title"></h3><span id="detail-badge"></span></header>
+      <div class="body" id="detail-body"></div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Notification queue</h3><span class="badge" id="queue-badge"></span></header>
+      <div class="body">
+        <div class="actions" style="margin:0 0 12px">
+          {% if can_admin %}<button class="btn" id="dispatch-btn" type="button">Send queued messages</button>{% endif %}
+          <button class="btn ghost small" id="queue-refresh" type="button">Refresh</button>
+        </div>
+        <div id="dispatch-notice" class="notice" role="status"></div>
+        <div class="table-wrap" id="queue"></div>
+        {% if can_admin %}
+        <details class="sim" style="margin-top:14px">
+          <summary>Mock outbox <span class="sub">· what the mock providers "sent"</span></summary>
+          <div id="outbox" style="margin-top:10px"></div>
+          {% if simulator %}
+          <div class="toolbar" style="margin:12px 0 0">
+            <div class="grow"><select id="pf-channel" aria-label="Provider to fail"><option value="email">Email provider</option><option value="sms">SMS provider</option><option value="print">Print provider</option></select></div>
+            <select id="pf-times" aria-label="How many sends fail"><option value="1">next 1 send</option><option value="2">next 2</option><option value="3">next 3 (all tries)</option></select>
+            <button class="btn ghost small" id="pf-fail" type="button">Make it fail</button>
+            <button class="btn ghost small" id="pf-clear" type="button">Clear</button>
+          </div>
+          <div class="sub" id="pf-note" style="margin-top:8px"></div>
+          {% endif %}
+        </details>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt, short} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }}, ADMIN = {{ 'true' if can_admin else 'false' }};
+  let selected = null;
+  const KIND = {
+    unauthorised: ["bad", "Unauthorised removal"], armed_on_loan: ["bad", "On loan, still armed"], unissued: ["warn", "Unissued tag"],
+    authorised: ["good", "Authorised exit"], bit_off: ["warn", "Bit off, not on loan"],
+  };
+  const kindBadge = e => h("span", {class: "badge " + (e.alarm ? "bad" : (KIND[e.kind] || ["", ""])[0])}, (e.alarm ? "ALARM · " : "") + (KIND[e.kind] || ["", e.kind])[1]);
+  const NSTATUS = {queued: ["warn", "Queued"], sent: ["good", "Sent"], failed: ["bad", "Failed"], cancelled: ["", "Cancelled"]};
+  const REMINDER = {due_soon: "Patron reminder: due tomorrow", due_today: "Patron reminder: due today"};
+  const CHANNEL = {email: "Email", sms: "SMS", print: "Print"};
+
+  // ------------------------------------------------------------------ tiles
+  async function loadTiles() {
+    try {
+      const s = await api("/api/gate/summary");
+      const spec = [["Alarms", s.alarms, s.alarms ? "bad" : ""], ["Unauthorised removals", s.unauthorised, ""], ["Passages", s.passages, ""], ["People through", s.people, ""], ["Messages queued", s.queued, s.queued ? "warn" : ""]];
+      fill($("tiles"), spec.map(([label, n]) => h("div", {class: "stat"}, h("div", {}, h("div", {class: "num"}, fmt(n)), h("div", {class: "lbl"}, label)))));
+    } catch (e) { fill($("tiles")); }
+  }
+
+  // ------------------------------------------------------------------ events
+  let timer = null;
+  async function loadEvents() {
+    const params = new URLSearchParams({q: $("q").value.trim(), limit: 15});
+    if ($("filter").value === "alarms") params.set("alarms_only", "true");
+    let d;
+    try { d = await api("/api/gate/events?" + params); } catch (e) { fill($("events"), h("div", {class: "empty"}, e.message)); return; }
+    $("count-badge").textContent = fmt(d.total) + " event" + (d.total === 1 ? "" : "s");
+    fill($("events"), d.events.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["When", "Result", "Item", "People"].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.events.map(e => h("tr", {class: "clickable" + (e.id === selected ? " selected" : ""), tabindex: "0", onclick: () => show(e.id), onkeydown: ev => { if (ev.key === "Enter") show(e.id); }},
+        h("td", {class: "time"}, when(e.ts)),
+        h("td", {}, kindBadge(e), e.duplicate_of ? h("div", {class: "sub"}, "repeat of #" + e.duplicate_of) : null),
+        h("td", {}, e.accession_no ? [h("b", {}, e.accession_no), h("div", {class: "sub"}, e.title)] : h("span", {class: "mono"}, short(e.tag_uid))),
+        h("td", {}, e.people)))))
+      : h("div", {class: "empty"}, "No gate events yet."));
+  }
+
+  async function show(id) {
+    selected = id;
+    let e;
+    try { e = await api("/api/gate/events/" + id); } catch (err) { return; }
+    $("detail").classList.remove("hidden");
+    $("detail-title").textContent = "Event #" + e.id;
+    fill($("detail-badge"), kindBadge(e));
+    const bit = e.security_armed === null ? "unreadable (treated as on)" : e.security_armed ? "ON" : "OFF";
+    fill($("detail-body"),
+      h("dl", {class: "kv tight", style: "margin:0 0 14px"},
+        h("dt", {}, "Result"), h("dd", {}, e.label),
+        h("dt", {}, "Item"), h("dd", {}, e.accession_no ? [h("b", {}, e.accession_no), " · " + e.title] : "No item: this tag is not registered"),
+        h("dt", {}, "Tag"), h("dd", {class: "mono"}, e.tag_uid),
+        h("dt", {}, "Gate · time"), h("dd", {}, e.gate_id + " · " + when(e.ts)),
+        h("dt", {}, "People"), h("dd", {}, e.people),
+        h("dt", {}, "Security bit"), h("dd", {}, bit + " · decided from the bit read at the gate; the library system was not asked"),
+        e.on_loan ? [h("dt", {}, "On loan to"), h("dd", {}, e.loan_member_no)] : null),
+      e.note ? h("div", {class: "notice show warn", style: "margin:0 0 14px"}, e.note) : null,
+      e.has_image ? h("figure", {style: "margin:0 0 14px"}, h("img", {src: "/api/gate/events/" + e.id + "/image", alt: "CCTV snapshot for event " + e.id, style: "width:100%;max-width:480px;border-radius:10px;border:1px solid var(--line);display:block"}),
+        h("figcaption", {class: "sub", style: "margin-top:6px"}, "CCTV snapshot · " + e.camera_id))
+        : e.image_error ? h("div", {class: "notice show bad", style: "margin:0 0 14px"}, "No CCTV snapshot: " + e.image_error)
+        : e.alarm && e.duplicate_of ? h("div", {class: "sub", style: "margin:0 0 14px"}, "A repeat alarm: the photo and messages are on event #" + e.duplicate_of + ".") : null,
+      e.notifications.length ? [h("h4", {style: "margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"}, "Messages for this alarm"),
+        h("ul", {class: "timeline"}, e.notifications.map(n => h("li", {}, h("time", {}, when(n.created_at)),
+          h("span", {}, CHANNEL[n.channel] + " to " + n.recipient + " · ", h("span", {class: "badge " + NSTATUS[n.status][0]}, NSTATUS[n.status][1]), n.last_error ? " · " + n.last_error : ""))))] : null);
+    loadEvents();
+    $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+
+  // ------------------------------------------------------------------ notification queue
+  async function loadQueue() {
+    let d;
+    try { d = await api("/api/notifications?limit=10"); } catch (e) { fill($("queue"), h("div", {class: "empty"}, e.message)); return; }
+    const c = d.counts;
+    $("queue-badge").textContent = c.queued + " queued · " + c.sent + " sent · " + c.failed + " failed" + (c.cancelled ? " · " + c.cancelled + " cancelled" : "");
+    fill($("queue"), d.notifications.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Channel", "To", "Status", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, d.notifications.map(n => h("tr", {},
+        h("td", {}, CHANNEL[n.channel]),
+        h("td", {}, n.recipient, h("div", {class: "sub"}, (REMINDER[n.kind] ? REMINDER[n.kind] + " · " : "") + n.subject)),
+        h("td", {title: n.last_error || ""}, h("span", {class: "badge " + NSTATUS[n.status][0]}, NSTATUS[n.status][1]),
+          n.status === "queued" && n.attempts ? h("div", {class: "sub"}, "tried " + n.attempts + "×: " + n.last_error) : n.status === "failed" || n.status === "cancelled" ? h("div", {class: "sub"}, n.last_error) : null),
+        h("td", {}, ADMIN && n.status === "failed" ? h("button", {class: "btn ghost small", type: "button", onclick: () => retry(n.id)}, "Retry") : null)))))
+      : h("div", {class: "empty"}, "Nothing in the queue."));
+  }
+  async function retry(id) { try { await api("/api/notifications/" + id + "/retry", {method: "POST"}); loadQueue(); loadTiles(); } catch (e) { say("dispatch-notice", "bad", e.message); } }
+
+  async function dispatch() {
+    clear("dispatch-notice");
+    try {
+      const r = await api("/api/notifications/dispatch", {method: "POST"});
+      say("dispatch-notice", r.failed ? "bad" : r.retry_later ? "warn" : "ok",
+        r.tried ? r.sent + " sent, " + r.retry_later + " will be retried, " + r.failed + " given up on."
+          : r.waiting ? r.waiting + " message(s) are waiting for their retry time" + (r.next_attempt_at ? " (next at " + new Date(r.next_attempt_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"}) + ")" : "") + "."
+          : "Nothing is waiting to be sent.");
+      refreshAll();
+    } catch (e) { say("dispatch-notice", "bad", e.message); }
+  }
+
+  async function loadOutbox() {
+    if (!ADMIN) return;
+    try {
+      const r = await api("/api/notifications/outbox");
+      fill($("outbox"), r.messages.length ? r.messages.slice(0, 6).map(m => h("div", {style: "margin-bottom:12px"},
+        h("div", {}, h("b", {}, CHANNEL[m.channel]), " to ", m.to, h("span", {class: "sub"}, " · " + m.ref)),
+        h("pre", {style: "margin:6px 0 0;white-space:pre-wrap;font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px"}, m.subject + "\n\n" + m.body)))
+        : h("div", {class: "sub"}, "Nothing has been sent yet."));
+    } catch (e) { fill($("outbox"), h("div", {class: "sub"}, e.message)); }
+  }
+
+  // ------------------------------------------------------------------ alert recipients
+  async function loadPrefs() {
+    if (!ADMIN) return;
+    try {
+      const d = await api("/api/notifications/prefs");
+      fill($("prefs"), h("div", {class: "table-wrap"}, h("table", {},
+        h("thead", {}, h("tr", {}, ["Staff", "Email", "SMS", "Print", ""].map(t => h("th", {}, t)))),
+        h("tbody", {}, d.users.map(u => h("tr", {id: "pref-" + u.user_id},
+          h("td", {}, h("b", {}, u.display_name), h("div", {class: "sub"}, u.username)),
+          ["email", "sms", "print"].map(ch => h("td", {},
+            h("label", {style: "display:flex;gap:6px;align-items:center;margin-bottom:4px"}, h("input", {type: "checkbox", "data-ch": ch, checked: u.channels[ch].active ? "" : false}), "on"),
+            h("input", {type: "text", "data-addr": ch, value: u.channels[ch].address, placeholder: d.hints[ch], "aria-label": CHANNEL[ch] + " contact for " + u.display_name, style: "width:100%;min-width:110px"}))),
+          h("td", {}, h("button", {class: "btn small", type: "button", onclick: () => savePrefs(u)}, "Save"))))))));
+    } catch (e) { say("prefs-notice", "bad", e.message); }
+  }
+  async function savePrefs(u) {
+    const row = $("pref-" + u.user_id), channels = {};
+    for (const ch of ["email", "sms", "print"]) channels[ch] = {active: row.querySelector('[data-ch="' + ch + '"]').checked, address: row.querySelector('[data-addr="' + ch + '"]').value.trim()};
+    clear("prefs-notice");
+    try { await api("/api/notifications/prefs/" + u.user_id, {method: "PUT", json: {channels}}); say("prefs-notice", "ok", "Saved the alert settings for " + u.display_name + "."); loadPrefs(); }
+    catch (e) { say("prefs-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ simulator
+  function refreshAll() { loadTiles(); loadEvents(); loadQueue(); loadOutbox(); }
+  $("poll-btn").onclick = async () => {
+    const button = $("poll-btn");
+    if (button.disabled) return;
+    button.disabled = true; UI.clear("poll-notice");
+    try {
+      const r = await UI.api("/api/gate/poll", {method: "POST"});
+      const gates = Object.entries(r.gates);
+      const down = gates.filter(([, g]) => !g.ok).map(([id, g]) => id + ": " + g.error);
+      if (!gates.length) UI.say("poll-notice", "warn", "No real gate is configured: only the simulator, which hands its passages over by itself.");
+      else UI.say("poll-notice", down.length ? "warn" : "ok", "Read " + gates.length + " gate(s): " + r.events + " new event(s), " + r.alarms + " alarm(s)." + (down.length ? " Not read: " + down.join("; ") : ""));
+      refreshAll();
+    } catch (e) { UI.say("poll-notice", "bad", e.message); }
+    finally { button.disabled = false; }
+  };
+
+  if (SIM) {
+    $("walk-btn").onclick = async () => {
+      clear("walk-notice");
+      const refs = $("sim-items").value.split(",").map(s => s.trim()).filter(Boolean);
+      try {
+        const r = await api("/api/gate/mock/gates/gate-1/walk", {json: {item_refs: refs, unregistered: +$("sim-unreg").value || 0, people: +$("sim-people").value || 1, bit: $("sim-bit").value}});
+        const alarms = r.events.filter(e => e.alarm);
+        say("walk-notice", alarms.length ? "bad" : "ok", r.events.length ? r.events.length + " tag(s) read. " + (alarms.length ? alarms.length + " alarm(s): " + alarms.map(a => (a.accession_no || "unregistered tag") + (a.duplicate_of ? " (repeat)" : "")).join(", ") + "." : "No alarm.") : "A passage with no tags: counted as footfall only.");
+        await refreshAll();
+        if (r.events.length) show(r.events[0].id);
+      } catch (e) { say("walk-notice", "bad", e.message); }
+    };
+    $("cam-fail").onclick = async () => { try { await api("/api/gate/mock/camera/fail", {method: "POST"}); say("walk-notice", "warn", "The camera will fail its next snapshot. Walk an item through to see an alarm without a picture."); } catch (e) { say("walk-notice", "bad", e.message); } };
+    if ($("pf-fail")) {
+      const note = r => $("pf-note").textContent = r.pending ? r.pending + " simulated failure(s) waiting for that provider." : "No simulated failures waiting.";
+      $("pf-fail").onclick = async () => { try { note(await api("/api/notifications/mock/fail", {json: {channel: $("pf-channel").value, mode: "error", times: +$("pf-times").value}})); } catch (e) { $("pf-note").textContent = e.message; } };
+      $("pf-clear").onclick = async () => { try { note(await api("/api/notifications/mock/fail", {method: "DELETE"})); } catch (e) { $("pf-note").textContent = e.message; } };
+    }
+  }
+  $("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(loadEvents, 250); });
+  $("filter").addEventListener("change", loadEvents);
+  $("queue-refresh").onclick = () => { loadQueue(); loadOutbox(); loadTiles(); };
+  if ($("dispatch-btn")) $("dispatch-btn").onclick = dispatch;
+  refreshAll(); loadPrefs();
+})();
+</script>
+{% endblock %}

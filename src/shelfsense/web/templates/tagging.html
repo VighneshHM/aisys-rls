@@ -1,0 +1,307 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}RFID tagging · {{ app_name }}{% endblock %}
+{% block heading %}RFID tagging{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Tag an item</h2>
+  <p>Read a tag on the staff reader, choose the item it belongs to, check it, then link them. The reader writes the accession number onto the tag and arms its security bit.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel" id="reader-panel">
+      <header><h3>1 · Staff reader</h3><span id="reader-badge" class="badge">…</span></header>
+      <div class="body">
+        <div class="actions" style="margin-top:0"><button class="btn" id="read-btn" type="button">Read reader</button></div>
+        <div id="reader-notice" class="notice" role="alert"></div>
+        <div class="pad" id="pad" style="margin-top:14px"></div>
+        {% if simulator %}
+        <details class="sim" id="sim-box">
+          <summary>Simulator controls <span class="sub">· development only, no hardware attached</span></summary>
+          <div class="actions">
+            <button class="btn ghost small" id="sim-place" type="button">Generate new tag</button>
+            <button class="btn ghost small" id="sim-clear" type="button">Remove tag</button>
+            <button class="btn ghost small" id="sim-power" type="button">Switch off</button>
+          </div>
+          <p class="sub" style="margin:10px 0 0">Generating a new tag replaces any tag already on the reader, as when you hold a different tag up to a real reader.</p>
+        </details>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h3>2 · Item to tag</h3><span id="item-badge" class="badge">none chosen</span></header>
+      <div class="body">
+        <div class="toolbar" style="margin-bottom:0"><div class="grow"><input id="item-q" type="search" placeholder="Search title, author, ISBN, accession no. or barcode…" autocomplete="off" aria-label="Find the item"></div></div>
+        <div class="picklist" id="picklist"></div>
+        <div id="chosen" style="margin-top:12px"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h3>3 · Check and link</h3></header>
+      <div class="body">
+        <dl class="kv tight" style="margin-bottom:14px">
+          <dt>Tag</dt><dd id="sum-tag" class="mono">— none chosen</dd>
+          <dt>Item</dt><dd id="sum-item">— none chosen</dd>
+        </dl>
+        <label id="replace-row" class="hidden" style="display:flex;gap:10px;align-items:flex-start;margin:6px 0 10px">
+          <input type="checkbox" id="replace" style="margin-top:4px">
+          <span><b>Replace the item's current tag</b><br><span class="sub">The old tag comes off the item and stays in its history.</span></span>
+        </label>
+        <div class="field hidden" id="fate-row"><label for="old-fate">What happens to the old tag?</label>
+          <select id="old-fate">
+            <option value="removed">Remove it: it can be used again later</option>
+            <option value="retired">Retire it: damaged or lost, never use it again</option>
+          </select></div>
+        <div class="field hidden" id="reason-row"><label for="reason">Reason for re-tagging (optional)</label><input id="reason" maxlength="200" placeholder="e.g. tag damaged"></div>
+        <div class="actions">
+          <button class="btn ghost" id="validate-btn" type="button" disabled>Check</button>
+          <button class="btn" id="tag-btn" type="button" disabled>Link tag to item</button>
+        </div>
+        <div id="check-notice" class="notice" role="alert"></div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="result-panel">
+      <header><h3>Linked</h3><span class="badge good"><span class="led"></span>Saved</span></header>
+      <div class="body" id="result-body"></div>
+    </section>
+
+    <section class="panel">
+      <header><h3>Recent tag activity</h3><button class="btn ghost small" id="refresh-events" type="button">Refresh</button></header>
+      <div class="table-wrap" id="events"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, api, say, clear, when, short} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }};
+  const st = {reader: null, readerOnline: true, tag: null, item: null, pad: []};
+  const EVENT_LABEL = {read: ["", "Read"], tagged: ["good", "Tagged"], retagged: ["good", "Re-tagged"], removed: ["", "Removed"], retired: ["warn", "Retired"], encode_failed: ["bad", "Write failed"]};
+
+  // ------------------------------------------------------------------ 1 · reader
+  async function loadReaders() {
+    try {
+      const readers = await api("/api/rfid/readers");
+      const r = readers.find(x => x.kind === "staff_reader");
+      if (!r) { say("reader-notice", "bad", "No staff reader is configured."); return; }
+      st.reader = r.id; st.readerOnline = r.online;
+      $("reader-badge").className = "badge " + (r.online ? "good" : "bad");
+      $("reader-badge").textContent = r.id + (r.mock ? " (simulator) · " : " · ") + (r.online ? "online" : "offline");
+      if (SIM) $("sim-power").textContent = r.online ? "Switch off" : "Switch on";
+      if (!r.online) say("reader-notice", "bad", "The reader is offline. Tags cannot be read or written until it is switched back on.");
+      else if ($("reader-notice").classList.contains("bad")) clear("reader-notice");
+    } catch (e) { say("reader-notice", "bad", e.message); }
+  }
+
+  async function readPad() {
+    clear("reader-notice");
+    try {
+      const data = await api("/api/rfid/readers/" + encodeURIComponent(st.reader) + "/read", {method: "POST"});
+      st.pad = data.tags;
+      // a chosen tag that left the pad, or has meanwhile been linked, can no longer be used
+      if (st.tag && !st.pad.some(t => t.uid === st.tag && t.usable)) st.tag = null;
+      // exactly one tag that can still be used: that is obviously the one to tag
+      const usable = st.pad.filter(t => t.usable);
+      if (!st.tag && usable.length === 1) st.tag = usable[0].uid;
+      renderPad(); renderSummary(); loadEvents();
+      if (!data.tags.length) emptyNotice();
+    } catch (e) { st.pad = []; st.tag = null; renderPad(); renderSummary(); say("reader-notice", "bad", e.message); }
+  }
+
+  function emptyNotice() {
+    say("reader-notice", "warn", "No tag is on the reader.");
+    if (SIM) $("reader-notice").append(" ", h("button", {class: "btn small", type: "button", style: "margin-left:8px", onclick: putNextBook}, "Generate a blank tag"));
+  }
+
+  function describe(t) {
+    if (t.state === "active") return "Already in use · linked to " + (t.item ? t.item.accession_no + " · " + t.item.title : "an item");
+    if (t.state === "retired") return "Retired · out of service, cannot be linked again";
+    if (t.state === "removed") return "Used before" + (t.item ? " (on " + t.item.accession_no + ")" : "") + " and removed · can be used again";
+    if (t.blank) return "Blank tag · ready to use";
+    return t.item_ref_on_tag ? "Carries " + t.item_ref_on_tag + " (not linked here)" : "Unknown tag";
+  }
+
+  function renderPad() {
+    $("pad").replaceChildren(...st.pad.map(t => {
+      const picked = st.tag === t.uid;
+      const card = h("div", {class: "tagcard" + (picked ? " picked" : "") + (t.usable ? "" : " disabled")},
+        h("div", {class: "ico"}, "⌁"),
+        h("div", {class: "meta"}, h("b", {}, t.uid), h("span", {class: "sub"}, describe(t) + (t.security_armed ? " · security armed" : ""))));
+      const ask = modes => {   // opens the remove / retire panel inside this card
+        if (card.querySelector(".confirm")) return;
+        const panel = UI.endTagPanel({uid: t.uid, itemText: t.item ? t.item.accession_no + " · " + t.item.title : "this tag", modes,
+          onDone: r => afterEnded(r, t.item && t.item.id), onCancel: () => panel.remove()});
+        card.append(panel);
+      };
+      const actions = [];
+      if (t.usable) actions.push(h("button", {class: "btn small" + (picked ? "" : " ghost"), type: "button", onclick: () => { st.tag = t.uid; renderPad(); renderSummary(); }}, picked ? "Chosen" : "Use this tag"));
+      if (t.state === "active" && t.item) actions.push(h("a", {class: "btn ghost small", href: "/catalogue?q=" + encodeURIComponent(t.item.accession_no), style: "text-decoration:none"}, "View item"));
+      if (t.state === "active") actions.push(h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => ask(["remove", "retire"])}, "Remove or retire"));
+      if (t.state === "removed") actions.push(h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => ask(["retire"])}, "Retire"));
+      if (t.state === "retired") actions.push(UI.stateBadge("retired"));
+      card.append(h("div", {class: "row-actions"}, actions));
+      return card;
+    }));
+  }
+
+  // simulator only: generating a new tag replaces any tag already on the reader
+  async function putNextBook() {
+    try { await api("/api/rfid/mock/readers/" + st.reader + "/tags", {json: {replace: true}}); st.tag = null; await readPad(); }
+    catch (e) { say("reader-notice", "bad", e.message); }
+  }
+
+  $("read-btn").onclick = readPad;
+  if (SIM) {
+    $("sim-place").onclick = putNextBook;
+    $("sim-clear").onclick = async () => { await api("/api/rfid/mock/readers/" + st.reader + "/tags", {method: "DELETE"}); st.tag = null; await readPad(); };
+    $("sim-power").onclick = async () => { await api("/api/rfid/mock/readers/" + st.reader + "/power", {json: {online: !st.readerOnline}}); await loadReaders(); if (st.readerOnline) readPad(); };
+  }
+
+  // ------------------------------------------------------------------ 2 · item
+  let timer = null;
+  async function searchItems() {
+    const q = $("item-q").value.trim();
+    if (!q) { $("picklist").replaceChildren(); return; }
+    try {
+      const data = await api("/api/catalogue/items?limit=8&q=" + encodeURIComponent(q));
+      $("picklist").replaceChildren(...(data.items.length ? data.items.map(i => h("button", {class: "pick", type: "button", onclick: () => chooseItem(i)},
+        h("b", {}, i.title), h("span", {}, i.accession_no + (i.author ? " · " + i.author : "") + " · " + (i.tag ? "tagged " + short(i.tag.uid) : "untagged")))) : [h("div", {class: "muted"}, "No items match.")]));
+    } catch (e) { $("picklist").replaceChildren(h("div", {class: "muted"}, e.message)); }
+  }
+  $("item-q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(searchItems, 250); });
+
+  function chooseItem(i) {
+    st.item = i; $("picklist").replaceChildren(); $("item-q").value = "";
+    $("item-badge").className = "badge"; $("item-badge").textContent = i.accession_no;
+    const card = h("div", {class: "tagcard picked"}, h("div", {class: "ico"}, "▤"),
+      h("div", {class: "meta"}, h("b", {style: "font-family:inherit;font-size:15px"}, i.title), h("span", {class: "sub"}, i.accession_no + " · " + i.status + (i.tag ? " · already has tag " + short(i.tag.uid) : " · no tag yet"))));
+    if (i.tag) card.append(h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => {
+      if (card.querySelector(".confirm")) return;
+      const panel = UI.endTagPanel({uid: i.tag.uid, itemText: i.accession_no + " · " + i.title,
+        onDone: r => afterEnded(r, i.id), onCancel: () => panel.remove()});
+      card.append(panel);
+    }}, "Remove or retire its tag"));
+    $("chosen").replaceChildren(card);
+    clear("check-notice"); renderSummary();
+  }
+
+  // after a tag was removed or retired: refresh what we show about the item and the reader, then say what happened
+  async function afterEnded(r, itemId) {
+    if (st.tag === r.uid) st.tag = null;
+    if (itemId && st.item && st.item.id === itemId) chooseItem(await api("/api/catalogue/items/" + itemId));
+    await readPad();
+    const fine = r.device.status === "cleared" || r.device.status === "not_linked";
+    say("check-notice", fine ? "ok" : "warn", "Tag " + r.state + ". " + r.device.message);
+  }
+
+  // ------------------------------------------------------------------ 3 · check + link
+  function renderSummary() {
+    $("sum-tag").textContent = st.tag ? st.tag : "— none chosen";
+    $("sum-item").textContent = st.item ? st.item.accession_no + " · " + st.item.title : "— none chosen";
+    const retag = !!(st.item && st.item.tag && st.tag && st.item.tag.uid !== st.tag);  // only when a different tag is chosen
+    $("replace-row").classList.toggle("hidden", !retag); $("reason-row").classList.toggle("hidden", !retag || !$("replace").checked);
+    $("fate-row").classList.toggle("hidden", !retag || !$("replace").checked);
+    if (!retag) $("replace").checked = false;
+    const ready = !!(st.tag && st.item);
+    $("validate-btn").disabled = !ready; $("tag-btn").disabled = !ready;
+  }
+  $("replace").onchange = renderSummary;
+
+  const payload = () => ({item_id: st.item.id, tag_uid: st.tag, reader_id: st.reader, replace: $("replace").checked, reason: $("reason").value.trim(), old_tag_fate: $("old-fate").value});
+
+  $("validate-btn").onclick = async () => {
+    clear("check-notice");
+    try {
+      const r = await api("/api/rfid/tagging/validate", {json: payload()});
+      if (r.ok) { say("check-notice", "ok", "No problems found. This tag can be linked to this item."); if (r.warnings.length) $("check-notice").append(UI.problemList(r.warnings, "warn")); }
+      else { say("check-notice", "bad", "This cannot be linked yet:"); $("check-notice").append(UI.problemList(r.problems)); }
+    } catch (e) { say("check-notice", "bad", e.message); }
+  };
+
+  $("tag-btn").onclick = async () => {
+    clear("check-notice"); $("tag-btn").disabled = true;
+    try {
+      const r = await api("/api/rfid/tagging", {json: payload()});
+      showResult(r); st.tag = null; st.item = r.item; chooseItem(r.item); await readPad(); renderSummary();
+    } catch (e) {
+      say("check-notice", "bad", e.message + (e.problems.length ? ":" : ""));
+      if (e.problems.length) $("check-notice").append(UI.problemList(e.problems));
+      loadEvents();
+    }
+    renderSummary();
+  };
+
+  function showResult(r) {
+    $("result-panel").classList.remove("hidden");
+    UI.fill($("result-body"),
+      h("div", {class: "relation"},
+        h("div", {class: "node"}, h("h4", {}, "RFID tag"), h("b", {class: "mono"}, r.tag.uid), h("div", {class: "sub"}, "Security bit " + (r.tag.security_armed ? "armed" : "off") + " · written by reader " + r.tag.reader_id)),
+        h("div", {class: "link"}, "linked"),
+        h("div", {class: "node"}, h("h4", {}, "Item (copy)"), h("b", {}, r.item.title), h("div", {class: "sub"}, "Accession " + r.item.accession_no + (r.item.author ? " · " + r.item.author : "")))),
+      r.previous_tag ? h("p", {class: "sub", style: "margin:10px 0 0"}, "Previous tag " + r.previous_tag.uid + " was " + r.previous_tag.status + (r.previous_tag.status === "retired" ? " (never to be used again)." : " (it can be used again).")) : null,
+      r.reused_tag ? h("p", {class: "sub", style: "margin:10px 0 0"}, "This tag had been used before and was linked again.") : null,
+      h("p", {class: "sub", style: "margin:10px 0 0"}, "The reader signalled “" + r.indication + "” (beep + green light). Saved by " + r.tag.tagged_by + " at " + when(r.tag.tagged_at) + "."),
+      h("div", {class: "actions"}, h("a", {class: "btn ghost small", href: "/catalogue?q=" + encodeURIComponent(r.item.accession_no), style: "text-decoration:none"}, "View in catalogue")));
+  }
+
+  // ------------------------------------------------------------------ activity
+  async function loadEvents() {
+    try {
+      const ev = await api("/api/rfid/events?limit=8");
+      $("events").replaceChildren(ev.length ? h("table", {}, h("thead", {}, h("tr", {}, ["When", "Event", "Tag", "By"].map(t => h("th", {}, t)))),
+        h("tbody", {}, ev.map(e => { const [cls, label] = EVENT_LABEL[e.type] || ["", e.type];
+          return h("tr", {}, h("td", {class: "time"}, when(e.ts)), h("td", {}, h("span", {class: "badge " + cls}, label)), h("td", {class: "mono"}, short(e.tag_uid)), h("td", {}, e.actor)); })))
+        : h("div", {class: "empty"}, "No tag activity yet."));
+    } catch (e) { $("events").replaceChildren(h("div", {class: "empty"}, e.message)); }
+  }
+  $("refresh-events").onclick = loadEvents;
+
+  // ------------------------------------------------------------------ reuse a removed tag (?tag=UID, from the registry)
+  async function prepareReuse(uid) {
+    const short6 = UI.short(uid);
+    try {
+      const d = await api("/api/rfid/tags/" + encodeURIComponent(uid));
+      if (d.state !== "removed") {
+        say("reader-notice", "warn", "Tag " + short6 + " is " + (d.state === "active" ? "in use on " + d.item.accession_no : "retired") + ", so it cannot be reused.");
+        return;
+      }
+      if (SIM) {   // the simulator can hold any tag: put this exact one on the reader
+        await api("/api/rfid/mock/readers/" + st.reader + "/tags", {json: {uid, replace: true}});
+        st.tag = null; await readPad();
+        say("reader-notice", "ok", "Tag " + short6 + " is on the simulator reader and ready to reuse. Now choose the item it should go on.");
+      } else {
+        say("reader-notice", "ok", "Put tag " + short6 + " on the reader, click Read reader, then choose the item it should go on.");
+      }
+    } catch (e) { say("reader-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ start
+  (async () => {
+    await loadReaders(); renderSummary(); loadEvents();
+    if (st.reader) await readPad();
+    const reuse = new URLSearchParams(location.search).get("tag");
+    if (reuse && st.reader) await prepareReuse(reuse);
+    const pre = new URLSearchParams(location.search).get("item");
+    if (pre) {
+      try {
+        const it = await api("/api/catalogue/items/" + encodeURIComponent(pre));
+        chooseItem(it);
+        // simulator: an untagged book arrives with an empty reader (the last book's tag is taken off); staff generate the tag
+        if (SIM && st.reader && !it.tag && !reuse) {
+          await api("/api/rfid/mock/readers/" + st.reader + "/tags", {method: "DELETE"});
+          st.tag = null; await readPad();
+        }
+      } catch (e) { /* ignore a stale link */ }
+    }
+  })();
+})();
+</script>
+{% endblock %}

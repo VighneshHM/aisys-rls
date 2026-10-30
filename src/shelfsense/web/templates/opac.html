@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Find a book · {{ app_name }}{% endblock %}
+{% block body %}
+<main style="max-width:880px;margin:0 auto;padding:28px 16px 60px">
+  <header style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
+    <span class="logo-mark" style="width:38px;height:38px;display:grid;place-items:center">{{ icon("radio") }}</span>
+    <div><h1 style="margin:0;font-size:24px">{{ app_name }}</h1><div class="sub">Find a book. No sign-in needed.</div></div>
+    <a href="/" class="btn ghost small" style="margin-left:auto">{{ icon("dash") }} Return to home page</a>
+  </header>
+
+  {% if staff_signed_in %}
+  <div class="notice show warn" role="alert" style="margin:0 0 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="flex:1;min-width:220px"><b>A staff member is still signed in on this browser.</b> Before leaving this screen for visitors, sign out.</span>
+    <form method="post" action="/handover" style="margin:0"><button class="btn small" type="submit">Sign out and keep the catalogue open</button></form>
+  </div>
+  {% endif %}
+  <form id="form" role="search" class="panel" style="padding:16px">
+    <label for="q" style="font-weight:600">Search by title, author, subject word, publisher or ISBN</label>
+    <div class="toolbar" style="margin:8px 0 0;flex-wrap:nowrap">
+      <input id="q" type="search" autocomplete="off" spellcheck="false" maxlength="100" placeholder="e.g. lighthouse, Solheim, 9780001000014" style="flex:1;min-width:0" autofocus>
+      <button class="btn" type="submit">Search</button>
+    </div>
+    <div id="notice" class="notice" role="alert" style="margin-top:10px"></div>
+  </form>
+
+  <div id="results" aria-live="polite" style="margin-top:18px"></div>
+  <div id="shelf" style="margin-top:18px"></div>
+  <p class="sub" style="margin-top:28px">Titles, shelves and availability only. Ask at the desk to borrow an item.</p>
+</main>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear} = UI;
+  let timer = null, seq = 0;
+
+  async function search() {
+    const q = $("q").value.trim(); clear("notice");
+    if (q.length < 2) { fill($("results")); return; }
+    const mine = ++seq;
+    try {
+      const d = await api("/api/opac/search?q=" + encodeURIComponent(q));
+      if (mine !== seq) return;  // a newer search is already on its way
+      history.replaceState(null, "", "?q=" + encodeURIComponent(q));
+      fill($("results"), h("p", {class: "sub", style: "margin:0 0 10px"}, (d.complete === false ? "More than " : "") + d.total + (d.total === 1 ? " book" : " books") + " found"),
+        d.results.length ? d.results.map(card) : h("div", {class: "empty"}, "Nothing matches “" + q + "”. Try fewer or shorter words."));
+    } catch (e) { say("notice", e.status === 429 ? "warn" : "bad", e.message); }
+  }
+
+  const card = b => h("section", {class: "panel", style: "margin-bottom:12px"},
+    h("div", {class: "body"},
+      h("div", {style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"}, h("b", {style: "font-size:17px"}, b.title),
+        b.available ? h("span", {class: "badge good"}, b.available + " available") : h("span", {class: "badge warn"}, "None available now")),
+      h("div", {class: "sub"}, [b.author, b.publisher, b.year, b.isbn ? "ISBN " + b.isbn : ""].filter(Boolean).join(" · ")),
+      h("table", {class: "copies", style: "margin-top:8px"}, h("tbody", {}, b.copies.map(c => h("tr", {},
+        h("td", {}, c.availability), h("td", {}, c.shelf ? "Shelf " + c.shelf : "—"), h("td", {class: "mono"}, c.call_number || ""),
+        h("td", {}, c.shelf ? h("button", {class: "btn ghost small", type: "button", onclick: () => showShelf(c.shelf, b.title)}, "Show the shelf") : null)))))));
+
+  async function showShelf(code, title) {
+    try {
+      const d = await api("/api/opac/shelf?code=" + encodeURIComponent(code));
+      fill($("shelf"), h("section", {class: "panel"}, h("header", {}, h("h3", {}, "Shelf " + d.code)),
+        h("div", {class: "body"}, h("div", {class: "bookshelf"}, d.books.map(x => h("div", {class: "spine" + (x.title === title ? "" : "") + (x.availability === "On loan" ? " loan" : "") + (x.availability.startsWith("Reference") ? " ref" : ""),
+          title: x.title + " · " + x.call_number, style: "cursor:default;height:" + (110 + (x.title.length * 7) % 60) + "px;" + (x.title === title ? "outline:3px solid var(--accent);outline-offset:1px" : "")},
+          h("span", {class: "t"}, x.title), h("span", {class: "n"}, (x.call_number || "").slice(0, 7))))))));
+      $("shelf").scrollIntoView({behavior: "smooth", block: "nearest"});
+    } catch (e) { say("notice", "bad", e.message); }
+  }
+
+  $("form").addEventListener("submit", e => { e.preventDefault(); search(); });
+  $("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(search, 300); });
+  const initial = new URLSearchParams(location.search).get("q");
+  if (initial) { $("q").value = initial; search(); }
+})();
+</script>
+{% endblock %}

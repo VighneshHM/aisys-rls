@@ -1,0 +1,257 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Data migration · {{ app_name }}{% endblock %}
+{% block heading %}Data migration{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Import holdings from a spreadsheet</h2>
+  <p>Nothing reaches the library until you commit. Rows are staged and checked first, a backup is taken, and the whole import can be rolled back.</p>
+</div>
+
+<ol class="steps" id="steps" aria-label="Import progress">
+  <li data-step="1" class="active"><span class="n">1</span><b class="lbl">Upload</b></li>
+  <li data-step="2"><span class="n">2</span><b class="lbl">Map columns</b></li>
+  <li data-step="3"><span class="n">3</span><b class="lbl">Review</b></li>
+  <li data-step="4"><span class="n">4</span><b class="lbl">Commit &amp; reconcile</b></li>
+</ol>
+
+<section class="panel" id="upload-panel">
+  <header><h3>1 · Upload a file</h3><span class="badge">.xlsx or .csv · up to 30 MB</span></header>
+  <div class="body">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".xlsx,.csv" hidden>
+      <span class="drop-ico">{{ icon("upload") }}</span>
+      <b id="drop-title">Drop a spreadsheet here, or click to choose</b>
+      <span class="muted" id="drop-sub">Columns are matched automatically; you can adjust them in the next step.</span>
+    </label>
+    <div id="upload-notice" class="notice" role="alert"></div>
+  </div>
+</section>
+
+<div id="batch" class="hidden">
+  <div class="panel" style="margin-top:18px">
+    <header>
+      <h3 id="batch-title"></h3>
+      <span id="batch-status" class="badge"></span>
+    </header>
+    <div class="body">
+      <div class="grid tiles" id="tiles"></div>
+      <div id="batch-notice" class="notice" role="alert"></div>
+    </div>
+  </div>
+
+  <div class="grid two" style="margin-top:18px">
+    <section class="panel" id="map-panel">
+      <header><h3>2 · Column mapping</h3><span class="badge" id="map-badge"></span></header>
+      <div class="body">
+        <p class="muted" style="margin-top:0">Choose which column of your file feeds each library field. <b>*</b> is required.</p>
+        <div id="map-grid" class="map-grid"></div>
+        <button class="btn" id="apply-map" type="button" style="margin-top:14px">Apply mapping &amp; re-check</button>
+      </div>
+    </section>
+
+    <section class="panel" id="issues-panel">
+      <header><h3>3 · Review problems</h3><a class="btn ghost small" id="dl-errors" href="#">Download report (CSV)</a></header>
+      <div id="issues-body"></div>
+    </section>
+  </div>
+
+  <section class="panel" id="commit-panel" style="margin-top:18px">
+    <header><h3>4 · Commit &amp; reconcile</h3><span id="commit-badge" class="badge"></span></header>
+    <div class="body">
+      <p class="muted" id="commit-help" style="margin-top:0"></p>
+      <div id="recon"></div>
+      <div class="actions">
+        <button class="btn" id="commit" type="button">Migrate valid rows</button>
+        <button class="btn ghost" id="rollback" type="button">Roll back this batch</button>
+      </div>
+      <div id="commit-notice" class="notice" role="alert"></div>
+    </div>
+  </section>
+</div>
+
+<section class="panel" style="margin-top:18px">
+  <header><h3>Previous imports</h3></header>
+  <div id="history" class="table-wrap"></div>
+</section>
+
+<script>
+(() => {
+  const FIELDS = {{ fields|tojson }}, REQUIRED = {{ required|tojson }};
+  const LABELS = {accession_no: "Accession no.", barcode: "Barcode", title: "Title", author: "Author", isbn: "ISBN",
+    publisher: "Publisher", pub_year: "Publication year", edition: "Edition", language: "Language", call_number: "Call number",
+    location: "Location", item_type: "Item type", status: "Status", price: "Price", acquired_on: "Date acquired"};
+  const $ = id => document.getElementById(id);
+  let batch = null;
+
+  // --- tiny DOM helper: data is only ever inserted as text, never as HTML
+  function h(tag, attrs = {}, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) { if (k === "class") el.className = v; else if (k.startsWith("on")) el[k] = v; else if (v !== false && v != null) el.setAttribute(k, v); }
+    for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(String(k)));
+    return el;
+  }
+  const fmt = n => (n ?? 0).toLocaleString();
+  function say(id, kind, text) { const n = $(id); n.className = "notice show " + kind; n.textContent = text; }
+  function clear(id) { $(id).className = "notice"; $(id).textContent = ""; }
+  async function api(url, opts = {}) {
+    const r = await fetch(url, {credentials: "same-origin", ...opts});
+    const body = r.headers.get("content-type")?.includes("json") ? await r.json() : null;
+    if (!r.ok) throw new Error(typeof body?.detail === "string" ? body.detail : (body?.detail?.[0]?.msg || "Request failed (" + r.status + ")"));
+    return body;
+  }
+  const STATUS = {staged: ["warn", "Needs mapping"], validated: ["", "Ready to review"], committed: ["good", "Migrated"], rolled_back: ["warn", "Rolled back"], failed: ["bad", "Failed"]};
+
+  // Progress per batch status. "done" = finished, "active" = what to do next, "warn"/"bad" = ended abnormally.
+  const STEPS = {
+    staged:      ["done", "active", "", ""],              // uploaded; required columns still need mapping
+    validated:   ["done", "done", "active", ""],          // checked; review the problems, then commit
+    committed:   ["done", "done", "done", "done"],        // migrated and reconciled
+    rolled_back: ["done", "done", "done", "warn"],        // was migrated, then undone
+    failed:      ["done", "done", "done", "bad"],         // commit aborted; nothing changed
+  };
+  const STEP4_LABEL = {rolled_back: "Rolled back", failed: "Failed"};
+  function setSteps(status) {
+    const states = STEPS[status] || STEPS.staged;
+    document.querySelectorAll("#steps li").forEach((li, i) => {
+      li.className = states[i];
+      li.querySelector(".n").textContent = states[i] === "done" ? "✓" : states[i] === "warn" ? "↺" : states[i] === "bad" ? "!" : i + 1;
+      if (i === 3) li.querySelector(".lbl").textContent = STEP4_LABEL[status] || "Commit & reconcile";
+    });
+    $("steps").dataset.status = status;
+  }
+
+  function render(b) {
+    batch = b; const s = b.summary || {};
+    $("batch").classList.remove("hidden");
+    $("batch-title").textContent = b.filename + "  ·  batch #" + b.id;
+    const [cls, label] = STATUS[b.status] || ["", b.status];
+    $("batch-status").className = "badge " + cls; $("batch-status").textContent = label;
+
+    const tiles = [["Source rows", s.source_rows, ""], ["Valid", s.valid, "good"], ["Invalid", s.invalid, s.invalid ? "bad" : ""],
+      ["Duplicates", s.duplicate, s.duplicate ? "warn" : ""], ["Valid with warnings", s.valid_with_warnings, ""]];
+    $("tiles").replaceChildren(...(s.valid === undefined ? [] : tiles.map(([l, v, c]) => h("div", {class: "tile " + c}, h("div", {class: "num"}, fmt(v)), h("div", {class: "lbl"}, l)))));
+    clear("batch-notice");
+    if (s.mapping_problems) say("batch-notice", "bad", s.mapping_problems.join("  ·  "));
+    if (b.refreshed) {
+      const p = b.refreshed.previous, n = b.refreshed.now;
+      say("batch-notice", "warn", "The library changed after this file was first checked (another import was committed or rolled back), "
+        + "so it has been checked again. Valid rows " + fmt(p.valid) + " → " + fmt(n.valid) + ", duplicates " + fmt(p.duplicate) + " → " + fmt(n.duplicate) + ". Review the results before committing.");
+    }
+
+    renderMapping(b); renderIssues(b); renderCommit(b);
+    setSteps(b.status);
+    $("batch").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+
+  function renderMapping(b) {
+    const editable = b.status === "staged" || b.status === "validated";
+    const unmapped = new Set((b.summary.unmapped_headers || []));
+    $("map-badge").textContent = Object.keys(b.mapping).length + " of " + FIELDS.length + " fields mapped";
+    $("map-grid").replaceChildren(...FIELDS.map(f => {
+      const sel = h("select", {id: "map-" + f, disabled: !editable ? "" : false}, h("option", {value: ""}, f === "title" || f === "accession_no" ? "— choose a column —" : "— not imported —"),
+        ...b.headers.map(col => h("option", {value: col, selected: b.mapping[f] === col ? "" : false}, col)));
+      return h("div", {class: "map-row"}, h("label", {for: "map-" + f}, LABELS[f], REQUIRED.includes(f) ? h("b", {class: "req"}, " *") : ""), sel);
+    }));
+    $("apply-map").classList.toggle("hidden", !editable);
+    if (unmapped.size && editable) $("map-grid").append(h("p", {class: "muted small"}, "Unused columns in your file: ", [...unmapped].join(", ")));
+  }
+
+  async function renderIssues(b) {
+    const s = b.summary, body = $("issues-body");
+    $("dl-errors").classList.toggle("hidden", s.valid === undefined);
+    $("dl-errors").href = "/api/migrations/" + b.id + "/errors.csv";
+    if (s.valid === undefined) { body.replaceChildren(h("div", {class: "empty"}, "Map the required columns to see the validation results.")); return; }
+    const codes = [...Object.entries(s.error_codes || {}).map(([c, n]) => [c, n, "error"]), ...Object.entries(s.warning_codes || {}).map(([c, n]) => [c, n, "warning"])];
+    const table = codes.length ? h("div", {class: "table-wrap"}, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Problem"), h("th", {}, "Rows"), h("th", {}, "Effect"))),
+      h("tbody", {}, ...codes.map(([c, n, sev]) => h("tr", {}, h("td", {class: "mono"}, c), h("td", {}, fmt(n)), h("td", {}, h("span", {class: "badge " + (sev === "error" ? "bad" : "warn")}, sev === "error" ? "Row skipped" : "Imported with a note"))))))) : h("div", {class: "empty"}, "No problems found.");
+    body.replaceChildren(table);
+    const bad = await api("/api/migrations/" + b.id + "/rows?status=invalid&limit=6");
+    const dup = await api("/api/migrations/" + b.id + "/rows?status=duplicate&limit=4");
+    const sample = [...bad.rows, ...dup.rows];
+    if (sample.length) body.append(h("div", {class: "sample"}, h("h4", {}, "Examples"), ...sample.map(r => h("div", {class: "ex"},
+      h("span", {class: "badge " + (r.status === "invalid" ? "bad" : "warn")}, "Row " + r.row_no),
+      h("span", {}, r.errors.filter(e => e.severity === "error").map(e => e.message).join("; ")), ))));
+  }
+
+  function renderCommit(b) {
+    const s = b.summary, rec = s.reconciliation, rb = s.rollback;
+    const ok = b.status === "validated" && (s.valid || 0) > 0;
+    $("commit").classList.toggle("hidden", b.status !== "validated");
+    $("commit").disabled = !ok;
+    $("rollback").classList.toggle("hidden", b.status !== "committed");
+    const [cls, label] = STATUS[b.status] || ["", b.status];
+    $("commit-badge").className = "badge " + cls; $("commit-badge").textContent = label;
+    $("commit-help").textContent = b.status === "validated"
+      ? (ok ? "A verified backup is taken, then " + fmt(s.valid) + " rows (" + fmt(s.bibs_to_create) + " new bibliographic records, " + fmt(s.bibs_reused) + " existing reused) are added in a single all-or-nothing step. Invalid rows and duplicates are skipped; existing records are never changed."
+             : "There are no valid rows to migrate. Fix the file or the mapping and upload again.")
+      : b.status === "committed" ? "Committed. The checks below prove the source and the library agree."
+      : b.status === "rolled_back" ? "This batch was rolled back; the library holds only what it held before." : "";
+    const rows = [];
+    if (rec) {
+      const chk = (ok, text) => h("li", {class: ok ? "pass" : "fail"}, h("span", {class: "mark"}, ok ? "✓" : "✕"), text);
+      rows.push(h("div", {class: "recon"},
+        h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Source file"), h("th", {}, "Rows"), h("th", {}, "Library"), h("th", {}, "Count"))),
+          h("tbody", {},
+            h("tr", {}, h("td", {}, "Rows in file"), h("td", {}, fmt(rec.source_rows)), h("td", {}, "Items before"), h("td", {}, fmt(rec.items_before))),
+            h("tr", {}, h("td", {}, "Rejected (invalid)"), h("td", {}, fmt(rec.rejected_invalid)), h("td", {}, "Items added"), h("td", {}, fmt(rec.items_added))),
+            h("tr", {}, h("td", {}, "Skipped (duplicate)"), h("td", {}, fmt(rec.skipped_duplicate)), h("td", {}, "Items after"), h("td", {}, fmt(rec.items_after))),
+            h("tr", {}, h("td", {}, h("b", {}, "Migrated")), h("td", {}, h("b", {}, fmt(rec.migrated))), h("td", {}, "Bibliographic records created"), h("td", {}, fmt(rec.bibs_created))))),
+        h("ul", {class: "checks"},
+          chk(rec.source_rows === rec.migrated + rec.rejected_invalid + rec.skipped_duplicate, "Every source row is accounted for (migrated + rejected + skipped = " + fmt(rec.source_rows) + ")"),
+          chk(rec.items_added === rec.migrated, "Items added to the library equal the rows migrated"),
+          chk(rec.existing_records_unchanged, "Every record that existed before is unchanged (verified by checksum of its key fields)"),
+          chk(rec.balanced, "Overall reconciliation balanced"),
+          b.backup ? h("li", {class: "pass"}, h("span", {class: "mark"}, "✓"), "Backup taken first: ", h("code", {}, b.backup.split(/[\\/]/).pop())) : null)));
+    }
+    if (rb) rows.push(h("ul", {class: "checks"}, h("li", {class: rb.restored_to_pre_migration_counts ? "pass" : "fail"}, h("span", {class: "mark"}, rb.restored_to_pre_migration_counts ? "✓" : "✕"),
+      "Rolled back: " + fmt(rb.items_removed) + " items and " + fmt(rb.bibs_removed) + " bibliographic records removed; library is back to " + fmt(rb.items_now) + " items.")));
+    if (s.failure) rows.push(h("div", {class: "notice show bad"}, "The import failed and was rolled back; the library is unchanged. A backup was kept."));
+    $("recon").replaceChildren(...rows);
+  }
+
+  async function upload(file) {
+    clear("upload-notice");
+    if (!file) return;
+    $("drop-title").textContent = "Uploading " + file.name + "…";
+    const fd = new FormData(); fd.append("file", file);
+    try { render(await api("/api/migrations", {method: "POST", body: fd})); loadHistory(); $("drop-title").textContent = "Drop another spreadsheet, or click to choose"; }
+    catch (e) { say("upload-notice", "bad", e.message); $("drop-title").textContent = "Drop a spreadsheet here, or click to choose"; }
+    $("file").value = "";
+  }
+  $("file").onchange = e => upload(e.target.files[0]);
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => upload(e.dataTransfer.files[0]));
+
+  $("apply-map").onclick = async () => {
+    const mapping = {}; FIELDS.forEach(f => { const v = $("map-" + f).value; if (v) mapping[f] = v; });
+    try { render(await api("/api/migrations/" + batch.id + "/mapping", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({mapping})})); loadHistory(); }
+    catch (e) { say("batch-notice", "bad", e.message); }
+  };
+  async function act(path, btn, confirmText) {
+    if (confirmText && !confirm(confirmText)) return;
+    btn.disabled = true; clear("commit-notice");
+    try { render(await api("/api/migrations/" + batch.id + "/" + path, {method: "POST"})); loadHistory(); }
+    catch (e) {
+      try { render(await api("/api/migrations/" + batch.id)); loadHistory(); } catch (_) { /* keep the view as it is */ }
+      say("commit-notice", "bad", e.message);
+    }
+    btn.disabled = false;
+  }
+  $("commit").onclick = () => act("commit", $("commit"));
+  $("rollback").onclick = () => act("rollback", $("rollback"), "Remove every record created by this import? Records that existed before are not touched.");
+
+  async function loadHistory() {
+    const list = await api("/api/migrations");
+    $("history").replaceChildren(list.length ? h("table", {}, h("thead", {}, h("tr", {}, ...["#", "File", "Status", "Rows", "Valid", "Invalid", "Duplicates", "By", ""].map(t => h("th", {}, t)))),
+      h("tbody", {}, ...list.map(b => h("tr", {}, h("td", {}, b.id), h("td", {}, b.filename), h("td", {}, h("span", {class: "badge " + (STATUS[b.status]?.[0] || "")}, STATUS[b.status]?.[1] || b.status),
+          b.stale ? h("span", {class: "badge warn", style: "margin-left:6px", title: "The library changed after this file was checked; opening it checks it again"}, "Needs re-check") : null),
+        h("td", {}, fmt(b.source_rows)), h("td", {}, fmt(b.valid)), h("td", {}, fmt(b.invalid)), h("td", {}, fmt(b.duplicate)), h("td", {}, b.created_by),
+        h("td", {}, h("button", {class: "btn ghost small", type: "button", onclick: async () => render(await api("/api/migrations/" + b.id))}, "Open")))))) : h("div", {class: "empty"}, "No imports yet."));
+  }
+  loadHistory();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Library rules and system set-up</h2>
+  <p>Change the rules the library runs by: loan period, fines, reminders, sign-in limits. A change applies at once and is written to the audit log with the old and new value. A value you change here wins over the configuration file; <b>Use file value</b> goes back to it. Devices, drivers and certificates are listed for reference and are changed in the configuration file.</p>
+</div>
+
+<div class="grid two">
+  <section class="panel">
+    <header><h3>Rules</h3><span class="badge" id="changed-count"></span></header>
+    <div class="body">
+      <div id="rules"></div>
+      <div class="actions"><button class="btn" id="save" type="button">Save changes</button><button class="btn ghost" id="discard" type="button">Discard edits</button></div>
+      <div id="notice" class="notice" role="alert"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h3>How the system is set up</h3><span class="badge">read only</span></header>
+    <div class="body" id="facts"></div>
+    <p class="sub" id="note" style="margin:0 18px 14px"></p>
+  </section>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear} = UI;
+  let items = [];
+  const why = e => e.problems && e.problems.length ? e.problems.map(p => p.message).join(" ") : e.message;
+  const inputOf = key => document.querySelector('[data-key="' + key + '"]');
+  const read = it => it.kind === "bool" ? inputOf(it.key).checked : inputOf(it.key).value.trim();
+  const edited = () => items.filter(it => String(read(it)) !== String(it.value));
+
+  function refreshCount() {
+    const n = edited().length;
+    $("changed-count").textContent = n ? n + " unsaved" : items.filter(i => i.changed).length + " changed from the file";
+    $("save").disabled = n === 0; $("discard").disabled = n === 0;
+  }
+
+  function field(it) {
+    const id = "f-" + it.key.replace(/\./g, "-");
+    const control = it.kind === "bool"
+      ? h("input", {type: "checkbox", id, "data-key": it.key, checked: it.value ? "" : false, onchange: refreshCount, style: "width:22px;height:22px"})
+      : h("input", {type: "number", id, "data-key": it.key, value: it.value, min: it.min, max: it.max, step: 1, inputmode: "numeric", oninput: refreshCount, style: "max-width:140px"});
+    const fileText = it.kind === "bool" ? (it.file_value ? "on" : "off") : it.file_value + (it.unit ? " " + it.unit : "");
+    return h("div", {class: "field"},
+      h("label", {for: id}, it.label, it.unit && it.kind !== "bool" ? h("span", {class: "sub"}, " (" + it.unit + ")") : null),
+      h("div", {style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap"},
+        control,
+        it.changed ? h("span", {class: "badge warn"}, "changed") : null,
+        it.changed ? h("button", {class: "btn ghost small", type: "button", onclick: () => reset(it)}, "Use file value (" + fileText + ")") : null),
+      h("div", {class: "sub"}, it.help + (it.kind === "int" ? " Allowed: " + it.min + " to " + it.max + "." : "") +
+        (it.changed ? " Set by " + it.updated_by + "." : "")));
+  }
+
+  function draw() {
+    const groups = [...new Set(items.map(i => i.group))];
+    fill($("rules"), groups.map(g => h("fieldset", {style: "border:0;padding:0;margin:0 0 14px"},
+      h("legend", {style: "font-weight:600;margin-bottom:6px"}, g), items.filter(i => i.group === g).map(field))));
+    refreshCount();
+  }
+
+  async function load() {
+    let d;
+    try { d = await api("/api/admin/settings"); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } fill($("rules"), h("div", {class: "empty"}, e.message)); return; }
+    items = d.items; draw();
+    const groups = [...new Set(d.readonly.map(f => f.group))];
+    fill($("facts"), groups.map(g => h("div", {style: "margin-bottom:12px"}, h("div", {style: "font-weight:600;margin-bottom:4px"}, g),
+      h("table", {style: "width:100%;table-layout:fixed"}, h("tbody", {}, d.readonly.filter(f => f.group === g).map(f => h("tr", {}, h("th", {scope: "row", style: "font-weight:500;vertical-align:top;padding-right:12px;width:38%"}, f.label), h("td", {class: "mono", style: "overflow-wrap:anywhere;white-space:normal"}, f.value))))))));
+    $("note").textContent = d.note;
+  }
+
+  async function reset(it) {
+    clear("notice");
+    try { await api("/api/admin/settings/" + encodeURIComponent(it.key), {method: "DELETE"}); say("notice", "ok", it.label + " now uses the configuration file's value."); await load(); }
+    catch (e) { say("notice", "bad", why(e)); }
+  }
+
+  $("discard").onclick = () => { clear("notice"); draw(); };
+  $("save").onclick = async () => {
+    clear("notice");
+    const values = {}; edited().forEach(it => values[it.key] = read(it));
+    if ($("save").disabled) return;
+    $("save").disabled = true;
+    try { const r = await api("/api/admin/settings", {method: "PUT", json: {values}}); say("notice", "ok", r.message); await load(); }
+    catch (e) { if (e.status === 401) { location.href = "/"; return; } say("notice", "bad", why(e)); refreshCount(); }
+  };
+  load();
+})();
+</script>
+{% endblock %}

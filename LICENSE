@@ -1,0 +1,29 @@
+ShelfSense Source-Available Licence
+Copyright (c) 2026 Vighnesh Haresh Madani. All rights reserved.
+
+1. Viewing. You may view and read the source code of ShelfSense (the "Software") in this repository.
+
+2. Contributing. You may fork this repository and modify your fork solely for the purpose of preparing contributions
+   (pull requests, issues or patches) to this repository. By submitting a contribution you confirm that you have the
+   right to submit it, and you grant the copyright holder a perpetual, worldwide, royalty-free, irrevocable licence to
+   use, modify, sublicense and distribute your contribution as part of the Software under any terms.
+
+3. Any other use needs permission first. You may not, without prior written permission from the copyright holder:
+   (a) run, deploy or operate the Software, in whole or in part, for any library, organisation or person other than
+       for evaluating a contribution under section 2;
+   (b) copy the Software, or substantial portions of it, into any other project or product;
+   (c) distribute, sublicense, sell or offer the Software, or works derived from it, to anyone;
+   (d) use the Software, or works derived from it, for any commercial purpose.
+   To ask for permission, open an issue in this repository or contact the author through GitHub
+   (https://github.com/VighneshHM). Permission is given case by case and may come with its own terms.
+
+4. Third-party components. The Software depends on third-party packages that are distributed under their own licences
+   (listed in docs/third-party-licences.md). Nothing in this licence changes their terms.
+
+5. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+   LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHOR OR COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+6. Termination. Any use outside these terms ends your rights under this licence immediately.

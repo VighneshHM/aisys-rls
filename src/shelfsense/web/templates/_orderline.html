@@ -1,0 +1,3 @@
+{% for key, label in [("title","Title"),("author","Author"),("isbn","ISBN"),("publisher","Publisher"),("year","Year"),("qty","Copies"),("price","Price each"),("location","Shelf")] %}
+<div class="field" style="margin:0 0 6px"><label for="n-{{ key }}">{{ label }}</label><input id="n-{{ key }}" autocomplete="off"{% if key == "qty" %} type="number" min="1" value="1"{% endif %}></div>
+{% endfor %}

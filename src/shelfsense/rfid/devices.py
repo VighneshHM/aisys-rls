@@ -1,0 +1,110 @@
+"""Device-neutral interfaces (RFID middleware layer).
+
+Commands go *to* a device (`encode`, `set_security`, `indicate`); events come *from* it (`TagObserved`).
+Handheld readers, gates, cameras and printers get their own interfaces in later stages and share `Device`.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
+
+from shelfsense.rfid.events import Passage, TagObserved
+
+
+class DeviceError(Exception):
+    """A device refused or failed a command."""
+
+
+class DeviceUnavailable(DeviceError):  # noqa: N818 - reads better than DeviceUnavailableError at call sites
+    """The device is offline / unreachable."""
+
+
+@dataclass(frozen=True)
+class DeviceHealth:
+    online: bool
+    detail: str = ""
+
+
+@runtime_checkable
+class Device(Protocol):
+    device_id: str
+    kind: str
+
+    def health(self) -> DeviceHealth: ...
+
+
+@runtime_checkable
+class Handheld(Device, Protocol):
+    """Handheld reader for walking a shelf: one sweep returns every tag in range (the same tag may repeat)."""
+
+    def scan(self) -> list[TagObserved]:
+        """One sweep. Raises DeviceUnavailable if the handheld is off or out of reach."""
+
+    def indicate(self, pattern: str) -> None:
+        """Audible/visible confirmation: 'ok' (one beep, green), 'warning' (two beeps, amber), 'error' (long, red)."""
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """A still image from a camera."""
+
+    content_type: str
+    data: bytes
+
+
+@runtime_checkable
+class Gate(Device, Protocol):
+    """Security gate: reports each passage (with the security bit of every tag) and sounds or lights an alarm."""
+
+    def poll(self) -> list[Passage]:
+        """Passages since the last poll. Raises DeviceUnavailable if the gate is unreachable."""
+
+    def indicate(self, pattern: str) -> None:
+        """Local alarm: 'ok', 'warning' or 'alarm' (siren and flashing light)."""
+
+
+@runtime_checkable
+class Camera(Device, Protocol):
+    """CCTV camera: takes a still image on request."""
+
+    def capture(self, caption: str) -> Snapshot:
+        """A snapshot. `caption` is overlaid by cameras that support it (the mock does)."""
+
+
+@dataclass(frozen=True)
+class CardJob:
+    """What is printed and encoded on one patron card."""
+
+    uid: str  # the card number written to the card's chip and barcode
+    member_no: str
+    name: str
+    library: str
+
+
+@runtime_checkable
+class CardPrinter(Device, Protocol):
+    """Card printer / encoder: prints the member's name and number on a card and writes the card number to its chip."""
+
+    def personalise(self, job: CardJob) -> str:
+        """Print and encode one card. Returns the printer's job reference. Raises DeviceError / DeviceUnavailable."""
+
+
+@runtime_checkable
+class StaffReader(Device, Protocol):
+    """Staff-station reader/encoder: reads tags on the pad and writes the item identifier + security bit."""
+
+    def read_field(self) -> list[TagObserved]:
+        """Tags currently in the reader field."""
+
+    def encode(self, uid: str, item_ref: str) -> None:
+        """Write the item identifier (accession number) to the tag."""
+
+    def set_security(self, uid: str, armed: bool) -> None:
+        """Arm/disarm the anti-theft (EAS/AFI) bit."""
+
+    def clear(self, uid: str) -> None:
+        """Undo `encode`: wipe the identifier and disarm. Used to roll back a failed association."""
+
+    def indicate(self, pattern: str) -> None:
+        """Audible/visible confirmation: 'ok', 'warning' or 'error'."""

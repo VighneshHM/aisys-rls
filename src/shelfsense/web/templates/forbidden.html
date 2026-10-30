@@ -1,0 +1,12 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Not permitted · {{ app_name }}{% endblock %}
+{% block heading %}Not permitted{% endblock %}
+{% block content %}
+<div class="panel"><div class="empty">
+  <div class="stat" style="display:inline-flex;border:0;box-shadow:none"><div class="ico">{{ icon("shield") }}</div></div>
+  <h2 style="margin:10px 0 6px">Your role cannot open this page</h2>
+  <p>You are signed in as <b>{{ role_label }}</b>. Ask an administrator if you need access.</p>
+  <a class="btn" href="/dashboard" style="text-decoration:none;margin-top:8px">Back to dashboard</a>
+</div></div>
+{% endblock %}

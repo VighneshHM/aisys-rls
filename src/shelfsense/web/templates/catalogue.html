@@ -1,0 +1,208 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Catalogue · {{ app_name }}{% endblock %}
+{% block heading %}Catalogue{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Find or add an item</h2>
+  <p>Locate any copy by title, author, ISBN, accession number, barcode or RFID tag, then see which tag it carries.</p>
+</div>
+
+<section class="panel">
+  <header>
+    <h3>Items</h3>
+    {% if can_write %}<button class="btn small" id="add-btn" type="button">+ Add item</button>{% endif %}
+  </header>
+  <div class="body" style="padding-bottom:4px">
+    <div class="toolbar">
+      <div class="grow"><input id="q" type="search" placeholder="Search title, author, ISBN, accession no., barcode or tag UID…" autocomplete="off" aria-label="Search the catalogue"></div>
+      <select id="filter" aria-label="Tag filter">
+        <option value="">All items</option><option value="true">Tagged only</option><option value="false">Untagged only</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap" id="results"></div>
+  <div class="pager" id="pager"></div>
+</section>
+
+{% if can_write %}
+<section class="panel hidden" id="add-panel" style="margin-top:18px">
+  <header><h3 id="form-title">Add an item</h3><button class="btn ghost small" id="add-close" type="button">Close</button></header>
+  <div class="body">
+    <p class="muted" style="margin-top:0" id="form-help">The same rules as the spreadsheet import apply. <b>*</b> is required.</p>
+    <form id="add-form" novalidate><div class="form-grid" id="add-fields"></div>
+      <div class="actions"><button class="btn" type="submit" id="save-btn">Save item</button>
+        <button class="btn ghost" id="lookup" type="button" title="Fill in the title, author and so on from the outside catalogue">Look up the ISBN</button></div>
+    </form>
+    <div id="add-notice" class="notice" role="alert"></div>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel hidden" id="detail" style="margin-top:18px">
+  <header><h3 id="detail-title">Item</h3><span id="detail-badge" class="badge"></span></header>
+  <div class="body" id="detail-body"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, api, say, clear, fmt, when, short} = UI;
+  const CAN_TAG = {{ 'true' if can_tag else 'false' }}, CAN_WRITE = {{ 'true' if can_write else 'false' }}, LIMIT = 15;
+  let offset = 0, selected = null, timer = null, editing = null;  // editing: the item whose record is open in the form
+
+  const FIELDS = [
+    ["accession_no", "Accession no.", true], ["title", "Title", true], ["author", "Author"], ["isbn", "ISBN"],
+    ["publisher", "Publisher"], ["pub_year", "Publication year"], ["edition", "Edition"], ["language", "Language"],
+    ["barcode", "Barcode"], ["call_number", "Call number"], ["location", "Location"],
+    ["item_type", "Item type", false, ["book", "reference", "serial", "media", "other"]],
+    ["status", "Status", false, ["available", "damaged", "lost", "withdrawn"]], ["price", "Price"], ["acquired_on", "Date acquired (dd/mm/yyyy)"],
+  ];
+
+  // ---------------------------------------------------------------- search results
+  async function load() {
+    const params = new URLSearchParams({q: $("q").value.trim(), limit: LIMIT, offset});
+    if ($("filter").value) params.set("tagged", $("filter").value);
+    let data;
+    try { data = await api("/api/catalogue/items?" + params); }
+    catch (e) { $("results").replaceChildren(h("div", {class: "empty"}, e.message)); return; }
+    const rows = data.items;
+    $("results").replaceChildren(rows.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Accession", "Title", "Location", "Status", "RFID tag"].map(t => h("th", {}, t)))),
+      h("tbody", {}, rows.map(i => h("tr", {class: "clickable" + (i.id === selected ? " selected" : ""), tabindex: "0", onclick: () => show(i.id), onkeydown: e => { if (e.key === "Enter") show(i.id); }},
+        h("td", {class: "mono"}, i.accession_no),
+        h("td", {}, h("b", {}, i.title), h("div", {class: "sub"}, [i.author, i.isbn].filter(Boolean).join(" · "))),
+        h("td", {}, i.location || "—"),
+        h("td", {}, h("span", {class: "badge " + (i.status === "available" ? "good" : "warn")}, i.status === "on_loan" ? "On loan" : i.status), i.is_reference ? h("span", {class: "badge", style: "margin-left:6px"}, "reference") : null),
+        h("td", {}, i.tag ? [h("span", {class: "badge good"}, "Tagged"), " ", h("span", {class: "tag-pill muted"}, short(i.tag.uid))] : i.matched_tag ? [h("span", {class: "badge warn"}, "Matched " + i.matched_tag.status + " tag"), " ", h("span", {class: "tag-pill muted"}, short(i.matched_tag.uid))] : h("span", {class: "badge"}, "Untagged")))))
+    ) : h("div", {class: "empty"}, "No items match."));
+    const from = data.total ? offset + 1 : 0, to = offset + rows.length;
+    $("pager").replaceChildren(h("span", {class: "muted"}, fmt(from) + "–" + fmt(to) + " of " + fmt(data.total)),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - LIMIT); load(); }}, "Previous"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= data.total ? "" : false, onclick: () => { offset += LIMIT; load(); }}, "Next"));
+  }
+  $("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { offset = 0; load(); }, 250); });
+  $("filter").addEventListener("change", () => { offset = 0; load(); });
+
+  // ---------------------------------------------------------------- item detail + tag relationship
+  async function show(id, flash, flashKind) {
+    selected = id;
+    let it;
+    try { it = await api("/api/catalogue/items/" + id); } catch (e) { return; }
+    $("detail").classList.remove("hidden");
+    $("detail-title").textContent = it.title;
+    $("detail-badge").className = "badge " + (it.tag ? "good" : "");
+    $("detail-badge").textContent = it.tag ? "Tagged" : "Untagged";
+    const kv = (k, v) => [h("dt", {}, k), h("dd", {}, v || "—")];
+    const tag = it.tag;
+    UI.fill($("detail-body"),
+      h("dl", {class: "kv tight"}, kv("Accession no.", it.accession_no), kv("Barcode", it.barcode), kv("Author", it.author), kv("ISBN", it.isbn),
+        kv("Publisher", [it.publisher, it.pub_year].filter(Boolean).join(", ")), kv("Call number", it.call_number), kv("Location", it.location),
+        kv("Type / status", it.item_type + " · " + (it.status === "on_loan" ? "on loan" : it.status)), kv("Price", it.price)),
+      h("h4", {style: "margin:20px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"}, "Tag-to-item relationship"),
+      tag ? h("div", {class: "relation"},
+          h("div", {class: "node"}, h("h4", {}, "RFID tag"), h("b", {class: "mono"}, tag.uid),
+            h("div", {class: "sub"}, "Security bit: " + (tag.security_armed ? "armed" : "off") + " · reader " + (tag.reader_id || "—")),
+            h("div", {class: "sub"}, "Tagged by " + tag.tagged_by + ", " + when(tag.tagged_at))),
+          h("div", {class: "link"}, "linked"),
+          h("div", {class: "node"}, h("h4", {}, "Item (copy)"), h("b", {}, it.title), h("div", {class: "sub"}, "Accession " + it.accession_no)))
+        : h("p", {class: "muted", style: "margin:0"}, "This copy has no active RFID tag."),
+      it.tag_history.length > 1 || (it.tag_history.length === 1 && !tag) ? h("div", {},
+        h("h4", {style: "margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"}, "Tag history"),
+        h("ul", {class: "timeline"}, it.tag_history.slice().reverse().map(t => h("li", {}, h("time", {}, when(t.tagged_at)),
+          h("span", {}, h("span", {class: "mono"}, short(t.uid)), " — ", t.status === "active" ? "active" : t.status + (t.end_reason ? " (" + t.end_reason + ")" : ""))))) ) : null,
+      CAN_TAG || CAN_WRITE ? h("div", {class: "actions"},
+        CAN_WRITE ? h("button", {class: "btn ghost small", type: "button", onclick: () => openEdit(it)}, "Edit details or status") : null,
+        CAN_TAG ? h("a", {class: "btn small", href: "/tagging?item=" + id, style: "text-decoration:none"}, tag ? "Re-tag this item" : "Tag this item") : null,
+        CAN_TAG && tag ? h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => toggleRemove(it)}, "Remove or retire tag") : null) : null,
+      h("div", {id: "remove-slot"}));
+    if (flash) $("detail-body").prepend(h("div", {class: "notice show " + (flashKind || "ok"), style: "margin:0 0 14px"}, flash));
+    load();
+    $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+
+  function toggleRemove(it) {
+    const slot = $("remove-slot");
+    if (slot.firstChild) { slot.replaceChildren(); return; }
+    slot.append(UI.endTagPanel({uid: it.tag.uid, itemText: it.accession_no + " · " + it.title,
+      onDone: async r => { await show(it.id, "Tag " + r.state + ". " + r.device.message, r.device.status === "cleared" ? "ok" : "warn"); },
+      onCancel: () => slot.replaceChildren()}));
+  }
+
+  // ---------------------------------------------------------------- add item
+  {% if can_write %}
+  const EDIT_FIELDS = FIELDS.concat([["reason", "Reason for a status change (kept in the audit log)"]]);
+  function buildForm(it) {
+    editing = it || null;
+    const list = editing ? EDIT_FIELDS : FIELDS;
+    $("add-fields").replaceChildren(...list.map(([key, label, req, options]) => {
+      const onLoan = editing && key === "status" && editing.status === "on_loan";
+      const control = options
+        ? h("select", {id: "f-" + key, disabled: onLoan ? "" : false}, (onLoan ? ["on_loan"] : options).map(o => h("option", {value: o}, o === "on_loan" ? "on loan (check it in first)" : o)))
+        : h("input", {id: "f-" + key, autocomplete: "off", disabled: editing && key === "accession_no" ? "" : false});
+      if (editing && editing[key] != null) control.value = String(editing[key]);
+      return h("div", {class: "field" + (key === "title" || key === "reason" ? " wide" : "")}, h("label", {for: "f-" + key}, label, req ? h("b", {class: "req"}, " *") : ""), control, h("div", {class: "err", id: "e-" + key}));
+    }));
+    $("form-title").textContent = editing ? "Edit " + editing.accession_no : "Add an item";
+    $("save-btn").textContent = editing ? "Save changes" : "Save item";
+    $("form-help").textContent = editing
+      ? "The same rules as a new item apply. The accession number cannot change. Title, author, ISBN and the other book details are shared by every copy of this title. To take a copy out of the collection, set its status to withdrawn: nothing is deleted."
+      : "The same rules as the spreadsheet import apply. Fields marked * are required.";
+  }
+  function clearErrors() { (editing ? EDIT_FIELDS : FIELDS).forEach(([k]) => { $("e-" + k).textContent = ""; $("f-" + k).classList.remove("invalid"); }); clear("add-notice"); }
+  function openPanel(focus) { $("add-panel").classList.remove("hidden"); $(focus).focus(); $("add-panel").scrollIntoView({behavior: "smooth", block: "nearest"}); }
+  function openEdit(it) { buildForm(it); clear("add-notice"); openPanel("f-title"); }
+  $("add-btn").onclick = () => { buildForm(); clear("add-notice"); openPanel("f-accession_no"); };
+  $("add-close").onclick = () => $("add-panel").classList.add("hidden");
+  // net cataloguing: fill the form from an outside catalogue; the person checks it and saves it
+  $("lookup").onclick = async () => {
+    clearErrors();
+    const isbn = $("f-isbn").value.trim();
+    if (!isbn) { say("add-notice", "warn", "Type the ISBN first, then look it up."); $("f-isbn").focus(); return; }
+    const button = $("lookup"); button.disabled = true; button.textContent = "Looking up…";
+    try {
+      const r = await api("/api/catalogue/lookup?isbn=" + encodeURIComponent(isbn));
+      ["title", "author", "publisher", "pub_year", "edition", "language", "isbn"].forEach(k => { if (r[k] != null && $("f-" + k)) $("f-" + k).value = r[k]; });
+      say("add-notice", "ok", "Found “" + r.title + "” in the " + r.source + " catalogue. Check the details, add the accession number and location, then save.");
+      $("f-accession_no").focus();
+    } catch (err) { say("add-notice", err.status === 404 ? "warn" : "bad", err.message); }
+    finally { button.disabled = false; button.textContent = "Look up the ISBN"; }
+  };
+  $("add-form").onsubmit = async e => {
+    e.preventDefault(); clearErrors();
+    const body = {};
+    if (editing) {  // send only what changed; an emptied field is sent empty so it is cleared
+      FIELDS.forEach(([k]) => { if (k === "accession_no" || $("f-" + k).disabled) return; const v = $("f-" + k).value.trim(); if (v !== String(editing[k] ?? "")) body[k] = v; });
+      const reason = $("f-reason").value.trim();
+      if (!Object.keys(body).length) { say("add-notice", "warn", "Nothing was changed."); return; }
+      if (reason) body.reason = reason;
+      try {
+        const it = await api("/api/catalogue/items/" + editing.id, {method: "PATCH", json: body});
+        $("add-panel").classList.add("hidden"); editing = null;
+        await show(it.id, "Saved. The change is in the audit log.");
+      } catch (err) {
+        for (const p of err.problems) { const box = $("e-" + p.field); if (box) { box.textContent = p.message; $("f-" + p.field).classList.add("invalid"); } }
+        say("add-notice", "bad", err.message + (err.problems.length ? ":" : ""));
+        if (err.problems.length) $("add-notice").append(UI.problemList(err.problems.filter(p => !$("e-" + p.field))));
+      }
+      return;
+    }
+    FIELDS.forEach(([k]) => { const v = $("f-" + k).value.trim(); if (v) body[k] = v; });
+    try {
+      const it = await api("/api/catalogue/items", {json: body});
+      $("add-panel").classList.add("hidden");
+      $("q").value = it.accession_no; offset = 0; await show(it.id);
+    } catch (err) {
+      for (const p of err.problems) { const box = $("e-" + p.field); if (box) { box.textContent = p.message; $("f-" + p.field).classList.add("invalid"); } }
+      say("add-notice", "bad", err.message + (err.problems.length ? ":" : ""));
+      if (err.problems.length) $("add-notice").append(UI.problemList(err.problems.filter(p => !$("e-" + p.field))));
+    }
+  };
+  {% endif %}
+
+  const initial = new URLSearchParams(location.search).get("q");
+  if (initial) $("q").value = initial;
+  load();
+})();
+</script>
+{% endblock %}

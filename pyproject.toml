@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=84.2.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shelfsense"
+version = "0.1.0"
+description = "RFID add-on for libraries: tagging, circulation, inventory and a security gate beside an existing ILMS"
+license = "LicenseRef-ShelfSense"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn==0.54.0",
+  "SQLAlchemy==2.1.6",
+  "alembic==1.20.1",
+  "Jinja2==3.1.6",
+  "python-multipart==0.0.32",
+  "openpyxl==3.1.5",
+]
+
+[project.optional-dependencies]
+dev = ["cryptography==50.0.2", "pytest==9.1.1", "pytest-xdist==3.8.0", "httpx==0.28.1", "ruff==0.17.2", "mypy==2.4.0"]
+
+[project.scripts]
+shelfsense = "shelfsense.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+shelfsense = ["migrations/*.mako", "migrations/versions/*.py", "web/templates/*.html", "web/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "req(*ids): requirement IDs (FR/NFR/AC) this test provides evidence for",
+]
+
+[tool.mypy]
+files = ["src"]
+ignore_missing_imports = true  # alembic and a few others ship no type information
+warn_unused_ignores = true
+exclude = ["src/shelfsense/migrations/"]  # generated-style migration scripts
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "shelfsense.deps.require"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S608"]
+"src/shelfsense/devtools/*" = ["S311"]  # synthetic data, not cryptography

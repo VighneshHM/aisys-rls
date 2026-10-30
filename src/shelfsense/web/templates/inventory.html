@@ -1,0 +1,201 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Inventory · {{ app_name }}{% endblock %}
+{% block heading %}Inventory{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Read a shelf</h2>
+  <p>Choose a shelf location and sweep it with the handheld. Every tag gets a confirmation (a beep and a light), and the report lists what is missing, misplaced or unknown. You can sweep as often as you like; a tag read twice is counted once.</p>
+</div>
+
+<div class="grid two">
+  <div class="grid">
+    <section class="panel">
+      <header><h3>1 · Start a session</h3><span id="hh-badge" class="badge">…</span></header>
+      <div class="body">
+        <div class="field" style="margin-bottom:12px">
+          <label for="location">Shelf location</label>
+          <select id="location"></select>
+        </div>
+        <div class="actions" style="margin-top:0"><button class="btn" id="start-btn" type="button">Start a session</button></div>
+        <div id="start-notice" class="notice" role="alert"></div>
+        <h4 class="muted" style="margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em">Earlier sessions</h4>
+        <div id="sessions"></div>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="run-panel">
+      <header><h3>2 · Sweep</h3><span id="run-badge" class="badge"></span></header>
+      <div class="body">
+        <dl class="kv tight" style="margin:0 0 14px">
+          <dt>Session</dt><dd id="run-title"></dd>
+          <dt>Sweeps</dt><dd id="run-sweeps"></dd>
+        </dl>
+        <div class="actions" style="margin-top:0">
+          <button class="btn" id="scan-btn" type="button">Scan shelf</button>
+          <button class="btn ghost" id="close-btn" type="button">Close session</button>
+          <a class="btn ghost" id="csv-link" href="#" style="text-decoration:none">Download CSV</a>
+        </div>
+        <div id="scan-notice" class="notice" role="alert"></div>
+        <div id="last-sweep" style="margin-top:12px"></div>
+        {% if simulator %}
+        <details class="sim" style="margin-top:14px" open>
+          <summary>Simulator controls <span class="sub">· development only, no hardware attached</span></summary>
+          <p class="sub" style="margin:10px 0 8px">Builds a shelf from the catalogue for the handheld to read. Books left off the shelf will show as missing, strays as misplaced.</p>
+          <div class="toolbar" style="margin:0">
+            <div class="field grow" style="margin:0"><label for="sim-missing">Missing</label><input id="sim-missing" type="number" min="0" max="50" value="1"></div>
+            <div class="field grow" style="margin:0"><label for="sim-strays">Strays</label><input id="sim-strays" type="number" min="0" max="50" value="1"></div>
+            <div class="field grow" style="margin:0"><label for="sim-unknown">Unknown</label><input id="sim-unknown" type="number" min="0" max="50" value="1"></div>
+            <div class="field grow" style="margin:0"><label for="sim-dups">Duplicates</label><input id="sim-dups" type="number" min="0" max="50" value="2"></div>
+          </div>
+          <div class="actions">
+            <button class="btn ghost small" id="sim-load" type="button">Put this shelf in range</button>
+            <button class="btn ghost small" id="sim-power" type="button">Switch handheld off</button>
+          </div>
+          <div id="sim-note" class="sub" style="margin-top:8px"></div>
+        </details>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <div class="grid stats" id="tiles"></div>
+    <section class="panel hidden" id="report-panel">
+      <header><h3>Report</h3><span class="badge" id="report-badge"></span></header>
+      <div class="body" id="report"></div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, say, clear, when, fmt, short} = UI;
+  const SIM = {{ 'true' if simulator else 'false' }};
+  let sid = null, hhId = "handheld-1", hhOnline = true;
+  const SIGNAL = {ok: ["good", "1 beep · green"], warning: ["warn", "2 beeps · amber"], error: ["bad", "long beep · red"]};
+  const signal = s => h("span", {class: "badge " + (SIGNAL[s] || ["", ""])[0], title: "What the handheld did"}, (SIGNAL[s] || ["", s])[1]);
+
+  // ------------------------------------------------------------------ start
+  async function loadSetup() {
+    try {
+      const [locs, hhs] = await Promise.all([api("/api/inventory/locations"), api("/api/inventory/handhelds")]);
+      fill($("location"), locs.length ? locs.map(l => h("option", {value: l.location}, l.location + " · " + l.items + " items, " + l.tagged + " tagged" + (l.on_loan ? ", " + l.on_loan + " on loan" : "")))
+        : h("option", {value: ""}, "No locations yet: import or add items first"));
+      const d = hhs[0];
+      if (d) {
+        hhId = d.id; hhOnline = d.online;
+        $("hh-badge").className = "badge " + (d.online ? "good" : "bad");
+        $("hh-badge").textContent = d.id + (d.mock ? " (simulator) · " : " · ") + (d.online ? "online" : "offline");
+        if (SIM && $("sim-power")) $("sim-power").textContent = d.online ? "Switch handheld off" : "Switch handheld on";
+      } else { $("hh-badge").className = "badge bad"; $("hh-badge").textContent = "no handheld configured"; }
+    } catch (e) { say("start-notice", "bad", e.message); }
+  }
+
+  async function loadSessions() {
+    try {
+      const list = await api("/api/inventory/sessions");
+      fill($("sessions"), list.length ? h("table", {}, h("tbody", {}, list.map(s => h("tr", {class: "clickable", tabindex: "0", onclick: () => open(s.id), onkeydown: e => { if (e.key === "Enter") open(s.id); }},
+        h("td", {}, h("b", {}, "#" + s.id), " ", s.location),
+        h("td", {class: "time"}, when(s.started_at)),
+        h("td", {}, h("span", {class: "badge " + (s.status === "open" ? "warn" : "good")}, s.status === "open" ? "Open" : "Closed"))))))
+        : h("div", {class: "sub"}, "No sessions yet."));
+    } catch (e) { fill($("sessions"), h("div", {class: "sub"}, e.message)); }
+  }
+
+  async function startSession() {
+    clear("start-notice");
+    const location = $("location").value;
+    if (!location) { say("start-notice", "warn", "There is no shelf location yet. Import or add items with a location first."); return; }
+    try { const s = await api("/api/inventory/sessions", {json: {location, handheld_id: hhId}}); await open(s.id); loadSessions(); }
+    catch (e) { say("start-notice", "bad", e.message); }
+  }
+
+  // ------------------------------------------------------------------ session view
+  async function open(id) {
+    sid = id; clear("scan-notice"); fill($("last-sweep"));
+    await refresh();
+  }
+
+  function tiles(c) {
+    const spec = [["Expected", c.expected, ""], ["Found", c.found, "ok"], ["Missing", c.missing, c.missing ? "warn" : ""], ["Misplaced", c.misplaced, c.misplaced ? "warn" : ""], ["Unknown tags", c.unknown, c.unknown ? "warn" : ""]];
+    fill($("tiles"), spec.map(([label, n]) => h("div", {class: "stat"}, h("div", {}, h("div", {class: "num"}, fmt(n)), h("div", {class: "lbl"}, label)))));
+  }
+
+  function table(title, rows, cols, note) {
+    if (!rows.length) return null;
+    return h("div", {style: "margin-bottom:18px"},
+      h("h4", {style: "margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"}, title + " (" + rows.length + ")"),
+      note ? h("p", {class: "sub", style: "margin:0 0 8px"}, note) : null,
+      h("div", {class: "table-wrap"}, h("table", {}, h("thead", {}, h("tr", {}, cols.map(c => h("th", {}, c[0])))),
+        h("tbody", {}, rows.map(r => h("tr", {}, cols.map(c => h("td", c[2] ? {class: c[2]} : {}, c[1](r)))))))));
+  }
+  const item = r => r.accession_no ? [h("b", {}, r.accession_no), h("div", {class: "sub"}, r.title || "")] : h("span", {class: "sub"}, "no item");
+  const tagcell = r => short(r.tag_uid);
+
+  async function refresh() {
+    let r;
+    try { r = await api("/api/inventory/sessions/" + sid); } catch (e) { say("scan-notice", "bad", e.message); return; }
+    const s = r.session, open = s.status === "open";
+    $("run-panel").classList.remove("hidden"); $("report-panel").classList.remove("hidden");
+    $("run-badge").className = "badge " + (open ? "warn" : "good"); $("run-badge").textContent = open ? "Open" : "Closed";
+    $("run-title").textContent = "#" + s.id + " · " + s.location;
+    $("run-sweeps").textContent = fmt(s.sweeps) + (s.closed_at ? " · closed " + when(s.closed_at) + " by " + s.closed_by : "");
+    $("scan-btn").disabled = !open; $("close-btn").disabled = !open;
+    $("csv-link").href = "/api/inventory/sessions/" + sid + "/export.csv";
+    tiles(r.counts);
+    const c = r.counts;
+    $("report-badge").textContent = open ? "live" : "final";
+    fill($("report"),
+      s.sweeps ? null : h("div", {class: "empty"}, "Nothing scanned yet. Scan the shelf to see the report."),
+      table("Missing", r.missing, [["Item", item], ["Call no.", x => x.call_number || "—"], ["Tag", tagcell, "mono"]], "Should be on this shelf but was not read."),
+      table("Misplaced", r.misplaced, [["Item", item], ["Belongs in", x => x.home_location || "—"], ["Signal", x => signal(x.signal)]], "Seen here, but belongs in another location."),
+      table("Unknown tags", r.unknown, [["Tag", tagcell, "mono"], ["Why", x => x.note], ["Signal", x => signal(x.signal)]]),
+      table("On loan but on the shelf", r.shelved_on_loan, [["Item", item], ["Note", x => x.note], ["Signal", x => signal(x.signal)]]),
+      r.shelf_order && s.sweeps ? (r.shelf_order.in_order
+        ? (r.shelf_order.checked ? h("p", {class: "sub", style: "margin:0 0 14px"}, "The " + r.shelf_order.checked + " books read are in call-number order.") : null)
+        : table("Out of call-number order", r.shelf_order.out_of_order, [["Item", item], ["Call no.", x => x.call_number || "—"]],
+            "Move these so the shelf is in order. The books left out of this list already form a correct run.")) : null,
+      table("Found", r.found, [["Item", item], ["Reads", x => x.reads], ["Signal", x => signal(x.signal)]]),
+      s.sweeps ? h("p", {class: "sub", style: "margin:0"}, fmt(c.reads) + " reads of " + fmt(c.distinct_tags) + " different tags" +
+        (c.untagged ? " · " + c.untagged + " untagged item(s) on this shelf cannot be read" : "") + (c.on_loan ? " · " + c.on_loan + " on loan, not expected" : "")) : null);
+  }
+
+  async function doScan() {
+    clear("scan-notice");
+    try {
+      const r = await api("/api/inventory/sessions/" + sid + "/scan", {method: "POST"});
+      const s = r.signals;
+      fill($("last-sweep"), h("div", {class: "notice show ok", style: "margin:0"},
+        "Sweep " + r.sweep + ": " + r.reads + " reads, " + r.distinct + " different tags" + (r.duplicate_reads ? " (" + r.duplicate_reads + " duplicate reads ignored)" : "") + ". ",
+        r.new.length ? "Confirmations: " : "Nothing new this sweep.",
+        ["ok", "warning", "error"].filter(k => s[k]).map(k => h("span", {style: "margin-left:6px"}, signal(k), " ×" + s[k]))));
+      await refresh(); loadSessions();
+    } catch (e) { say("scan-notice", e.status === 503 ? "warn" : "bad", e.message + (e.status === 503 ? ". Switch it on and scan again." : "")); }
+  }
+
+  async function doClose() {
+    try { await api("/api/inventory/sessions/" + sid + "/close", {method: "POST"}); await refresh(); loadSessions(); }
+    catch (e) { say("scan-notice", "bad", e.message); }
+  }
+
+  $("start-btn").onclick = startSession;
+  $("scan-btn").onclick = doScan;
+  $("close-btn").onclick = doClose;
+  if (SIM) {
+    $("sim-load").onclick = async () => {
+      const n = id => +$(id).value || 0;
+      try {
+        const r = await api("/api/inventory/mock/handhelds/" + hhId + "/load-shelf", {json: {session_id: sid, missing: n("sim-missing"), strays: n("sim-strays"), unknown: n("sim-unknown"), duplicates: n("sim-dups")}});
+        $("sim-note").textContent = r.in_range + " tags in range. Left off the shelf: " + (r.left_off_the_shelf.join(", ") || "none") +
+          ". Strays: " + (r.strays.map(x => x.accession_no + " (belongs in " + x.belongs_in + ")").join(", ") || "none") + ". Unknown tags: " + r.unknown_tags + ". Now click Scan shelf.";
+      } catch (e) { $("sim-note").textContent = e.message; }
+    };
+    $("sim-power").onclick = async () => { await api("/api/inventory/mock/handhelds/" + hhId + "/power?online=" + !hhOnline, {method: "POST"}); await loadSetup(); };
+  }
+  fill($("tiles"));
+  loadSetup(); loadSessions();
+})();
+</script>
+{% endblock %}

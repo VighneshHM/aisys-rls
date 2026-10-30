@@ -1,0 +1,108 @@
+{% extends "app.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Tag registry · {{ app_name }}{% endblock %}
+{% block heading %}Tag registry{% endblock %}
+{% block content %}
+<div class="hello">
+  <h2>Every RFID tag, and what state it is in</h2>
+  <p><b>In use</b> tags are on an item. <b>Removed</b> tags were taken off an item and can be used again. <b>Retired</b> tags are out of service for good.</p>
+</div>
+
+<div class="grid stats" id="tiles"></div>
+
+<section class="panel">
+  <header><h3>Tags</h3><span class="badge" id="count-badge"></span></header>
+  <div class="body" style="padding-bottom:4px">
+    <div class="toolbar">
+      <div class="grow"><input id="q" type="search" placeholder="Search a tag UID, or an item's accession no. or title (including items it was on before)…" autocomplete="off" aria-label="Search tags"></div>
+      <select id="state" aria-label="State">
+        <option value="">All states</option><option value="active">In use</option><option value="removed">Removed (reusable)</option><option value="retired">Retired</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap" id="results"></div>
+  <div class="pager" id="pager"></div>
+</section>
+
+<section class="panel hidden" id="detail" style="margin-top:18px">
+  <header><h3 class="mono" id="detail-title"></h3><span id="detail-state"></span></header>
+  <div class="body" id="detail-body"></div>
+</section>
+
+<script src="/static/ui.js?v={{ asset_v }}"></script>
+<script>
+(() => {
+  const {$, h, fill, api, fmt, when, short, stateBadge} = UI;
+  const CAN_TAG = {{ 'true' if can_tag else 'false' }}, LIMIT = 15;
+  let offset = 0, selected = null, timer = null;
+  const EVENT = {read: "Read on a reader", tagged: "Linked to an item", retagged: "Linked (replacing another tag)", removed: "Removed from an item", retired: "Retired", encode_failed: "Write failed"};
+
+  function tiles(counts) {
+    const total = counts.active + counts.removed + counts.retired;
+    const spec = [["", "All tags", total], ["active", "In use", counts.active], ["removed", "Removed · reusable", counts.removed], ["retired", "Retired", counts.retired]];
+    fill($("tiles"), spec.map(([value, label, n]) => h("button", {type: "button", class: "stat stat-btn" + ($("state").value === value ? " on" : ""),
+        onclick: () => { $("state").value = value; offset = 0; load(); }},
+      h("div", {}, h("div", {class: "num"}, fmt(n)), h("div", {class: "lbl"}, label)))));
+  }
+
+  async function load() {
+    const params = new URLSearchParams({q: $("q").value.trim(), limit: LIMIT, offset});
+    if ($("state").value) params.set("state", $("state").value);
+    let data;
+    try { data = await api("/api/rfid/tags?" + params); } catch (e) { fill($("results"), h("div", {class: "empty"}, e.message)); return; }
+    tiles(data.counts);
+    $("count-badge").textContent = fmt(data.total) + " tag" + (data.total === 1 ? "" : "s");
+    fill($("results"), data.tags.length ? h("table", {},
+      h("thead", {}, h("tr", {}, ["Tag UID", "State", "Item (latest)", "Links", "Last change", "Reason"].map(t => h("th", {}, t)))),
+      h("tbody", {}, data.tags.map(t => h("tr", {class: "clickable" + (t.uid === selected ? " selected" : ""), tabindex: "0", onclick: () => show(t.uid), onkeydown: e => { if (e.key === "Enter") show(t.uid); }},
+        h("td", {class: "mono", title: t.uid}, short(t.uid)),
+        h("td", {}, stateBadge(t.state)),
+        h("td", {}, h("b", {}, t.item.accession_no), h("div", {class: "sub"}, t.item.title)),
+        h("td", {}, t.links > 1 ? "×" + t.links : "1"),
+        h("td", {class: "time"}, when(t.ended_at || t.tagged_at)),
+        h("td", {class: "sub"}, t.end_reason || "—")))))
+      : h("div", {class: "empty"}, "No tags match."));
+    const to = offset + data.tags.length;
+    fill($("pager"), h("span", {class: "muted"}, fmt(data.total ? offset + 1 : 0) + "–" + fmt(to) + " of " + fmt(data.total)),
+      h("button", {class: "btn ghost small", type: "button", disabled: offset === 0 ? "" : false, onclick: () => { offset = Math.max(0, offset - LIMIT); load(); }}, "Previous"),
+      h("button", {class: "btn ghost small", type: "button", disabled: to >= data.total ? "" : false, onclick: () => { offset += LIMIT; load(); }}, "Next"));
+  }
+  $("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { offset = 0; load(); }, 250); });
+  $("state").addEventListener("change", () => { offset = 0; load(); });
+
+  async function show(uid, flash, kind) {
+    selected = uid;
+    let d;
+    try { d = await api("/api/rfid/tags/" + encodeURIComponent(uid)); } catch (e) { return; }
+    $("detail").classList.remove("hidden");
+    $("detail-title").textContent = uid;
+    fill($("detail-state"), stateBadge(d.state));
+    const slot = h("div", {});
+    const ask = modes => {
+      if (slot.firstChild) { slot.replaceChildren(); return; }
+      slot.append(UI.endTagPanel({uid, itemText: d.associations[d.associations.length - 1].item.accession_no + " · " + d.associations[d.associations.length - 1].item.title, modes,
+        onDone: async r => { await show(uid, "Tag " + r.state + ". " + r.device.message, r.device.status === "cleared" || r.device.status === "not_linked" ? "ok" : "warn"); load(); },
+        onCancel: () => slot.replaceChildren()}));
+    };
+    const mute = {style: "margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)"};
+    fill($("detail-body"),
+      flash ? h("div", {class: "notice show " + (kind || "ok"), style: "margin:0 0 14px"}, flash) : null,
+      d.state === "retired" ? h("p", {class: "muted", style: "margin:0"}, "This tag is out of service and can never be linked to an item again.") : null,
+      d.state === "removed" ? h("p", {class: "muted", style: "margin:0"}, "This tag is not on an item. Use “Reuse on another item” to link it again, or retire it if it is damaged.") : null,
+      h("h4", mute, "Where this tag has been"),
+      h("ul", {class: "timeline"}, d.associations.slice().reverse().map(a => h("li", {}, h("time", {}, when(a.tagged_at)),
+        h("span", {}, h("b", {}, a.item.accession_no), " · " + a.item.title + " — ", a.status === "active" ? "on it now" : a.status + (a.end_reason ? " (" + a.end_reason + ")" : ""))))),
+      h("h4", mute, "Recent activity"),
+      h("ul", {class: "timeline"}, d.history.slice(0, 10).map(e => h("li", {}, h("time", {}, when(e.ts)), h("span", {}, (EVENT[e.type] || e.type) + (e.actor ? " · " + e.actor : ""))))),
+      CAN_TAG && d.state === "active" ? h("div", {class: "actions"}, h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => ask(["remove", "retire"])}, "Remove or retire tag")) : null,
+      CAN_TAG && d.state === "removed" ? h("div", {class: "actions"},
+        h("a", {class: "btn small", href: "/tagging?tag=" + encodeURIComponent(uid), style: "text-decoration:none"}, "Reuse on another item"),
+        h("button", {class: "btn ghost small danger-text", type: "button", onclick: () => ask(["retire"])}, "Retire tag")) : null,
+      slot);
+    $("detail").scrollIntoView({behavior: "smooth", block: "nearest"});
+  }
+
+  load();
+})();
+</script>
+{% endblock %}
